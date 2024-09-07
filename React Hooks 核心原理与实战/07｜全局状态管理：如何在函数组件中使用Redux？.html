@@ -1,0 +1,580 @@
+<audio title="07｜全局状态管理：如何在函数组件中使用Redux？" src="https://static001.geekbang.org/resource/audio/b9/40/b91b77776720f3d43f2b538014883140.mp3" controls="controls"></audio> 
+<p>你好，我是王沛。今天我们来聊聊怎么在函数组件中使用Redux。</p><p>Redux 作为一款状态管理框架啊，是公认的React 开发中最大的一个门槛，但同时呢，它也是 React 开发人员必须掌握的一项技能。因为只有熟练应用 Redux，你才能更加灵活地使用 React，来从容应对大型项目的开发难题。</p><p>这里我要说句题外话。Redux诞生于 2015 年，也就是React 出现之后一年多。虽然一开始是由第三方开发者开源，不是 Facebook 官方，但是也迅速成为了最为主流的 React 状态管理库。而且，之后 Redux 跟它的开发者 Dan Abbramov 和 Andrew Clark 一起，都被 Facebook 收编，成为 React 官方生态的一部分。侧面可以看到 Redux 在React 中的重要作用。</p><p>需要说明的是，Redux 作为一套独立的框架，虽然可以和任何 UI 框架结合起来使用。但是因为它基于不可变数据的机制，可以说，基本上就是为 React 量身定制的。</p><p>不过你可能会说，Redux 上手比较难，该怎么办呢？的确是这样，因Redux引入了一些新的编程思想，还有比较繁琐的样板代码，确实带来了一定的上手难度。</p><p>但是你不要担心，今天这节课，我会通过具体的例子带你上手Redux。而且我会讲解 Redux 要解决什么问题，引入了什么样的新概念，争取能从本质上去理解 Redux 的理念和使用方法，提高你举一反三的能力。</p><!-- [[[read_end]]] --><h1>Redux 出现的背景</h1><p>很多同学一开始可能不太明白状态管理框架的作用。但是如果随着对 React 使用的深入，你会发现组件级别的 state，和从上而下传递的 props 这两个状态机制，无法满足复杂功能的需要。例如跨层级之间的组件的数据共享和传递。我们可以从下图的对比去理解：</p><p><img src="https://static001.geekbang.org/resource/image/f3/46/f3ba61ff5de2c3c6fbd658a22c00bf46.png?wh=2640*1100" alt=""></p><p>其中左图是单个 React 组件，它的状态可以用内部的 state 来维护，而且这个 state 在组件外部是无法访问的。而右图则是使用 Redux 的场景，用全局唯一的 Store 维护了整个应用程序的状态。可以说，对于页面的多个组件，都是从这个 Store 来获取状态的，保证组件之间能够共享状态。</p><p>所以从这张对比图，我们可以看到 Redux Store 的两个特点：</p><ol>
+<li><strong>Redux Store 是全局唯一的</strong>。即整个应用程序一般只有一个 Store。</li>
+<li><strong>Redux Store 是树状结构</strong>，可以更天然地映射到组件树的结构，虽然不是必须的。</li>
+</ol><p>我们通过把状态放在组件之外，就可以让 React 组件成为更加纯粹的表现层，那么很多对于业务数据和状态数据的管理，就都可以在组件之外去完成（后面课程会介绍的 Reducer 和 Action）。同时这也天然提供了状态共享的能力，有两个场景可以典型地体现出这一点。</p><ol>
+<li>跨组件的状态共享：当某个组件发起一个请求时，将某个 Loading 的数据状态设为 True，另一个全局状态组件则显示 Loading 的状态。</li>
+<li>同组件多个实例的状态共享：某个页面组件初次加载时，会发送请求拿回了一个数据，切换到另外一个页面后又返回。这时数据已经存在，无需重新加载。设想如果是本地的组件 state，那么组件销毁后重新创建，state 也会被重置，就还需要重新获取数据。</li>
+</ol><p>因此，学会 Redux ，才能真正用 React 去灵活解决问题。下面我们就来了解下 Redux 中的一些基本概念。</p><h1>理解 Redux 的三个基本概念</h1><p>Redux 引入的概念其实并不多，主要就是三个：State、Action 和 Reducer。</p><ul>
+<li>其中 State 即 Store，一般就是一个纯 JavaScript Object。</li>
+<li>Action 也是一个 Object，用于描述发生的动作。</li>
+<li>而 Reducer 则是一个函数，接收 Action 和 State 并作为参数，通过计算得到新的 Store。</li>
+</ul><p>它们三者之间的关系可以用下图来表示：<br>
+<img src="https://static001.geekbang.org/resource/image/91/2c/9193e33b6d1715b845e1ed01cc348d2c.png?wh=932*354" alt=""></p><p>在 Redux 中，所有对于 Store 的修改都必须通过这样一个公式去完成，即通过 Reducer 完成，而不是直接修改 Store。这样的话，一方面可以保证数据的不可变性（Immutable），同时也能带来两个非常大的好处。</p><ol>
+<li>可预测性（Predictable）：即给定一个初始状态和一系列的 Action，一定能得到一致的结果，同时这也让代码更容易测试。</li>
+<li>易于调试：可以跟踪 Store 中数据的变化，甚至暂停和回放。因为每次 Action 产生的变化都会产生新的对象，而我们可以缓存这些对象用于调试。Redux 的基于浏览器插件的开发工具就是基于这个机制，非常有利于调试。</li>
+</ol><p>这么抽象的解释，你可能不好理解，别着急，我给你举个例子，来帮助你理解这几个概念。这个例子是开发一个计数器的逻辑。比如说要实现“加一”和“减一”这两个功能，对于 Redux 来说，我们需要如下代码：</p><pre><code>import { createStore } from 'redux'
+
+// 定义 Store 的初始值
+const initialState = { value: 0 }
+
+// Reducer，处理 Action 返回新的 State
+function counterReducer(state = initialState, action) {
+  switch (action.type) {
+    case 'counter/incremented':
+      return { value: state.value + 1 }
+    case 'counter/decremented':
+      return { value: state.value - 1 }
+    default:
+      return state
+  }
+}
+
+// 利用 Redux API 创建一个 Store，参数就是 Reducer
+const store = createStore(counterReducer)
+
+// Store 提供了 subscribe 用于监听数据变化
+store.subscribe(() =&gt; console.log(store.getState()))
+
+// 计数器加 1，用 Store 的 dispatch 方法分发一个 Action，由 Reducer 处理
+const incrementAction = { type: 'counter/incremented' };
+store.dispatch(incrementAction);
+// 监听函数输出：{value: 1}
+
+// 计数器减 1
+const decrementAction = { type: 'counter/decremented' };
+store.dispatch(decrementAction)
+// 监听函数输出：{value: 0}
+</code></pre><p>通过这段代码，我们就用三个步骤完成了一个完整的 Redux 的逻辑：</p><ol>
+<li>先创建 Store；</li>
+<li>再利用 Action 和 Reducer 修改 Store；</li>
+<li>最后利用 subscribe 监听 Store 的变化。</li>
+</ol><p>需要注意的是，在 Reducer 中，我们每次都必须返回一个新的对象，确保不可变数据（Immutable）的原则。一般来说，我们可以用延展操作符（Spread Operator）来简单地实现不可变数据的操作，例如：</p><pre><code>return {
+  ...state, // 复制原有的数据结构
+  value: state.value + 1, // 变化 value 值使其 + 1
+}
+</code></pre><p>这在大多数场景下已经足够使用。当然对于复杂的数据结构，也有一些第三方的库可以帮助操作不可变数据，比如 Immutable、Immer 等等。</p><p>通过这个例子，我们看到了纯 Redux 使用的场景，从而更加清楚地看到了 Store、Action 和 Reducer 这三个基本概念，也就能理解 State + Action =&gt; New State 这样一个简单却核心的机制。</p><h1>如何在 React 中使用 Redux</h1><p>在刚才的讲解和具体例子中，我们并没有把 Redux 和 React 建立联系，这主要是为了帮助你先理解概念。要知道，在实际场景中，Redux Store 中的状态最终一定是会体现在 UI 上的，即通过 React 组件展示给用户。那么如何建立Redux 和 React 的联系呢？</p><p>主要是两点：</p><ol>
+<li>React 组件能够在依赖的 Store 的数据发生变化时，重新 Render；</li>
+<li>在 React 组件中，能够在某些时机去 dispatch 一个 action，从而触发 Store 的更新。</li>
+</ol><p>要实现这两点，我们需要引入 Facebook 提供的 <code>react-redux</code> 这样一个工具库，工具库的作用就是建立一个桥梁，让 React 和 Redux 实现互通。</p><p>在 <code>react-redux</code> 的实现中，为了确保需要绑定的组件能够访问到全局唯一的 Redux Store，利用了 React 的 Context 机制去存放 Store 的信息。通常我们会将这个 Context 作为整个 React 应用程序的根节点。因此，作为 Redux 的配置的一部分，我们通常需要如下的代码：</p><pre><code>import React from 'react'
+import ReactDOM from 'react-dom'
+
+import { Provider } from 'react-redux'
+import store from './store'
+
+import App from './App'
+
+const rootElement = document.getElementById('root')
+ReactDOM.render(
+  &lt;Provider store={store}&gt;
+    &lt;App /&gt;
+  &lt;/Provider&gt;,
+  rootElement
+)
+</code></pre><p>这里使用了 Provider 这样一个组件来作为整个应用程序的根节点，并将 Store 作为属性传给了这个组件，这样所有下层的组件就都能够使用 Redux 了。</p><p>完成了这样的配置之后，在函数组件中使用 Redux 就非常简单了：利用 react-redux 提供的 useSelector 和 useDispatch 这两个 Hooks。</p><p>在第二讲我们已经提到，Hooks 的本质就是提供了让 React 组件能够绑定到某个可变的数据源的能力。在这里，当 Hooks 用到 Redux 时可变的对象就是 Store，而 useSelector 则让一个组件能够在 Store 的某些数据发生变化时重新 render。</p><p>我在这里仍然以官方给的计数器例子为例，来给你讲解如何在 React 中使用 Redux：</p><pre><code>import React from 'react'
+import { useSelector, useDispatch } from 'react-redux'
+
+export function Counter() {
+  // 从 state 中获取当前的计数值
+  const count = useSelector(state =&gt; state.value)
+
+  // 获得当前 store 的 dispatch 方法
+  const dispatch = useDispatch()
+
+  // 在按钮的 click 时间中去分发 action 来修改 store
+  return (
+    &lt;div&gt;
+      &lt;button
+        onClick={() =&gt; dispatch({ type: 'counter/incremented' })}
+      &gt;+&lt;/button&gt;
+      &lt;span&gt;{count}&lt;/span&gt;
+      &lt;button
+        onClick={() =&gt; dispatch({ type: 'counter/decremented' })}
+      &gt;-&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre><p>此外，通过计数器这个例子，我们还可以看到 React 和 Redux 共同使用时的单向数据流：</p><p><img src="https://static001.geekbang.org/resource/image/b6/e0/b6991fd03d27ee987b1cd29ae16552e0.png?wh=752*412" alt=""></p><p>需要强调的是，在实际的使用中，我们无需关心 View 是如何绑定到 Store 的某一部分数据的，因为React-Redux 帮我们做了这件事情。总结来说，通过这样一种简单的机制，Redux 统一了更新数据状态的方式，让整个应用程序更加容易开发、维护、调试和测试。</p><h1>使用 Redux 处理异步逻辑</h1><p>学完了如何在React 中使用Redux，接下来我们就进入到Redux的进阶场景中。</p><p>在 Redux 中，处理异步逻辑也常常被称为<strong>异步 Action</strong>，它几乎是 React 面试中必问的一道题，可以认为这是 Redux 使用的进阶场景。</p><p>虽然 Redux 的官方文档中已经将异步逻辑的原理写得很清楚，但是大部分同学仍然只能说个大概，或者蹦出 Thunk、Saga 之类的几个单词。造成这种现象的很大一部分原因可能在于，仅满足于根据参考示例写出可运行的代码，而没有深究背后的原理。</p><p>但是要明白一点，只有能够解释清楚异步 Action，才算是真正理解了 Redux，才能在实际开发中灵活应用。</p><p>在 Redux 的 Store 中，我们不仅维护着业务数据，同时维护着应用程序的状态。比如对于发送请求获取数据这样一个异步的场景，我们来看看涉及到 Store 数据会有哪些变化：</p><ol>
+<li>请求发送出去时：设置 state.pending = true，用于 UI 显示加载中的状态；</li>
+<li>请求发送成功时：设置 state.pending = false, state.data = result。即取消 UI 的加载状态，同时将获取的数据放到 store 中用于 UI 的显示。</li>
+<li>请求发送失败时：设置 state.pending = false, state.error = error。即取消 UI 的加载状态，同时设置错误的状态，用于 UI 显示错误的内容。</li>
+</ol><p>前面提到，任何对 Store 的修改都是由 action 完成的。那么对于一个异步请求，上面的三次数据修改显然必须要三个 action 才能完成。那么假设我们在 React 组件中去做这个发起请求的动作，代码逻辑应该类似如下：</p><pre><code>function DataList() {
+  const dispatch = useDispatch();
+  // 在组件初次加载时发起请求
+  useEffect(() =&gt; {
+    // 请求发送时
+    dispatch({ type: 'FETCH_DATA_BEGIN' });
+    fetch('/some-url').then(res =&gt; {
+      // 请求成功时
+      dispatch({ type: 'FETCH_DATA_SUCCESS', data: res });
+    }).catch(err =&gt; {
+      // 请求失败时
+      dispatch({ type: 'FETCH_DATA_FAILURE', error: err });
+    })
+  }, []);
+  
+  // 绑定到 state 的变化
+  const data = useSelector(state =&gt; state.data);
+  const pending = useSelector(state =&gt; state.pending);
+  const error = useSelector(state =&gt; state.error);
+  
+  // 根据 state 显示不同的状态
+  if (error) return 'Error.';
+  if (pending) return 'Loading...';
+  return &lt;Table data={data} /&gt;;
+}
+</code></pre><p>从这段代码可以看到，我们使用了三个（同步）Action完成了这个异步请求的场景。这里我们将 Store 完全作为一个存放数据的地方，至于数据哪里来， Redux 并不关心。尽管这样做是可行的。</p><p>但是很显然，发送请求获取数据并进行错误处理这个逻辑是不可重用的。假设我们希望在另外一个组件中也能发送同样的请求，就不得不将这段代码重新实现一遍。因此，Redux 中提供了 middleware 这样一个机制，让我们可以巧妙地实现所谓异步 Action 的概念。</p><p>简单来说，middleware 可以让你提供一个拦截器在 reducer 处理 action 之前被调用。在这个拦截器中，你可以自由处理获得的 action。无论是把这个 action 直接传递到 reducer，或者构建新的 action 发送到 reducer，都是可以的。</p><p>从下面这张图可以看到，Middleware 正是在 Action 真正到达 Reducer 之前提供的一个额外处理 Action 的机会：</p><p><img src="https://static001.geekbang.org/resource/image/b4/3a/b438a3e944c5f15911637868e78cd13a.png?wh=1042*210" alt=""></p><p>我们刚才也提到了，Redux 中的 Action 不仅仅可以是一个 Object，它可以是任何东西，也可以是一个函数。利用这个机制，Redux 提供了 <code>redux-thunk</code> 这样一个中间件，它如果发现接受到的 action 是一个函数，那么就不会传递给 Reducer，而是执行这个函数，并把 dispatch 作为参数传给这个函数，从而在这个函数中你可以自由决定何时，如何发送 Action。</p><p>例如对于上面的场景，假设我们在创建 Redux Store 时指定了 redux-thunk 这个中间件：</p><pre><code>import { createStore, applyMiddleware } from 'redux'
+import thunkMiddleware from 'redux-thunk'
+import rootReducer from './reducer'
+
+const composedEnhancer = applyMiddleware(thunkMiddleware)
+const store = createStore(rootReducer, composedEnhancer)
+</code></pre><p>那么在我们dispatch action 时就可以 dispatch 一个函数用于来发送请求，通常，我们会写成如下的结构：</p><pre><code>function fetchData() {
+  return dispatch =&gt; {
+    dispatch({ type: 'FETCH_DATA_BEGIN' });
+    fetch('/some-url').then(res =&gt; {
+      dispatch({ type: 'FETCH_DATA_SUCCESS', data: res });
+    }).catch(err =&gt; {
+      dispatch({ type: 'FETCH_DATA_FAILURE', error: err });
+    })
+  }
+}
+</code></pre><p>那么在我们dispatch action 时就可以 dispatch 一个函数用于来发送请求，通常，我们会写成如下的结构：</p><pre><code>import fetchData from './fetchData';
+
+function DataList() {
+  const dispatch = useDispatch();
+  // dispatch 了一个函数由 redux-thunk 中间件去执行
+  dispatch(fetchData());
+}
+</code></pre><p>可以看到，通过这种方式，我们就实现了异步请求逻辑的重用。那么这一套结合 <code>redux-thunk</code> 中间件的机制，我们就称之为异步 Action。</p><p>所以说异步 Action 并不是一个具体的概念，而可以把它看作是 Redux 的一个使用模式。它通过组合使用同步 Action ，在没有引入新概念的同时，用一致的方式提供了处理异步逻辑的方案。</p><h1>小结</h1><p>尽管 Redux 有令人诟病的地方，例如函数式的概念比较难以理解，样板代码过多等问题。但其带来的好处也是很明显的，比如可以让代码更容易理解，维护和测试。因此有超过60%的 React 应用都使用了 Redux。</p><p>所以即使对于一些小型的应用，不一定需要使用 Redux。但是对于开发人员来说，学会和理解 Redux 仍然是一项必须掌握的既能。</p><h1>思考题</h1><p>只考虑 Redux 部分，对于计数器应用，目前每次是固定加减1，如果要能够在每次调用时增加或减少指定的变量值，应该如何实现？</p><p>欢迎把你的思考和想法分享在留言区，我会和你交流讨论。也欢迎你把课程分享给你的朋友和同事，我们共同进步！</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/f2/4f/59bd4141.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Isaac</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，redux 如何和自定义 hooks 很好的结合起来？<br>比如常见的获取一个列表，我封装成一个 useList 的自定义 hook，那么就可以在多个组件中使用 useList。但是每次 useList() 的时候，都会触发接口调用，获取到的数据源组件之间无法共享。<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 给你看一个实际的例子，你可能就可以理解了。关键在于，useEffect 中判断是否要去获取数据。这个判断条件可能因场景而异，比如下面的代码，只在 admins 不存在，并且没有 error 不在 pending 的情况下，才调用接口。<br><br>export function useFetchAdmins() {<br>  const dispatch = useDispatch();<br><br>  const { admins, fetchAdminsPending, fetchAdminsError } = useSelector(<br>    state =&gt; ({<br>      admins: state.pluginPluginManager.home.admins,<br>      fetchAdminsPending: state.pluginPluginManager.home.fetchAdminsPending,<br>      fetchAdminsError: state.pluginPluginManager.home.fetchAdminsError,<br>    }),<br>    shallowEqual,<br>  );<br><br>  const boundAction = useCallback(<br>    (...args) =&gt; {<br>      return dispatch(fetchAdmins(...args));<br>    },<br>    [dispatch],<br>  );<br><br>  useEffect(() =&gt; {<br>    if (!admins &amp;&amp; !fetchAdminsPending &amp;&amp; !fetchAdminsError) boundAction();<br>  }, [admins, fetchAdminsPending, fetchAdminsError, boundAction]);<br><br>  return {<br>    admins,<br>    fetchAdmins: boundAction,<br>    fetchAdminsPending,<br>    fetchAdminsError,<br>  };<br>}</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-09 16:17:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/51/4d/0aceadde.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>腾挪</span>
+  </div>
+  <div class="_2_QraFYR_0">给极客时间网页版提一个建议，强烈建议网页版也能像手机端一样，对写得好的文章进行点赞👍。本文写得通俗易懂，说明王老师水平很高，值得赞。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-08 14:00:24</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1f/11/b1/4379e143.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>H</span>
+  </div>
+  <div class="_2_QraFYR_0">请问老师在这个专栏更新完之后还有没有其他的计划》<br>学习老师的每一篇文章以及视频都有醍醐灌顶，任脉打通的感觉。<br>很期待老师接着出一个关于解读react源码的课程，很期待，很期待。<br>不知道老师除了react的专栏和视屏还有没有其它的课程，很想很想跟着去学习学习。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 谢谢支持，过奖了~~ 目前先把这次课程完结了哦，暂时没有后续计划</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-20 13:28:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/4a/97/414d0e39.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>kotumato</span>
+  </div>
+  <div class="_2_QraFYR_0">function counterReducer(state = initialState, action) {<br>    switch (action.type) {<br>        case &#39;counter&#47;incremented&#39;: return {value: state.value + action.payload}<br>        case &#39;counter&#47;decremented&#39;: return {value: state.value - action.payload}<br>        default: return state<br>    }<br>}<br>const incrementAction = { type: &#39;counter&#47;incremented&#39;, payload: 10 };<br>store.dispatch(incrementAction); &#47;&#47; 计数器加 10<br>const decrementAction = { type: &#39;counter&#47;decremented&#39;,  payload: 10 };<br>store.dispatch(decrementAction); &#47;&#47; 计数器减 10</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-08 22:52:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/5d/22/6e78881e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Aaron</span>
+  </div>
+  <div class="_2_QraFYR_0">可以通过在action添加其他字段，如payload来传递需要加减的数值</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-08 09:23:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/b8/2c/0f7baf3a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Change</span>
+  </div>
+  <div class="_2_QraFYR_0">老师问个问题，redux toolkit和redux有啥区别，在项目用哪个更方便一些</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-18 14:54:24</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/bd/ec/cc7abf0b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>L</span>
+  </div>
+  <div class="_2_QraFYR_0">总感觉redux这套已经过时了。样板代码之类的实在是太多太繁琐了。同样是这种统一管理数据的方式，vuex就比他好很多。感觉现在很多玩的都是约定式</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-12 11:49:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/28/3b/43/dedbfc4c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Redmi_18117543951</span>
+  </div>
+  <div class="_2_QraFYR_0">终于知道啥是异步Action了，之前被名字吓住，学过才发现原来实际上很简单呀</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的，很多其实挺简单的东西，需要很长的文档来说明场景和用法，造成了看上去很复杂的现象。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-20 16:20:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/28/66/d5/f36495bd.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>81</span>
+  </div>
+  <div class="_2_QraFYR_0">异步操作需要传递数据的时候，可以这样操作嘛？dispath((dispatch,playload)=&gt;{fetch(&quot;&#47;some-url&quot;，{playload}).then(dispatth({type:&quot;&#47;update&#47;msg&quot;,playload}))})；。 是在dipatch派发的函数中的第二个参数位置传数据  第一个参数位置 写dispatch？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-18 14:41:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/20/fc/0f/df9edecd.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小灰</span>
+  </div>
+  <div class="_2_QraFYR_0"><br>import { createStore } from &#39;redux&#39;<br><br>&#47;&#47; 定义 Store 的初始值<br>const initialState = { value: 0 }<br><br>&#47;&#47; Reducer，处理 Action 返回新的 State<br>function counterReducer(state = initialState, action) {<br>  switch (action.type) {<br>    case &#39;counter&#47;incremented&#39;:<br>      return { value: state.value + 1 }<br>    case &#39;counter&#47;decremented&#39;:<br>      return { value: state.value - 1 }<br>    case &#39;counter&#47;add&#39;: <br>      return {<br>          ...state,<br>          value: stat.value + action.data<br>      }<br>    default:<br>      return state<br>  }<br>}<br><br>&#47;&#47; 利用 Redux API 创建一个 Store，参数就是 Reducer<br>const store = createStore(counterReducer)<br><br>&#47;&#47; Store 提供了 subscribe 用于监听数据变化<br>store.subscribe(() =&gt; console.log(store.getState()))<br><br>&#47;&#47; 计数器加 1，用 Store 的 dispatch 方法分发一个 Action，由 Reducer 处理<br>const incrementAction = { type: &#39;counter&#47;incremented&#39; };<br><br>store.dispatch(incrementAction);<br>&#47;&#47; 监听函数输出：{value: 1}<br><br>&#47;&#47; 计数器减 1<br>const decrementAction = { type: &#39;counter&#47;decremented&#39; };<br>store.dispatch(decrementAction)<br>&#47;&#47; 监听函数输出：{value: 0}<br><br>const add = (data)=&gt;({type: &#39;counter&#47;add&#39;, data});<br>store.dispatch(add(5));</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-08 22:07:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/d1/ad/1aed3dec.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小飞侠</span>
+  </div>
+  <div class="_2_QraFYR_0">小结里面，最后一个词有错别字（∩▽∩），既能=&gt;技能</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">编辑回复: 感谢反馈，马上修正</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-03-11 08:34:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJVpGfkkH8rqC7nTmX8DlTZ3lMQpCic3a7rjUTXqnzv5bhXfQwQ15SxJF5CETbVegcHFbQNc4XfGyA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_9b9b7e</span>
+  </div>
+  <div class="_2_QraFYR_0">为什么要异步action?老师的答案是：“发送请求获取数据并进行错误处理这个逻辑是不可重用的。假设我们希望在另外一个组件中也能发送同样的请求，就不得不将这段代码重新实现一遍。“<br><br>也就是说，redux-thunk 要做的就是【把这段代码实现一遍】。<br><br>就是下面这段代码：<br>    &#47;&#47; 请求发送时<br>    dispatch({ type: &#39;FETCH_DATA_BEGIN&#39; });<br>    fetch(&#39;&#47;some-url&#39;).then(res =&gt; {<br>      &#47;&#47; 请求成功时<br>      dispatch({ type: &#39;FETCH_DATA_SUCCESS&#39;, data: res });<br>    }).catch(err =&gt; {<br>      &#47;&#47; 请求失败时<br>      dispatch({ type: &#39;FETCH_DATA_FAILURE&#39;, error: err });<br>    });<br><br>为了redux-thunk能重复使用这段代码，我们还需要定义一个 actionCreator 函数，用来返回这段代码。<br><br>我们为啥不直接使用自定义hooks呢，hooks的主要功能不就是”代码复用“。<br><br>例如：<br>useUserList(dispatch =&gt; {<br>    return useCallback(() =&gt; {<br>        &#47;&#47; 请求发送时<br>    dispatch({ type: &#39;FETCH_DATA_BEGIN&#39; });<br>    fetch(&#39;&#47;some-url&#39;).then(res =&gt; {<br>      &#47;&#47; 请求成功时<br>      dispatch({ type: &#39;FETCH_DATA_SUCCESS&#39;, data: res });<br>    }).catch(err =&gt; {<br>      &#47;&#47; 请求失败时<br>      dispatch({ type: &#39;FETCH_DATA_FAILURE&#39;, error: err });<br>    }), [dispatch]);<br>    });<br>}) </div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-03-07 11:20:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/ed/23/73af9e5c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>山丘smith18651579836</span>
+  </div>
+  <div class="_2_QraFYR_0">为什么不用usecontext</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-01-23 19:54:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/2b/e4/af/f8cf4bc2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Light 胖虎</span>
+  </div>
+  <div class="_2_QraFYR_0">这样写可以吗，老师。在定义action对象的时候增加一个字段用来存储每次计算的步长（默认为1）<br>&#47;&#47; 定义 Store 的初始值const initialState = { value: 0，step: 1 }<br>function counterReducer(state = initialState, action) <br>{ switch (action.type) { <br>case &#39;counter&#47;incremented&#39;: return { value: state.value + action.step || 1} <br>case &#39;counter&#47;decremented&#39;: return { value: state.value - action.step || 1 } <br>default: return state <br>}}<br><br><br>return (<br> dispatch({ type: &#39;counter&#47;incremented&#39;,action: 2 })} &gt;+ {count}<br> dispatch({ type: &#39;counter&#47;decremented&#39; })} &gt;-<br>)}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-12-28 21:01:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_dbfc78</span>
+  </div>
+  <div class="_2_QraFYR_0">使用action对象属性作为 表现层 -&gt; 数据层 参数传递的入口，实现动态值的加减</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-09 16:20:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/fa/21/abb7bfe3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Vongola</span>
+  </div>
+  <div class="_2_QraFYR_0">const data = useSelectore(state =&gt; state.data);<br>这里应该是useSelector吧？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 感谢指出，已提交修改。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-08-04 10:07:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/10/34/705572e6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>陈芳</span>
+  </div>
+  <div class="_2_QraFYR_0">在 react-redux 的实现中，为了确保需要绑定的组件能够访问到全局唯一的 Redux Store，利用了 React 的 Conext 机制去存放 Store 的信息。<br>应该是Context</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 谢谢指出！会更新一下。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-24 17:22:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/29/05/6f/6a47d5b7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>君</span>
+  </div>
+  <div class="_2_QraFYR_0">有个问题<br>假设我页面有表单<br>表单控件复用程度很大<br>如何更优雅的管理<br>1、表单数据源<br>2、表单鉴权<br>3、表单鉴权后的数据再次过滤应对不同场景<br>4、表单初始值确定，同步和异步的情况<br>5、维护一个表单值准备好的状态并以此为准界定初始查询<br><br>感觉表单这一块还是蛮好玩的</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-06 22:57:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/db/ba/304a9a4a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Juntíng</span>
+  </div>
+  <div class="_2_QraFYR_0">Hooks 的出现，结合 context API，用管理全局状态更加简洁易懂，只是在数据流变更机制上不容易捕获，但是却比 Redux 带来的代码复杂度的增加、样板代码过多，不易于阅读上来说我更加偏爱 hooks + ContextAPI 。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-22 21:21:08</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/fc/c3/0991edfc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>闲闲</span>
+  </div>
+  <div class="_2_QraFYR_0">老师我有两个问题麻烦问下，<br>1、如果项目里面状态值特别多，业务比较复杂，感觉redux就很容易造成一些不知道哪里引起的重复渲染，导致组件频繁渲染，这个问题有啥好的办法吗？<br>2、使用redux，怎么实现A请求完了再发B请求呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1. 每个组件用到 redux 上哪些 state，一定要具体，不要绑定在一个太大的节点上。<br>2. 第9课会讲哦。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-08 22:38:00</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

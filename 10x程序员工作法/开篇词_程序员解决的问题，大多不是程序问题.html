@@ -1,0 +1,443 @@
+<audio title="开篇词_程序员解决的问题，大多不是程序问题" src="https://static001.geekbang.org/resource/audio/23/f6/23ddbb631ca8fb4eef93dc2cb7fe8cf6.mp3" controls="controls"></audio> 
+<p>你好！我是郑晔，一个程序员。</p><p>很多人都说，程序员很辛苦，与这个角色联系在一起的词儿，通常是忙碌、加班、熬夜等。</p><p>作为程序员，我们将其看作一个值得全情投入的职业，希望能够把精力放在设计算法、改进设计、优化系统这些具有创造性与成就感的本职工作上。</p><p>但现实情况却是，许多人因为一些“意外”，陷入了无休止的忙碌，比如：</p><ul>
+<li>你辛辛苦苦写的代码还没上线，产品经理就告诉你需求变了；</li>
+<li>你拼命加班只因错估了工作量，自己造的“孽”，含着泪也要搞定；</li>
+<li>你累死累活做出来的东西和要求不符，只能从头再来；</li>
+<li>你大面积地修改代码只是因为设计糟糕，无法适应新的需求变化；</li>
+<li>……</li>
+</ul><p>诸如此类，不胜枚举。我们很辛苦，但耗费我们大量时间和精力去应付的工作，并不是技术工作，反而是这些看似很“不值当”的事儿。</p><p>为什么会这样？</p><p>软件行业里有一本名著叫《人月神话》，其中提到两个非常重要的概念：<strong>本质复杂度（Essential Complexity）和偶然复杂度（Accident Complexity）。</strong></p><p>简单来说，本质复杂度就是解决一个问题时，无论怎么做都必须要做的事，而偶然复杂度是因为选用的做事方法不当，而导致要多做的事。</p><p>比如你要做一个网站，网站的内容是你无论如何都要写的，这就是“本质复杂度”。而如果今天你还在用汇编写一个网站，效率是不可能高起来的，因为你选错了工具。这类选错方法或工具而引发的问题就是“偶然复杂度”。</p><!-- [[[read_end]]] --><p>作为一个在软件行业奋斗了近二十年的程序员，我深刻意识到一个遗憾的事实：<strong>大部分程序员忙碌解决的问题，都不是程序问题，而是由偶然复杂度导致的问题。</strong></p><p>换句话说，只要选择了正确的做事方法，减少偶然复杂度带来的工作量，软件开发是可以有条不紊进行的。</p><p><strong>如何减少偶然复杂度引发的问题，让软件开发工作有序、高效地进行，这正是我希望通过这个专栏帮你解决的问题。</strong></p><p>许多人工作做事主要依靠直觉，在这个科学越发昌明的时代，我们清楚地看到，人类的直觉常常是错的，就像古人凭直觉认为大地是平的一样。</p><p>软件开发也不例外，如果你不曾在做软件这件事上有过学习和思考，形成一套高效的工作方法，只是凭直觉行事，在真实世界中往往会举步维艰。</p><p>幸运的是，总会有不同的人在不同的方向上探索不同的做法，一旦通过真实世界的验证，就会沉淀出可供行业直接应用的最佳实践（Best Practice）。</p><p>在软件行业中，这样能够提升工作效率的最佳实践已经有很多，但是，学习掌握这些最佳实践是有难度的，其根源就在于，很难找到这些实践彼此间的内在联系。</p><p>直觉大多是错误的，最佳实践又多而琐碎，所以在这个专栏中，<strong>我会尝试给你提供一个思考框架，帮你在遇到问题时梳理自己真正要做的事情。围绕着这个框架，我还会给你一些原则。</strong></p><p>这些原则，是我从软件行业的诸多软件开发最佳实践中总结出来的，也是我如今在工作中所坚持的。这些原则就是一条主线，将各种最佳实践贯穿起来。</p><p>这些原则不多，总结起来就四个：</p><ul>
+<li>以终为始；</li>
+<li>任务分解；</li>
+<li>沟通反馈；</li>
+<li>自动化。</li>
+</ul><p>也许看到这四个原则的名字，你会不以为然，这些说法你在很多地方都看到过，但我想与你分享的内容可能与你想的并不完全一致。</p><p>比如：你以为的“终”可能不是终，因为你只是站在自己的角度；你以为自己做了任务分解，在我看来，可能还不够，因为我希望你能够做到微操作；你以为的沟通反馈就是说话聊天，我想告诉你很多技术实践的存在也是为了沟通反馈；你以为自动化就是写代码，我会告诉你，有时候不写代码而解决问题，可能才是一个好方案。</p><p>在我看来，想要将精力聚焦在本质复杂度上，提高工作效率，摆脱直觉的束缚，只要掌握上面的四个原则就可以了。</p><p>或许你此时会问，这些原则很难吧？其实并不难，在探讨这个专栏的内容时，我的编辑作为软件开发的局外人，经常发出感叹：“这事真的就这么简单吗？这不就是正常做事应该有的逻辑吗？”</p><p>是的，就是这样简单，但大多数人没有这样做，因为这些原则在实际工作中很可能是反直觉的。只要打破思维误区，你的整个人都会变得不一样。</p><p>下面是整个专栏的目录，我希望能帮助你回答，或者厘清一些开发过程中，曾经遇到，又未曾深入的问题。</p><p><img src="https://static001.geekbang.org/resource/image/10/3e/10dfc61006956121316d73090ec9cc3e.jpg?wh=750*4005" alt=""></p><p>当我们详谈这些原则时，我会给你讲述一些最佳实践，让你看到这些原则是如何应用于不同的实践中的。希望我对这些实践的理解成为你的知识地图，让你拥有继续探索的方向。</p><p>我做这个专栏的原则是“授人以鱼，不如授人以渔”。我希望你很好地理解这些原则，掌握高效工作的方法。至于最佳实践，你可以自行决定，是直接采纳还是曲线救国更为合适。</p><p>介绍一下我自己，我是郑晔，目前在火币网担任首席架构师，写过代码、带过团队、做过咨询，创过业，还维护着一个拿过 Oracle Duke 选择奖的开源项目 Moco，至今仍然在编程一线写着代码。</p><p>很长时间里，我一直对<strong>如何做好软件</strong>充满了好奇，了解过各种技术以及开发方法。做咨询的经历让我有机会见识到不同公司面临的问题；带团队的时候，我也看到很多小兄弟因为不会工作，虽然很努力却收效甚微；而我自己菜鸟时期的笨拙依然是历历在目。</p><p><strong>在我看来，所有做软件的人能力都很强，这些问题都只是因为不会工作造成的，但更可怕的是，许多人深陷泥潭而不自知。</strong></p><p>在这些年的工作里，我一遍又一遍给别人讲如何工作，逐渐总结出一套自己的工作原则，如今呈现在你面前的就是我这些年思考的总结。</p><p>我不指望所有人都能从这个专栏受益，我只想把这个专栏写给那些愿意成长的人。我只是来做一次信息分享，分享一些思考，分享一些做法，希望可以将你从常见的思维误区中带出来。</p><p>也许在这个专栏的最后，你发现自己并不认同我的原则，却能够用自己的原则来与我探讨，那么，恭喜你，因为那是最美妙的事情！</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/f4/8f/06bd9544.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>AlphaGao</span>
+  </div>
+  <div class="_2_QraFYR_0">直觉在某种程度上也是很重要的吧，不是很多专家都是很依赖直觉的么</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这是一个好问题，这种说法混淆了直觉和洞见两件事。直觉是本能的，无需积累，而洞见是溯因推理（Abductive Reasoning），需要前期进行大量的积累之后，从中发现模式，方能形成洞见。<br><br>打个比方，同样的思念，可以说，衣带渐宽终不悔，为伊消得人憔悴，也可以说，我想死你了。二者看上去差不多，但境界有差异。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-25 22:10:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/56/a4/f1459f9b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>it-spurs</span>
+  </div>
+  <div class="_2_QraFYR_0">购买了课程，学完了目前更新过的所有课程，除了测试这块，比较难推动，其他的基本都原来都践行，或者正在准备在落实。非常有用的课程，个人觉得，比看JAVA或者微服务的一个专栏，更容易学进去，也更有直接的收获，也更迫切需要。技术类课程到处都是，不花钱也可以找到，但是对于程序员的效率提升，整体能力的提升的课程较少，我之前也是一直觉得程序员就是写代码，但是新公司半年的加班告诉我，写代码成本太高，客户，产品经理一句话就可能让你多加几天班，但做出的功能却在业务上并未带来多少意义。我们不是执行指令的机器，也讨厌客户说的那句，你们只管写代码就好了，不要总是提什么拆分任务评估工时，跟她讲条件。按刘慈欣整理定律的方式来整理客户和开发的经验:1.甲方永远觉得付了钱，让乙方多干活也理所当然。2.开发时间是比较难评估的，一定要预留缓冲时间，即使多出来时间，也可以用来优化。3。技术是硬知识，独立思考和沟通，个人管理与项目管理是软知识，软知识是我所欠缺的，有更好的软知识可以事半功倍，可以处理各个上下文的问题。还有最直接的，把甲方拍大腿想的需求推掉，至少晚上更有时间去学习那些技术。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我希望专栏的读者在学过之后，遇到事情开始动脑想想为什么和怎么做，你的回复让我觉得我的初衷达成了。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-17 15:10:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/be/30/1154657e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>风含叶</span>
+  </div>
+  <div class="_2_QraFYR_0">老师：<br>您好！<br>已经购买了这堂课程。同时想咨询一下：<br>我是一只，刚刚工作一年多的本科生。现在在一家500人左右的公司工作。工作中充当研发+技术支持的角色。事情总是被突然打断。请问您可以简单说一下 您的一些建议吗？谢谢。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-24 19:58:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/92/cd/d39e568c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>felix</span>
+  </div>
+  <div class="_2_QraFYR_0">这个专栏太棒了，不客气地说，跟我十年工作之后的体会一模一样。平常我也是跟团队教导这四个原则。<br>努力很重要，方向和方法更重要。我们要付出至少90%的努力，同时达到120%的效果。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 欢迎你把自己的经验也分享给大家</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 22:52:08</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/ab/6f/49e98aab.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>davidce</span>
+  </div>
+  <div class="_2_QraFYR_0">t.cn&#47;EGeYlAA，一个讲本质复杂度和偶然复杂度的视频</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 多谢推荐！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-09 22:03:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/oh2uojnJHou7WxFub9AnhJLeGcfHt85QSTqwEDUiaDz2BsLOFrN4hLbib1tLvDCrpKrH75aGxpia0TqNqkgYDnFicw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>妮可</span>
+  </div>
+  <div class="_2_QraFYR_0">作为开发，要谈需求，写需求，以及日常业务数据处理，有的时候还要充当客服，确实有点迷茫。希望能通过学习大佬的经验，回到开发本质上，提升工作效率。期待(๑˙ー˙๑)</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 跨角色是件好事，会让你有更多的视角，这是我鼓励很多人去尝试的。只要把握住自己的核心能力，不断提升就好。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-24 20:30:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/51/b1/7d6879dc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>未设置</span>
+  </div>
+  <div class="_2_QraFYR_0">期待</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-24 17:23:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83erHVpYe1MzicdzQ2cZkNXa92PDtsIIzic12xH7ibbZRyxyajtRA4gTXfdOL3eds2PVA7hH4WKA16oQjA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>二木又土</span>
+  </div>
+  <div class="_2_QraFYR_0">请教下，对于一个明确的技术点，优秀的程序员仿佛能更快的找到解决方案，而且往往就是最佳实践，这是什么原因？从技术点角度讲，它并不需要掌握其他相关知识…</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你把结果当成了原因，优秀的程序员能够快速解决问题，是因为它已经做了大量积累，有自己的知识体系，任何领域想做到一定的水准都需要刻意练习，而且是大量的刻意练习。<br><br>刻意练习，是一个重要的概念，我本打算在这个专栏里讲一下，后来由于主题的关系，暂时拿掉了，看后面是不是有机会专门加餐讲一次。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-08 07:12:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/EUqwKu38BfJPbjnn4q1HpZCbKRHqZjsnA1ZRUOfEPXBqDQoQU0bfj3icBibdw3PUiadxE15DpicmD0cdnaGaxZB8qA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>爬虫也疯狂</span>
+  </div>
+  <div class="_2_QraFYR_0">感觉我才大一好像买早了，不过还是希望大佬们多多指教，以后少走弯路</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-24 21:58:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/88/c8/6af6d27e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Y024</span>
+  </div>
+  <div class="_2_QraFYR_0">10x 程序员工作法——郑晔老师希望你记住的一句话版本：<br><br>https:&#47;&#47;mubu.com&#47;doc&#47;4mk3cB_cKdv</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 总结得真好！:)</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-22 07:04:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/1b/88/ac69f57a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>磉盘</span>
+  </div>
+  <div class="_2_QraFYR_0">首先做一个，愿意成长的人。其次要承认直觉不总是正确的。<br>认清程序员的本质工作，避免陷入琐碎的忙碌。<br>选择正确的方法解决偶然复杂度，投入精力解决必然复杂度。<br>学习行业的最佳实践，试着用思考框架考虑事情，通过原则处理事情。<br>最终目的是优化完善自己的做事方式，希望从此专栏里得到启发。<br><br>I can do it<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 一点一点地进步。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-15 11:34:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/16/5b/83a35681.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Monday</span>
+  </div>
+  <div class="_2_QraFYR_0">我目前就是工作效率很低的0.15*程序员。<br>做事经常确实方法论，蒙着头一顿猛搞，为做而做。<br>希望通过本课程至少达到5*程序员目标，希望自己能够有清晰的思维，谢谢老师</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-31 08:52:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/19/5b/08/b0b0db05.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>丁丁历险记</span>
+  </div>
+  <div class="_2_QraFYR_0">成不成10x 不重要，读书笔记一定要写的欢快起来。<br>1 开发严重浪费的成本花哪去了， accident complexity 【极端例子，用汇编写网站】 。<br>2 如何优化呢（ 减少偶然复杂度引发的问题，让软件开发工作有序、高效地进行），我整篇专栏都在说如何处理。<br>3开发认知。 直觉 到最佳实践(BP),掌握BP 是有难度的，极根源在于【很难找到这些实践彼此间的内在联系】 【附带说一句，科学往往是反直觉的】<br>4 上套路：四原则（以终为始 任务分解 沟通反馈 自动化） 【初看，其中都蕴含着节约注意力的思考】<br>5 作者很nx.(细节略<br>6 作者经常看到某小弟很幸苦，回想自己 青葱岁月,可怕的是这些人不自知陷入了困境，他总结了很多经验，想分享给想成长的人，想通过努力把他们从常见的思维误区中带出来，请大家快速买课，谢谢。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 欢迎分享</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-29 17:31:09</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/55/74/04e95bd8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>火山飘雪</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，你好！你说古人是凭直觉，说地是平的，方的，这是不正确的，在古天文学家张衡的《灵宪》已经说明了地是圆的。并且古人并不是通过平直觉或想象就妄下结论的。不要感觉现在人就比古人聪明。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 多谢提醒，准确地说，人习惯于用直觉，与古今无关，这是一种节省能量的做法，但不适合处理复杂事物。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-14 23:27:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/13/98/e6240c55.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Max</span>
+  </div>
+  <div class="_2_QraFYR_0">要做工程师，拒绝做码农……今天开始打卡，跟着老师走正道😉</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 欢迎加入！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-29 20:30:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/f2/6a/3bcef8ef.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>唐堂</span>
+  </div>
+  <div class="_2_QraFYR_0">期待后续文章~解放自己的劳动生产力</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-24 18:56:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/7f/ca/ea85bfdd.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>helloworld</span>
+  </div>
+  <div class="_2_QraFYR_0">希望通过本专栏能对自己的整体能力有一个小小的提升！为什说小呢？因为改变自己既有的行为习惯和思考习惯不是一蹴而就的事情，需要自己真正领悟了后才能从打心眼里付诸行动。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 每天找到一点可以改变的地方，慢慢来。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-15 12:28:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/1d/de/62bfa83f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>aoe</span>
+  </div>
+  <div class="_2_QraFYR_0">学了老师的课就停不下来，要变强了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-11-14 00:48:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/8f/c1/8f70fc24.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>kimmking</span>
+  </div>
+  <div class="_2_QraFYR_0">很棒。加油。赞一个，我是郑老师的小粉丝。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-15 03:11:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/a9/0c/afaaacca.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>leeheol</span>
+  </div>
+  <div class="_2_QraFYR_0">嗯，当你判断某人的建议没有的时候，对方的建议其实在起着作用。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-29 09:48:10</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

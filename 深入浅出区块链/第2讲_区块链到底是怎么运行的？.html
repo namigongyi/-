@@ -1,0 +1,507 @@
+<audio title="第2讲_区块链到底是怎么运行的？" src="https://static001.geekbang.org/resource/audio/c8/06/c8ce24920b5f462b3ff6bea5d91b6706.mp3" controls="controls"></audio> 
+<p>上一次，我们聊到了区块链的概念及整个行业的发展过程，今天我想稍微深入一下，尽可能通俗地介绍一下：区块链到底是如何运行的？</p>
+<p> 这一篇文章我将以比特币区块链为例来进行讲解，理由有两个：</p>
+<ol>
+<li>由于区块链发展到目前阶段，各个技术方向都有长足的发展，那么为了方便你理解，我在这里介绍最简单、最容易理解的比特币区块链；</li>
+<li>由于大部分区块链都是以比特币区块链为基础进行扩充的，所以首先了解比特币区块链有助于其他项目区块链的后续学习。</li>
+</ol>
+<h2 id="-">中心化记账的问题</h2>
+<p>首先，我们借鉴了一个区块链描述中的经典情景来模拟中心化记账。</p>
+<p>假设有一个有百户居民的村子，其中有一位德高望重的村长，村长有一个儿子。村民们都把钱存到村长家，村长负责记账。比如，张三用1000买了李四家的牛，村长就把张三名下的存款减去1000，李四家加上1000。听起来是不是很像银行的操作？</p>
+<p>对，我们就是先从中心化的银行记账开始聊起。村民都相信村长，才愿意把钱存到村长家，他们相信村长不会作恶。</p>
+<p>可惜好景不长，老村长由于操劳过度，驾鹤西去了。新上任的村长儿子铁蛋很是聪明，但也有个毛病，就是粗心大意。他不但经常算错账，一次还被人偷改了账单。</p>
+<p>不过，幸好村民自己都有记账，但是由于铁蛋每次错账后都要和别人核对半天，导致村民对新村长的记账能力十分不满。</p>
+<p>时间就这么过着，然而最可怕的事情还是发生了，铁蛋的老婆竟然私下篡改账本，给铁蛋七大姑八大姨的余额全部偷偷加了好多，终于有一天事情暴露，村民们气冲冲地跑到铁蛋家里讨说法，于是一片混乱。</p>
+<p>这时候有个叫中本聪的人站了出来，他说他设计了一套系统，可以不依赖任何人记账，于是，众人开始将目光集中到他的身上。</p>
+<h3 id="-1-"><strong>1. 公开记账</strong></h3>
+<p>中本聪说他的系统稍微麻烦一点，需要干三件事儿。</p>
+<ol>
+<li>每家每户都派发一只信鸽。这就是 P2P网络，是一个点对点的分布式网络，如果不好理解，你先不用理会，我会在后面讲到。</li>
+<li>每家每户都发一个特殊的印章和一个扫描器。这个扫描器有两个功效，一是识别他人的交易是否真实有效，二是识别这个交易是不是自己账号的，同时识别并解锁未花费的余额。这就是非对称加密。</li>
+<li>每家每户可以参与记账，不过不再记余额，而是记交易本身的内容。这就是区块链中的交易，这个“交易”对应的英文单词是“Transaction”，这是个专有名词，专指一笔账，不同于金融交易的Trade。</li>
+</ol>
+<p>这三条总体来说其实是干一件事情，就是：</p>
+<p><strong>每家每户都记账，账簿上不再记载每户村民的余额，而只记载每一笔Transaction，即记载每一笔交易的付款人、收款人和付款金额。</strong></p>
+<p>那么问题就来了：如果每户都记账，肯定每户的账都不统一啊，你记你的，我记我的，最后不全乱了么？</p>
+<p>这个时候需要大家统一账本，保证大家的账本都是一致的。因为记录的交易是全村所有人有序产生的，所以这就需要有一个广播机制。这个广播机制，我先卖个关子，后面再讲。</p>
+<p>中本聪说，其实很简单，我们现在先把全村所有人的资产都加起来。还真巧了，刚好100万。</p>
+<p>中本聪接着说：“只要账簿的初始状态确定，并且每一笔交易可靠并按照物理时间自然记录，并且只加不改不删，这样，当前每户持有多少资产是可以推算出来的。”</p>
+<p>中本聪说我现在把我的印章给你们看，这个印章很特殊，盖的章有两块标记，第一块是一个可以识别的标记，比如我往纸上一敲，可识别的标记是1MsTg2。</p>
+<p>这就是你们的代号，由于我们账本是公开的，使用真实姓名会很危险，所以你们记账的交易单上收款人、付款人都填这个码，不用写姓名。你的扫描器和你的印章生成的代号是关联的，有且仅有持有对应扫描器的人才能花费金额，这一步即为“解开交易”。</p>
+<p>刚刚说印章有两块，这第二块内容配合这个扫描器才能看，肉眼看则都是乱码，扫描器一扫就知道第二块内容是否有效，这一步也就是“交易验证”。</p>
+<p>并且所有交易大家都能接收，都能看到，但却解不开印章乱码部分的内容，仅仅收款方才能解开，因为你的扫描器和你印章生成的代号是关联的，有且仅有持有对应扫描器的人才能解开交易。</p>
+<p>以上就是区块链中“公开记账”的过程。“公开记账”就是全网所有人都可以随时查看一套账本，然后按照规则透明公开地进行记账。</p>
+<h3 id="-2-"><strong>2. 创建创世区块</strong></h3>
+<p>创世区块是我们生成全村公开账本的第一笔交易的第一个信封，好比一篇文章总得有个开头一样。</p>
+<p>于是乎，中本聪说我先生成第一个Transaction，这个交易单的付款人为空，收款人是村长，付款金额是100万，因为是创世区块，产出多少个是可以随意规定的，由于我们上面统计了全村的账目情况，所以我就写了100万，待会儿付款给村长以后，我们可以按照原来的账本给大家发送对应的金额过去。</p>
+<p>好了，我们有了第一笔交易，第一个信封也已经做好了。现在让村长把信封传给张三，张三复印一份，然后传给李四，李四继续传下去，一传十，十传百，直到传给全村人，这个步骤也就是“同步区块”，也就是全网都拿到这个信封，以及信封里面的Transaction。</p>
+<h3 id="-3-"><strong>3. 交易</strong></h3>
+<p>由于上一节我们的创世区块把100万交给了村长，那么我们假设张三在村长那里的存款余额是10万，这时候村长要根据原来的旧账本，把这10万发送给张三，然后把旧账本上的账划掉。下面我们讨论一下如何构造这笔交易。</p>
+<p>中本聪开始教村长写交易单，把100万分成两部分，第一部分10万，收款人是张三；第二部分是90万，收款人是自己；这样一个Transaction就做成啦。</p>
+<p>前面我们说了，不能直接写名字，要写代号，这个代号也就是你的钱包地址，我们需要把收款人写名字的地方，让收款人拿出自己印章，把代号读出来，然后告诉村长即可。</p>
+<p>100万  　10万，张三
+      <br>　　　　      90万，自己</p>
+<p>村长写好 Transaction 以后，还需要拿出自己的印章，在Transaction上盖章，这个盖章的过程也就相当于区块链中的签名。这个章，全村人都可以拿扫描器扫一下验证是否有效，即验证付款人的章是否有效。</p>
+<p>100万  　10万，张三的印章（1s25vR）
+ <br />   　　　　 90万，村长的印章（13gYip）</p>
+<p>就这样，村长一共写了10份Transaction，分别代表了发送给不同人的交易，张三一笔10万，李四一笔1万，等等。</p>
+<h3 id="-4-transaction-"><strong>4. 打包 Transaction （挖矿）</strong></h3>
+<p>现在我们有了Transaction，但是还需要东西把Transaction装起来，我们用一个特殊的信封把Transaction装起来，这个信封就是区块链中的“区块”，这个封装过程就是“打包交易”。</p>
+<p>为什么要封装起来呢？是为了让打包交易的人能够在信封上署名，表示这次打包是由某某某打包的，其次全村的交易可能非常多，需要装配标号，方便大家查询。</p>
+<p>我们看到上述的Transaction虽然已经生成，但是有个问题，就是没有规定谁有权利把Transaction封装到信封里。</p>
+<p>我们在开篇的故事中看到了中心化操作肯定是不行的，假设在全村人中，这时候如何筛选出这些打包的人呢？</p>
+<p>中本聪这时候说了，由于我们村的人口增长，100万未来可能不够，我们暂定150万，那多余的50万，我们就当奖励给这些装信封的人了，当然不能一次性给，谁装一次信封就领3个币。</p>
+<p>这时候大家伙儿来劲了呀，只要装信封就能够领钱了，我们在这里把符合条件的人称作“矿工”。</p>
+<p>但是中本聪又说了，要获得这个装信封的权利，是有条件的。我给大家出一个难题，谁先解出这个难题的答案，谁就有权利把Transaction装到一个信封中，并且要在此信封上盖上自己的章。</p>
+<p>这个难题是这样的，它有两大特性，第一是容易验证，第二是计算过程非常复杂。</p>
+<p>例如，有种棋牌类游戏叫作“24点”，玩法就是给出任意4个整数，通过整数运算得到24，比如现在给出2、9、1、5四个数，答案是（5-2）*（9-1）= 24。当然，本处仅是举例，“24点”游戏的答案空间非常小，是远远不够生成信封的。</p>
+<p>答案非常好验证，但是计算过程是一个尝试的过程，需要耗费大量的精力。而在真实的比特币中，采用的是寻找符合条件的目标哈希，这也就是比特币矿工所做的事情。</p>
+<p>好了，这时候大家开始计算给出的难题，刚好李四第一个计算出来，那么这次装信封的操作就由李四完成，李四把10份Transaction装到信封中，也就是打包Transaction，并且要在信封背面写上一个信封的摘要信息。</p>
+<p>比如上一个信封中的第一个交易是什么、信封封面长什么样，最后要在信封上盖上章，也就是“签名”，矿工签名的目的是为了领币，也就是 Coinbase 交易。</p>
+<p>以上过程在区块链领域称作“打包 Transaction”，也就是大名鼎鼎的“挖矿”。</p>
+<h3 id="-5-"><strong>5. 广播交易</strong></h3>
+<p>来说说上文提到的广播交易，广播是为了让全村人知道当前时刻你产生了一笔Transaction，或者是你装好了一个信封。</p>
+<p>广播的内容分两种，一种是广播Transaction，一种是广播信封。第一种广播是意味着还有未被打包的Transaction，而第二种广播信封则意味着这个Transaction已经被某个矿工确认。</p>
+<p>收到了广播的通知后，大家先验证信封上难题的答案是否正确，这样便可以验证出信封是否被伪造，接着验里面的每笔交易，最后还要验证信封背面的内容，即上一个信封的摘要是否正确。因为上一个信封大家都已经确认，所以这样可以极大地规避作弊的可能。如果觉得没问题，就可以存入本地数据库中了。</p>
+<p>至此，全村人的记账问题就差不多解决啦。</p>
+<h2 id="-">总结</h2>
+<p>今天我用非常浅显的例子与你聊了比特币区块链，其中包括区块链中公开记账、创建创世区块、交易、打包Transaction、广播交易的几个步骤。</p>
+<p>因为篇幅所限，在表述上可能会有不精确的部分，但是大体意思是相通的，相信读完文本，你已经对区块链的原理有了一个大致的了解。</p>
+<p>你也可以针对每个模块进行扩展，比方更换矿工的计算方法，可以推导出PoS共识机制，不知道你还能想到哪些扩展呢？欢迎留言探讨。</p>
+<p>感谢你的收听，我们下次再见。</p>
+<!-- [[[read_end]]] -->
+<p>本文叙述模式参考链接：
+<br>
+<a href="http://www.8btc.com/bitcoin-story?_t=1520884553">http://www.8btc.com/bitcoin-story?_t=1520884553</a></p>
+<p></p>
+
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/55/02/410a6fda.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>蜡蜡</span>
+  </div>
+  <div class="_2_QraFYR_0">陈老师，您好，非常精彩的讲解了比特币到底是怎么运行的，个人对比特币运行的整理与思考如下，欢迎讨论： <br>步骤1：召集全村每家每户， 一起共同记账。<br>1）高薪招聘记录账本人员：  人人都可以参与，只要每次谁记录的最快又最准，每次可以拿到丰厚的报酬。<br><br>2）分发村民记账工具：特殊的印章（盖章有两块标记，第一块可识别的标记，第二块扫描器才能看）、扫描器（扫描器有两个功效、一是识别他人的交易是否真实有效，二是识别这个交易是不是自己账号的，同时识别并解锁未花费的余额）    、特殊的信封（装交易信息的文件）  ；<br>3）记账注意事项：<br>为了防止大家真实姓名泄漏，   大家统一使用代号代替（第一块可识别的标记）；<br>账本上不再记载每户村民的余额，只记录每一笔交易的信息，即只标注付款人、收款人、付款金额；<br>必须保证每个村民随时查看整套账本，每次交易信息用小喇叭通知大家。<br>步骤二：创建账本的开头；首先中本聪创建第一步交易信息，付款人为空、收款人为村长、付款金额100万元，<br>然后记录着交易信息，装进特殊的信封里，现在让村长把信封传递给张三，张三复印一份，在传递给李四，一传十，十传百，直到传到全村人。<br>步骤三：交易；<br>1）村长与村民的交易：现在村长有100万元，这时村长根据张三旧账10万元，把这10万元给张三，然后把旧账划掉。中本聪教村长记账，付款人代号村长、收款人代号张三、付款金额10万元；村长填好交易信息，在交易信息签名（盖章），这个章全村人可以用扫描器验证是否有效，就这样，村长与村民陆续操作，张三一笔10万元，李四一笔1万元，王五2万元，等等！<br>2）村民与村民的交易；现在张三有10万元，李四有1万元，现在张三买李四家的房屋1万元，张三在付1万元单盖章，李四用扫描器查看着1万元是否有效，然后高新聘请的记账人员开始记账，交易信息为：付款人代号张三，收款人代号李四，付款金额1万元。<br>步骤四：打包数据（挖矿）<br>因为装信封人报酬多，参与的人非常多，中本聪设定难题，答案很容易验证，计算过程非常复杂，如比如,2、9、1、5加减乘除如何计算得到24，只有答案（5-2）*（9-1）=24，当谁最快又最准计算出，谁就可以把这交易信息放进信封里，并在信封上签字盖章。<br>步骤五：广播交易；记账人员把数据放进信封里，并签字盖章，用广播的方式通知所有人，每个村民可以验证交易是否伪造。<br>步骤六：账本按每一笔交易数据物理时间自然记录，并且只加不该不删，不断形成新的账本数据库，至此，全村人的记账问题就解决了。<br><br>当这些还看不懂比特币如何运行模式，举结婚场景大家脑补下：<br>张三与李四结婚，请全村人见证他们结婚了，张三签字保证爱李四一辈子，李四也同意爱张三一辈子，记录人员记录着他俩的承诺，并装进信封，然后通知全村人。当张三不爱李四啦，需征求全村人的意见，并且全村人同意他俩才能离婚。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 11:25:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/66/73/fd1e37a2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>良辰美景</span>
+  </div>
+  <div class="_2_QraFYR_0">作者你好，我读了几遍，仍然还是不太明白，有如下问题，希望能给解答一下：<br>假如现在有A村民（有50万）与B村民，A转账10万给B<br>	文章说需要在这个交易上写的信息如下：<br>	10万，B章<br>	40万，A章<br>问题如下：<br>	1：上面的交易是否还要盖上村长的章？A主动转账给B，这个交易信息是否需要村长监控：比如村长需要监控A的账户是否有10万以上的钱<br>	2：如果不需要，扫描器的作用是否能识别这个村里的每一笔交易，还是只能识别自已的交易（这个扫描器的作用还是没太明白）假如我是村民C，我能解开上面的交易么。<br>	3：挖矿也就是得到信封，将交易数据打包到这个信封中，而这个信封也需要有一个地方存储，这个信封（区块）存在那里呢？每个村民的家中么（初使化好的服务器）？<br>	4：这份账单会存在网络中多份，具体有多少个节点呢，是事先约定好的还是可以动态变化的？<br>	5：一个区块（信封）能存储的交易数据有数量限制么（还是有一个时间段的限制），如果没有交易限制，如微信系统一分钟的交易量上百万份，这个数据量级的情况有解决方案么。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1. 不需要的。村民A如果有50万，转移过程由村民A盖章即可，其实这更像咱们的实体纸币，纸币100在花费的时候，现场确认是你掏出来的就行。钞票本身的面额就是50万，不需要检查的。<br>2. 村民C是无法解开交易的，扫描器和章是一对的。扫描器其实有两个功用，一个是可以验证别人的章是否有效，第二是识别属于自己的交易。<br>3. 是的，存在每个村民的家（本地持久化存储）中。快速理解就是每个村民家中都有一套日志型的账本，有点像数据库的binlog，是无状态的。每家收下的所有信封连在一起就是重演历史交易<br>4. 账单是全冗余的，所有节点都保存了副本。节点数量是开放的，动态变化的。<br>5. 一个区块是由大小上限的，比特币的上限为1MB一个块，曾经出现了网络拥堵的情况。上万TPS的区块链系统是由的，不过从架构上看更中心化一点。这个我们会再后续文章有详细讲解</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-28 15:25:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/60/87/90107b77.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>near</span>
+  </div>
+  <div class="_2_QraFYR_0">请问老师：例子中说拿出50万奖励封装信封的人，当这50万奖励用完以后，后续产生的交易信息由谁来封装信封呢？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-28 21:54:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/60/b8/82acc94d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>teletime</span>
+  </div>
+  <div class="_2_QraFYR_0">这样记帐的话，随着时间推移，总帐无限增大，每次计算一个帐户的当前余额，要追溯的历史链越来越多，效率能撑住？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-28 23:37:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/60/95/08571d0b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>陈建斌红了..</span>
+  </div>
+  <div class="_2_QraFYR_0">怎么广播，难道每个节点要保留所有其他节点的ip地址吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的。仅保存临近节点，临近节点接力</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-28 19:32:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/d9/40/e6492320.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>胡敏</span>
+  </div>
+  <div class="_2_QraFYR_0">我理解 打包交易 的的前提是有交易，如果交易量不足，哪些所谓矿工为啥可以一直挖矿呢</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 交易笔数至少会有一笔。这一笔叫做铸币交易。又称coinbase。这种区块我们叫做空块。属于正常情况<br></p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 08:19:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/59/fa/c01c14c6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>LuDi</span>
+  </div>
+  <div class="_2_QraFYR_0">配一些图来说明的话，会让读者更容易理解呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 谢谢建议，到深入讲解模块会配图的。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 18:02:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/73/2e/c845441a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ync</span>
+  </div>
+  <div class="_2_QraFYR_0">作者您好，阅读后我收获很多，但有个问题不太清楚：交易为什么不记用户余额？不记得话每次交易都要翻老帐，当用户量和交易量上去的话效率会不会很低？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你好。<br>区块链有两种记账模式，第一种是我们正在举例讲解的utxo模型，另外一种是你说的记余额模式。交易效率不会低的，但是会影响同步效率。<br>utxo是无状态的，余额是有状态的。后面utxo一文我们会有详细讲解这两者。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 15:14:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/OwlfSZBK8I7dpGtLia70p3e4cXib5ZsbY1vIpXiaWtAowoawJQFNVibGurpKlDwIBXmqZZpHx7RtSwCEyjOepicjstA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ytl</span>
+  </div>
+  <div class="_2_QraFYR_0">如果两个矿工差不多时间解除难题，都暂时认为自己获得奖励，区块链产生自然分叉。通过竞争，几个区块后只有一条链最长，所有矿工都追随最长链。前面以为自己得到奖励的矿工并没有真正得到奖励。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 嗯嗯，我们理解一致。“最长”其实是难度累计最大，而不是高度。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-04-03 05:16:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/ed/f1/e31585a8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jonhey</span>
+  </div>
+  <div class="_2_QraFYR_0">中本聪规定比特币总量2100万个，等2100个万个比特币全部在流通了，如果有个人特会赚钱，把所有比特币都赚到手里了，这个系统怎么去创造新的流通货币？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你这种属于经济学假设，假设通过极端的市场操纵手段收获了大量比特币，这其实会造成剧烈的市场波动，价值共识基础可能会崩塌，那么比特币很可能就不值钱了，毕竟只是一串数字一串代码不是？</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-09-18 16:29:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/66/75/54bb858e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>life is short, enjoy more.</span>
+  </div>
+  <div class="_2_QraFYR_0">老师您好，请问150w的总数，是怎样的一种机制保证他无法被修改？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 由创世区块规定的，后面的区块的哈希计算都是依赖前面区块，所以历史记录没有办法改，一改全变了。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-04-03 16:32:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/56/35/46bad28c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>DBG</span>
+  </div>
+  <div class="_2_QraFYR_0">打包时计算出来的目标哈希 怎么确定没有被其他矿工已经计算出来</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 目标哈希不是唯一的，只要满足难度条件即可。即使别人同时有了答案，剩下拼速度了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 08:29:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83er5GnyD0t2QibYt5xM9pPDznFGFlwQTW0NdN2K0u1gicSEp2lBA3HsgqJldPXWzDdKosibRnzeeHdR8g/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Corey</span>
+  </div>
+  <div class="_2_QraFYR_0">（1）矿工打包交易时，计算出目标哈希，是怎么实现易于验证的？<br>（2）全网有没有可能，同时超过2个矿工同时计算出目标哈希，如果出现这种情况，网络是怎么处理的？<br>（3）目前btc使用1M，bch使用8M，扩容可以提高交易量，带来的问题有 带宽、存储、计算，但是目前btc也基本都是专业人士在挖，扩容还带来了其他什么问题吗？<br>（4）目前为了提高交易速度，除了扩容，还有分片和侧链，我想问的是，扩容是必须的吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1. 简单来说，就是所有人把这位矿工的计算原结果再计算一次。如果符合前n位是0就证明是有效的<br>2. 网络不存在绝对的同时。这种情况再观察下一个块的产生，如果其中某一条链“长度”大于另外一条，则废弃短链。这种情况的概率叫做孤块率，越低越好<br>3. 扩容之争有很多备选方案，比特币社区争论了很久，导致社区分歧才有了bch。专业矿机的产生不是扩容导致的，扩容后续我们也会讲。<br>4. 不是必须</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 07:59:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/85/85/22fac609.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>泡泡</span>
+  </div>
+  <div class="_2_QraFYR_0">“为什么要封装起来呢？是为了让打包交易的人能够在信封上署名，表示这次打包是由某某某打包的”这句话没有逻辑性吧。为什么要装起来，是因为要让装起来的人写是他装起来的，那他为什么要装起来，不装不就不用写了吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 为了获取奖励哦，不写就没法发奖励。coinbase</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-08 23:36:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/1f/66/59e0647a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>万历十五年</span>
+  </div>
+  <div class="_2_QraFYR_0">1.数字签名主要解决了“谁干了什么”的问题<br>2.打包主要解决了“篡改”问题，使篡改成本变高</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-05-27 08:38:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/66/c8/67a885eb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张军营Jason</span>
+  </div>
+  <div class="_2_QraFYR_0">咨询几个问题<br> 1.多少个transaction可以打包成为一个信封？<br>2.transaction的验证过程，是否有效，不太明白</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1. 这个是由区块容量上限决定的，区块容量上限是由物理环境，代码决定的。通常几百几千笔一个块。<br>2. tx的验证是由非对称加密中的签名算法保证的，全网可验证。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-04-03 09:15:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/53/fb/b05ee03f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>羽惑飞</span>
+  </div>
+  <div class="_2_QraFYR_0">50万被旷工挖完后谁来打包？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-04-02 09:25:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/65/21/101a7075.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>davix</span>
+  </div>
+  <div class="_2_QraFYR_0">建议老师对文章中出现过的关键概念，给出一些可以深入阅读的链接。比自己搜靠谱吧。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-03-29 12:19:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/2c/d8/442c13dc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>李小文</span>
+  </div>
+  <div class="_2_QraFYR_0">老师！李四解开难题后，再打包时，怎么知道的上一个信封中的第一个交易是什么？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-26 22:14:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/0b/89/96d3f847.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>三木四水</span>
+  </div>
+  <div class="_2_QraFYR_0">陈老师，能不能用经济学的角度说一下为什么数字货币可以交换实际存在的东西比如美金，真金白银？像法定货币都是有国家的黄金储备和国力在支撑的，但是数字货币好像就是凭空的一个东西？它为什么存在价值呢？数字货币如果不被世界认可，它的意义又在哪里？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你好，可以阅读后续章节来答疑哦。<br>本质上是在讨论什么是货币，例如美元的本质不是黄金储备和国力，而是美元霸权强制全球流通，这么看起来美元也只是人为定义的价值支撑，所以为什么是美元霸权，不是人民币霸权？<br>回到问题，信用货币本身也是共识的一种，它更多是法律意义上的甚至军事霸权强制的，而数字货币也是一种共识，只不过是自由的超越国家的存在，所以作为货币一点也不奇怪，只要有共识存在，那么货币就是成立的。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-15 15:29:04</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

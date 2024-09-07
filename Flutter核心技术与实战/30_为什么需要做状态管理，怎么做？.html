@@ -1,0 +1,561 @@
+<audio title="30_为什么需要做状态管理，怎么做？" src="https://static001.geekbang.org/resource/audio/2c/26/2c7fef7af30267adcb930e92ca364c26.mp3" controls="controls"></audio> 
+<p>你好，我是陈航。</p><p>在上一篇文章中，我与你分享了如何在原生混编Flutter工程中管理混合导航栈，应对跨渲染引擎的页面跳转，即解决原生页面如何切换到Flutter页面，以及Flutter页面如何切换到原生页面的问题。</p><p>如果说跨渲染引擎页面切换的关键在于，如何确保页面跳转的渲染体验一致性，那么跨组件（页面）之间保持数据共享的关键就在于，如何清晰地维护组件共用的数据状态了。在第20篇文章“<a href="https://time.geekbang.org/column/article/116382">关于跨组件传递数据，你只需要记住这三招</a>”中，我已经与你介绍了InheritedWidget、Notification和EventBus这3种数据传递机制，通过它们可以实现组件间的单向数据传递。</p><p>如果我们的应用足够简单，数据流动的方向和顺序是清晰的，我们只需要将数据映射成视图就可以了。作为声明式的框架，Flutter可以自动处理数据到渲染的全过程，通常并不需要状态管理。</p><p>但，随着产品需求迭代节奏加快，项目逐渐变得庞大时，我们往往就需要管理不同组件、不同页面之间共享的数据关系。当需要共享的数据关系达到几十上百个的时候，我们就很难保持清晰的数据流动方向和顺序了，导致应用内各种数据传递嵌套和回调满天飞。在这个时候，我们迫切需要一个解决方案，来帮助我们理清楚这些共享数据的关系，于是状态管理框架便应运而生。</p><!-- [[[read_end]]] --><p>Flutter在设计声明式UI上借鉴了不少React的设计思想，因此涌现了诸如flutter_redux、flutter_mobx 、fish_redux等基于前端设计理念的状态管理框架。但这些框架大都比较复杂，且需要对框架设计概念有一定理解，学习门槛相对较高。</p><p>而源自Flutter官方的状态管理框架Provider则相对简单得多，不仅容易理解，而且框架的入侵性小，还可以方便地组合和控制UI刷新粒度。因此，在Google I/O 2019大会一经面世，Provider就成为了官方推荐的状态管理方式之一。</p><p>那么今天，我们就来聊聊Provider到底怎么用吧。</p><h2>Provider</h2><p>从名字就可以看出，Provider是一个用来提供数据的框架。它是InheritedWidget的语法糖，提供了依赖注入的功能，允许在Widget树中更加灵活地处理和传递数据。</p><p>那么，什么是依赖注入呢？通俗地说，依赖注入是一种可以让我们在需要时提取到所需资源的机制，即：预先将某种“资源”放到程序中某个我们都可以访问的位置，当需要使用这种“资源”时，直接去这个位置拿即可，而无需关心“资源”是谁放进去的。</p><p>所以，为了使用Provider，我们需要解决以下3个问题：</p><ul>
+<li>资源（即数据状态）如何封装？</li>
+<li>资源放在哪儿，才都能访问得到？</li>
+<li>具体使用时，如何取出资源？</li>
+</ul><p>接下来，我通过一个例子来与你演示如何使用Provider。</p><p>在下面的示例中，我们有两个独立的页面FirstPage和SecondPage，它们会共享计数器的状态：其中FirstPage负责读，SecondPage负责读和写。</p><p>在使用Provider之前，我们<strong>首先需要在pubspec.yaml文件中添加Provider的依赖</strong>：</p><pre><code>dependencies:
+  flutter:
+    sdk: flutter
+  provider: 3.0.0+1  #provider依赖
+</code></pre><p>添加好Provider的依赖后，我们就可以进行数据状态的封装了。这里，我们只有一个状态需要共享，即count。由于第二个页面还需要修改状态，因此我们还需要在数据状态的封装上包含更改数据的方法：</p><pre><code>//定义需要共享的数据模型，通过混入ChangeNotifier管理听众
+class CounterModel with ChangeNotifier {
+  int _count = 0;
+  //读方法
+  int get counter =&gt; _count; 
+  //写方法
+  void increment() {
+    _count++;
+    notifyListeners();//通知听众刷新
+  }
+}
+</code></pre><p>可以看到，我们在资源封装类中使用mixin混入了ChangeNotifier。这个类能够帮助我们管理所有依赖资源封装类的听众。当资源封装类调用notifyListeners时，它会通知所有听众进行刷新。</p><p><strong>资源已经封装完毕，接下来我们就需要考虑把它放到哪儿了。</strong></p><p>因为Provider实际上是InheritedWidget的语法糖，所以通过Provider传递的数据从数据流动方向来看，是由父到子（或者反过来）。这时我们就明白了，原来需要把资源放到FirstPage和SecondPage的父Widget，也就是应用程序的实例MyApp中（当然，把资源放到更高的层级也是可以的，比如放到main函数中）：</p><pre><code>class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+     //通过Provider组件封装数据资源
+    return ChangeNotifierProvider.value(
+        value: CounterModel(),//需要共享的数据资源
+        child: MaterialApp(
+          home: FirstPage(),
+        )
+    );
+  }
+}
+</code></pre><p>可以看到，既然Provider是InheritedWidget的语法糖，因此它也是一个Widget。所以，我们直接在MaterialApp的外层使用Provider进行包装，就可以把数据资源依赖注入到应用中。</p><p>这里需要注意的是，由于封装的数据资源不仅需要为子Widget提供读的能力，还要提供写的能力，因此我们需要使用Provider的升级版ChangeNotifierProvider。而如果只需要为子Widget提供读能力，直接使用Provider即可。</p><p><strong>最后，在注入数据资源完成之后，我们就可以在FirstPage和SecondPage这两个子Widget完成数据的读写操作了。</strong></p><p>关于读数据，与InheritedWidget一样，我们可以通过Provider.of方法来获取资源数据。而如果我们想写数据，则需要通过获取到的资源数据，调用其暴露的更新数据方法（本例中对应的是increment），代码如下所示：</p><pre><code>//第一个页面，负责读数据
+class FirstPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    //取出资源
+    final _counter = Provider.of&lt;CounterModel&gt;(context);
+    return Scaffold(
+      //展示资源中的数据
+      body: Text('Counter: ${_counter.counter}'),
+      //跳转到SecondPage
+      floatingActionButton: FloatingActionButton(
+        onPressed: () =&gt; Navigator.of(context).push(MaterialPageRoute(builder: (context) =&gt; SecondPage()))
+      ));
+  }
+}
+
+//第二个页面，负责读写数据
+class SecondPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    //取出资源
+    final _counter = Provider.of&lt;CounterModel&gt;(context);
+    return Scaffold(
+      //展示资源中的数据
+      body: Text('Counter: ${_counter.counter}'),
+      //用资源更新方法来设置按钮点击回调
+      floatingActionButton:FloatingActionButton(
+          onPressed: _counter.increment,
+          child: Icon(Icons.add),
+     ));
+  }
+}
+</code></pre><p>运行代码，试着多点击几次第二个界面的“+”按钮，关闭第二个界面，可以看到第一个界面也同步到了按钮的点击数。</p><p><img src="https://static001.geekbang.org/resource/image/8e/45/8e13ca8e62920a403b00122136a46245.gif?wh=716*1192" alt=""></p><center><span class="reference">图1 Provider使用示例</span></center><h2>Consumer</h2><p>通过上面的示例可以看到，使用Provider.of获取资源，可以得到资源暴露的数据的读写接口，在实现数据的共享和同步上还是比较简单的。但是，<strong>滥用Provider.of方法也有副作用，那就是当数据更新时，页面中其他的子Widget也会跟着一起刷新。</strong></p><p>为验证这一点，我们以第二个界面右下角FloatingActionButton中的子Widget “+”Icon为例做个测试。</p><p>首先，为了打印出Icon控件每一次刷新的情况，我们需要自定义一个控件TestIcon，并在其build方法中返回Icon实例的同时，打印一句话：</p><pre><code>//用于打印build方法执行情况的自定义控件
+class TestIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    print(&quot;TestIcon build&quot;);
+    return Icon(Icons.add);//返回Icon实例
+  }
+}
+</code></pre><p>然后，我们用TestIcon控件，替换掉SecondPage中FloatingActionButton的Icon子Widget：</p><pre><code>class SecondPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    //取出共享的数据资源
+    final _counter = Provider.of&lt;CounterModel&gt;(context);
+    return Scaffold(
+     ...
+      floatingActionButton:FloatingActionButton(
+          onPressed: _counter.increment,
+          child: TestIcon(),//替换掉原有的Icon(Icons.add)
+     ));
+  }
+</code></pre><p>运行这段实例，然后在第二个页面多次点击“+”按钮，观察控制台输出：</p><pre><code>I/flutter (21595): TestIcon build
+I/flutter (21595): TestIcon build
+I/flutter (21595): TestIcon build
+I/flutter (21595): TestIcon build
+I/flutter (21595): TestIcon build
+</code></pre><p>可以看到，TestIcon控件本来是一个不需要刷新的StatelessWidget，但却因为其父Widget FloatingActionButton所依赖的数据资源counter发生了变化，导致它也要跟着刷新。</p><p>那么，<strong>有没有办法能够在数据资源发生变化时，只刷新对资源存在依赖关系的Widget，而其他Widget保持不变呢？</strong></p><p>答案当然是可以的。</p><p>在本次分享一开始时，我曾说Provider可以精确地控制UI刷新粒度，而这一切是基于Consumer实现的。Consumer使用了Builder模式创建UI，收到更新通知就会通过builder重新构建Widget。</p><p>接下来，我们就看看<strong>如何使用Consumer来改造SecondPage</strong>吧。</p><p>在下面的例子中，我们在SecondPage中去掉了Provider.of方法来获取counter的语句，在其真正需要这个数据资源的两个子Widget，即Text和FloatingActionButton中，使用Consumer来对它们进行了一层包装：</p><pre><code>class SecondPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      //使用Consumer来封装counter的读取
+      body: Consumer&lt;CounterModel&gt;(
+        //builder函数可以直接获取到counter参数
+        builder: (context, CounterModel counter, _) =&gt; Text('Value: ${counter.counter}')),
+      //使用Consumer来封装increment的读取 
+      floatingActionButton: Consumer&lt;CounterModel&gt;(
+        //builder函数可以直接获取到increment参数
+        builder: (context, CounterModel counter, child) =&gt; FloatingActionButton(
+          onPressed: counter.increment,
+          child: child,
+        ),
+        child: TestIcon(),
+      ),
+    );
+  }
+}
+</code></pre><p>可以看到，Consumer中的builder实际上就是真正刷新UI的函数，它接收3个参数，即context、model和child。其中：context是Widget的build方法传进来的BuildContext，model是我们需要的数据资源，而child则用来构建那些与数据资源无关的部分。在数据资源发生变更时，builder会多次执行，但child不会重建。</p><p>运行这段代码，可以发现，不管我们点击了多少次“+”按钮，TestIcon控件始终没有发生销毁重建。</p><h2>多状态的资源封装</h2><p>通过上面的例子，我们学习了Provider是如何共享一个数据状态的。那么，如果有多个数据状态需要共享，我们又该如何处理呢？</p><p>其实也不难。接下来，我就<strong>按照封装、注入和读写这3个步骤，与你介绍多个数据状态的共享</strong>。</p><p>在处理多个数据状态共享之前，我们需要先扩展一下上面计数器状态共享的例子，让两个页面之间展示计数器数据的Text能够共享App传递的字体大小。</p><p><strong>首先，我们来看看如何封装</strong>。</p><p>多个数据状态与单个数据的封装并无不同，如果需要支持数据的读写，我们需要一个接一个地为每一个数据状态都封装一个单独的资源封装类；而如果数据是只读的，则可以直接传入原始的数据对象，从而省去资源封装的过程。</p><p><strong>接下来，我们再看看如何实现注入。</strong></p><p>在单状态的案例中，我们通过Provider的升级版ChangeNotifierProvider实现了可读写资源的注入，而如果我们想注入多个资源，则可以使用Provider的另一个升级版MultiProvider，来实现多个Provider的组合注入。</p><p>在下面的例子中，我们通过MultiProvider往App实例内注入了double和CounterModel这两个资源Provider：</p><pre><code>class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(providers: [
+      Provider.value(value: 30.0),//注入字体大小
+      ChangeNotifierProvider.value(value: CounterModel())//注入计数器实例
+    ],
+    child: MaterialApp(
+      home: FirstPage(),
+    ));
+  }
+}
+</code></pre><p>在完成了多个资源的注入后，最后我们来看看<strong>如何获取这些资源</strong>。</p><p>这里，我们还是使用Provider.of方式来获取资源。相较于单状态资源的获取来说，获取多个资源时，我们只需要依次读取每一个资源即可：</p><pre><code>final _counter = Provider.of&lt;CounterModel&gt;(context);//获取计时器实例
+final textSize = Provider.of&lt;double&gt;(context);//获取字体大小
+</code></pre><p>而如果以Consumer的方式来获取资源的话，我们只要使用Consumer2&lt;A,B&gt;对象（这个对象提供了读取两个数据资源的能力），就可以一次性地获取字体大小与计数器实例这两个数据资源：</p><pre><code>//使用Consumer2获取两个数据资源
+Consumer2&lt;CounterModel,double&gt;(
+  //builder函数以参数的形式提供了数据资源
+  builder: (context, CounterModel counter, double textSize, _) =&gt; Text(
+      'Value: ${counter.counter}', 
+      style: TextStyle(fontSize: textSize))
+)
+</code></pre><p>可以看到，Consumer2与Consumer的使用方式基本一致，只不过是在builder方法中多了一个数据资源参数。事实上，如果你希望在子Widget中共享更多的数据，我们最多可以使用到Consumer6，即共享6个数据资源。</p><h2>总结</h2><p>好了，今天的分享就到这里，我们总结一下今天的主要内容吧。</p><p>我与你介绍了在Flutter中通过Provider进行状态管理的方法，Provider以InheritedWidget语法糖的方式，通过数据资源封装、数据注入和数据读写这3个步骤，为我们实现了跨组件（跨页面）之间的数据共享。</p><p>我们既可以用Provider来实现静态的数据读传递，也可以使用ChangeNotifierProvider来实现动态的数据读写传递，还可以通过MultiProvider来实现多个数据资源的共享。</p><p>在具体使用数据时，Provider.of和Consumer都可以实现数据的读取，并且Consumer还可以控制UI刷新的粒度，避免与数据无关的组件的无谓刷新。</p><p>可以看到，通过Provider来实现数据传递，无论在单个页面内还是在整个App之间，我们都可以很方便地实现状态管理，搞定那些通过StatefulWidget无法实现的场景，进而开发出简单、层次清晰、可扩展性高的应用。事实上，当我们使用Provider后，我们就再也不需要使用StatefulWidget了。</p><p>我把今天分享所涉及到的知识点打包到了<a href="https://github.com/cyndibaby905/30_provider_demo">GitHub</a>中，你可以下载下来，反复运行几次，加深理解与记忆。</p><h2>思考题</h2><p>最后，我给你留一道思考题吧。</p><p>使用Provider可以实现2个同样类型的对象共享，你知道应该如何实现吗？</p><p>欢迎你在评论区给我留言分享你的观点，我会在下一篇文章中等待你！感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/48/55/48de9a24.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Carlo</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，我们在生产环境的项目比较大，我们通过建造一个DependencyProvider <br>class DependencyProvider {<br>  DependencyProvider._();<br><br>  static DependencyProvider _sharedInstance;<br>  static DependencyProvider get sharedInstance {<br>    return _sharedInstance;<br>  }<br>  UserService get userService =&gt; UserService.sharedInstance(persistenceService);<br>}<br><br>然后通过在页面中注入页面所需的Service来共享数据<br>DependencyProvider.sharedInstance.userService<br><br>感觉也比较清晰，不知道您怎么评价这种机制？<br>跟Provider相比的优劣势是什么呢？<br><br>谢谢您的回复！</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 以单例模式共享数据，本质上和全局变量共享数据类似，全局可见，读写效率高，适合代码量少、功能也少、相对比较简单的程序。<br>对于代码量大、功能又多、逻辑又复杂的工程来说，就不建议用单例&#47;全局变量了。主要有以下几个原因：<br>1.代码对单例产生耦合依赖，破坏了代码的封装性&#47;独立性<br>2.变量的读写处于无序状态，每个模块都可以去读写数据，对系统维护及调试非常不利<br>3.变量常驻内存，无法释放</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-25 02:23:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/c8/db/44a3b5c3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小石头若海</span>
+  </div>
+  <div class="_2_QraFYR_0">老师说的“事实上，当我们使用Provider后，我们就再也不需要使StatefulWidget了”这句不太合理吧。。。😂<br><br>这是不是会导致Provider的滥用，还是应该把一些共享的数据放在Provider中，其他的交给组件自治更好</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 哈，这是个夸张的语法，形容provider的强大：）实际上StatefulWidget的用途不仅是通过数据变更驱动UI更新，还涉及到状态流转的各个生命周期，这些provider是搞不定的。技术领域没有银弹，还是得看具体场景</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-05 08:49:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/0c/05/3e2b8688.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>时光念你</span>
+  </div>
+  <div class="_2_QraFYR_0">InheritWidget.of只会找到当前widget树中距离当前节点最近的type对象。同样类型的共享对象，要么另一个对象变成共享对象的子类类型，要么改成持有关系。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-24 23:35:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/1e/e0/238fda97.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>🌝</span>
+  </div>
+  <div class="_2_QraFYR_0">老师， ChangeNotifier中有dispose方法， 这个方法又应该在是情况下才使用的到？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 需要释放封装对象资源的时候，比如在用文件做持久化的场景。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-16 18:54:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>辉哥</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，实现两个类型相同对象共享，是不是依靠共享对象的两个相同类型的成员实现到</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以，赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-30 08:54:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/da/66/5858322e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>满大大</span>
+  </div>
+  <div class="_2_QraFYR_0">我理解应该是需要夸页面共享才用provider吧，它应该是一个单利吧，正常情况下还是少用，对不对</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 涉及到复杂的状态共享情况，无论是单页面还是跨页面，都推荐使用Provider</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-26 19:10:46</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTIzYVBmYxzSZLFptgiazZ3CBiaMR2deF89Ja4eTNricbpNicQtIx72o9rqTP0emjQpJ0HHKOfPiajhckyw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ray</span>
+  </div>
+  <div class="_2_QraFYR_0">一直觉得Provider的Consumer～Consumer6不够优雅</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 确实不优雅</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-05 09:37:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/32/63/fa24f92e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>九三</span>
+  </div>
+  <div class="_2_QraFYR_0">hangeNotifierProvider.value 不推荐使用这种方式创建对象</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2023-04-28 16:56:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/b1/55/249c3abd.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>包美丽</span>
+  </div>
+  <div class="_2_QraFYR_0">求问老师，一个widget<br>1，如何监听多个model？<br>2，如何监听一个model中的多个字段？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-09-13 10:38:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epk6XJfVGqsW1b5oiatsuvSRkCF4yo2KxSUSf5LHRRTbuCPKJrRiblqRbMZBuicQMgDTO1bRp6vXW7Lg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jayce</span>
+  </div>
+  <div class="_2_QraFYR_0">CounterModel counterModel = Provider.of&lt;CounterModel&gt;(context, listen: false);<br>加上listen false的参数可以不刷新当前的Widget，默认是true</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-09-29 16:23:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/fc/cb/5e79c6ed.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>(Jet)黄仲平</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，关于Provider  是InheritedWidget的语法糖，不是很理解，会方便给一个例子说明一下吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-06 10:54:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/48/55/48de9a24.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Carlo</span>
+  </div>
+  <div class="_2_QraFYR_0">能不能再解释下Provider.of ？获取对象不是按照数据类型来定的吧？比如如果我还有个lineHeight，那写成<br>final _counter = Provider.of&lt;CounterModel&gt;(context);&#47;&#47;获取计时器实例<br>final textSize = Provider.of&lt;double&gt;(context);&#47;&#47;获取字体大小<br>final lineHeight = Provider.of&lt;double&gt;(context);<br>照数据类型一样的情况下，如何知道我获取的是textSize还是lineHeight？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 包一个大对象就可以了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-25 02:10:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/1e/e0/238fda97.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>🌝</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，Provider的数据会在跳转页面的时候清除掉。我该如何去处理这个问题？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你检查下组件的生命周期看看是不是有销毁&#47;新建</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-08 10:35:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/f7/16/20562cdf.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>离尘不离人คิดถึง</span>
+  </div>
+  <div class="_2_QraFYR_0">final _counter = Provider.of&lt;CounterModel&gt;(context);<br>    return Scaffold(<br>      appBar: AppBar(<br>        title: Text(&#39;DataFlow Page2&#39;),<br>      ),<br>      &#47;&#47;展示资源中的数据<br>      body: Consumer&lt;CounterModel&gt;(<br>        builder: (context, CounterModel counter, _) =&gt; Center(<br>          child: Text(&#39;Value: ${counter.counter}&#39;)<br>        )<br>      ),<br>      &#47;&#47; floatingActionButton: FloatingActionButton(<br>      &#47;&#47;   child: TestIcon(),<br>      &#47;&#47;   onPressed: _counter.increment,<br>      &#47;&#47; ),<br>      &#47;&#47;用资源更新方法来设置按钮点击回调<br>      floatingActionButton: Consumer&lt;CounterModel&gt;(<br>        builder: (context, CounterModel counter, child) =&gt; FloatingActionButton(<br>          onPressed: _counter.increment,<br>          child: child,<br>        ),<br>        child: TestIcon(),<br>      )<br>    );<br><br>如上代码所示，在测试的时候发现，按钮还是会不断的刷新重建</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你的第一行代码有主动获取build上下文：final _counter = Provider.of&lt;CounterModel&gt;(context);<br><br></p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-28 21:32:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/9e/6e/c4fa7cbc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>二师哥</span>
+  </div>
+  <div class="_2_QraFYR_0">请教一下先生，这个写的 widget 如何进行编写测试代码。按照普通的 widget 发现无法正常进行测试？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 参考38节的分享哈</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-22 19:01:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/4d/75/7c9c8d56.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>王企鹅群翁群</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，要是把那个资源都放在main里面，会不会太多了？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以分模块分文件声明啊</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-11 21:11:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJEDNglUOrnn3bWOByASEZjMSGZl9EEiby6Z2hfQdCFLuP2FbphsEbSGEQyA1VmmhwqCPiaiaguHMoZQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_keyi</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，问题一是不是共享两个同样类型的不同对象，只是共享树的层次不一样，读取的时候会找最近的那个共享对象。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这样可以，也可以通过封装一个大对象解决</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-26 14:20:31</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/3c/88/6bef27d6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>大神博士</span>
+  </div>
+  <div class="_2_QraFYR_0">持久化，尤其是 Provider 中的持久化 一般怎么做</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Provider目前还没有内置持久化的选项，不过这也不难，只要为Provider中的model提供序列化和反序列化JSON的方法，直接写到文件即可。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-23 19:10:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83eoLw2qjwoaVCDq8BqCcXOibyTG3rxiaJlDy2lt62IkiaDrrHeVwq4Pe8RpBbYJTIiadyicZ7InBCLCjJtQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Bojack</span>
+  </div>
+  <div class="_2_QraFYR_0">文档上不是说必须是不同类型的吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是啊，所以这就是今天的问题呀</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-10 18:37:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/bb/dd/5d473145.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>亡命之徒</span>
+  </div>
+  <div class="_2_QraFYR_0">老师你好，如果想修改tabbar的高度以及文字和图片的间距，必须自定义嘛，系统默认的不能修改嘛</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 试试Tabbar的preferredSize属性</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-06 15:11:16</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

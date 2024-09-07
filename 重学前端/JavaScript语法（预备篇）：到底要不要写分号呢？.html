@@ -1,0 +1,504 @@
+<audio title="JavaScript语法（预备篇）：到底要不要写分号呢？" src="https://static001.geekbang.org/resource/audio/ac/d1/accffbf5ccf1d32f20fdcba676b784d1.mp3" controls="controls"></audio> 
+<p>你好，我是winter。</p><p>在我们介绍JavaScript语法的全局结构之前，我们先要探讨一个语言风格问题：究竟要不要写分号。</p><p>这是一个非常经典的口水问题，“加分号”党和“不写分号”党之间的战争，可谓是经久不息。</p><p>实际上，行尾使用分号的风格来自于Java，也来自于C语言和C++，这一设计最初是为了降低编译器的工作负担。</p><p>但是，从今天的角度来看，行尾使用分号其实是一种语法噪音，恰好JavaScript语言又提供了相对可用的分号自动补全规则，所以，很多JavaScript的程序员都是倾向于不写分号。</p><p>这里要特意说一点，在今天的文章中，我并不希望去售卖自己的观点（其实我是属于“加分号”党），而是希望比较中立地给你讲清楚相关的知识，让你具备足够的判断力。</p><p>我们首先来了解一下自动插入分号的规则。</p><h2>自动插入分号规则</h2><p>自动插入分号规则其实独立于所有的语法产生式定义，它的规则说起来非常简单，只有三条。</p><ul>
+<li>要有换行符，且下一个符号是不符合语法的，那么就尝试插入分号。</li>
+<li>有换行符，且语法中规定此处不能有换行符，那么就自动插入分号。</li>
+<li>源代码结束处，不能形成完整的脚本或者模块结构，那么就自动插入分号。</li>
+</ul><p>这样描述是比较难以理解的，我们一起看一些实际的例子进行分析：</p><!-- [[[read_end]]] --><pre><code class="language-JavaScript">let a = 1
+void function(a){
+    console.log(a);
+}(a);
+</code></pre><p>在这个例子中，第一行的结尾处有换行符，接下来void关键字接在1之后是不合法的，这命中了我们的第一条规则，因此会在void前插入分号。</p><pre><code class="language-JavaScript">var a = 1, b = 1, c = 1;
+a
+++
+b
+++
+c
+</code></pre><p>这也是个著名的例子，我们看第二行的a之后，有换行符，后面遇到了++运算符，a后面跟++是合法的语法，但是我们看看JavaScript标准定义中，有[no LineTerminator here]这个字样，这是一个语法定义中的规则，你可以感受一下这个规则的内容（下一小节，我会给你详细介绍no LineTerminator here ）：</p><pre><code>UpdateExpression[Yield, Await]:
+    LeftHandSideExpression[?Yield, ?Await]
+    LeftHandSideExpression[?Yield, ?Await][no LineTerminator here]++
+    LeftHandSideExpression[?Yield, ?Await][no LineTerminator here]--
+    ++UnaryExpression[?Yield, ?Await]
+    --UnaryExpression[?Yield, ?Await]
+</code></pre><p>于是，这里a的后面就要插入一个分号了。所以这段代码最终的结果，b和c都变成了2，而a还是1。</p><pre><code class="language-JavaScript">(function(a){
+    console.log(a);
+})()
+(function(a){
+    console.log(a);
+})()
+</code></pre><p>这个例子是比较有实际价值的例子，这里两个function调用的写法被称作IIFE（立即执行的函数表达式），是个常见技巧。</p><p>这段代码意图上显然是形成两个IIFE。</p><p>我们来看第三行结束的位置，JavaScript引擎会认为函数返回的可能是个函数，那么，在后面再跟括号形成函数调用就是合理的，因此这里不会自动插入分号。</p><p>这是一些鼓励不写分号的编码风格会要求大家写IIFE时必须在行首加分号的原因。</p><pre><code class="language-JavaScript">function f(){
+    return/*
+        This is a return value.
+    */1;
+}
+f();
+</code></pre><p>在这个例子中，return和1被用注释分隔开了。</p><p>根据JavaScript自动插入分号规则，<strong>带换行符的注释也被认为是有换行符</strong>，而恰好的是，return也有[no LineTerminator here]规则的要求。所以这里会自动插入分号，f执行的返回值是undefined。</p><h2>no LineTerminator here 规则</h2><p>好了，到这里我们已经讲清楚了分号自动插入的规则，但是我们要想彻底掌握分号的奥秘，就必须要对JavaScript的语法定义做一些数据挖掘工作。</p><p>no LineTerminator here规则表示它所在的结构中的这一位置不能插入换行符。</p><p>自动插入分号规则的第二条：有换行符，且语法中规定此处不能有换行符，那么就自动插入分号。跟no LineTerminator here规则强相关，那么我们就找出JavaScript语法定义中的这些规则。</p><p><img src="https://static001.geekbang.org/resource/image/c3/ad/c3ffbc89e049ad1901d4108c8ad88aad.jpg?wh=1008*598" alt=""></p><p>为了方便你理解，我把产生式换成了实际的代码。</p><p>下面一段代码展示了，带标签的continue语句，不能在continue后插入换行。</p><pre><code class="language-JavaScript">outer:for(var j = 0; j &lt; 10; j++)
+    for(var i = 0; i &lt; j; i++)
+        continue /*no LineTerminator here*/ outter
+</code></pre><p>break跟continue是一样的，break后也不能插入换行：</p><pre><code class="language-JavaScript">outer:for(var j = 0; j &lt; 10; j++)
+    for(var i = 0; i &lt; j; i++)
+        break /*no LineTerminator here*/ outter
+</code></pre><p>我们前面已经提到过return和后自增、后自减运算符。</p><pre><code class="language-JavaScript">function f(){
+    return /*no LineTerminator here*/1;
+}
+</code></pre><pre><code class="language-JavaScript">i/*no LineTerminator here*/++
+i/*no LineTerminator here*/--
+</code></pre><p>以及，throw和Exception之间也不能插入换行符：</p><pre><code class="language-JavaScript">throw/*no LineTerminator here*/new Exception("error")
+</code></pre><p>凡是async关键字，后面都不能插入换行符：</p><pre><code class="language-JavaScript">async/*no LineTerminator here*/function f(){
+
+}
+const f = async/*no LineTerminator here*/x =&gt; x*x
+</code></pre><p>箭头函数的箭头前，也不能插入换行：</p><pre><code class="language-JavaScript">const f = x/*no LineTerminator here*/=&gt; x*x
+</code></pre><p>yield之后，不能插入换行：</p><pre><code class="language-JavaScript">function *g(){
+    var i = 0;
+    while(true)
+        yield/*no LineTerminator here*/i++;
+}
+</code></pre><p>到这里，我已经整理了所有标准中的no LineTerminator here规则，实际上，no LineTerminator here规则的存在，多数情况是为了保证自动插入分号行为是符合预期的，但是令人遗憾的是，JavaScript在设计的最初，遗漏了一些重要的情况，所以有一些不符合预期的情况出现，需要我们格外注意。</p><h2>不写分号需要注意的情况</h2><p>下面我们来看几种不写分号容易造成错误的情况，你可以稍微注意一下，避免发生同样的问题。</p><h3>以括号开头的语句</h3><p>我们在前面的案例中，已经展示了一种情况，那就是以括号开头的语句：</p><pre><code class="language-JavaScript">(function(a){
+    console.log(a);
+})()/*这里没有被自动插入分号*/
+(function(a){
+    console.log(a);
+})()
+</code></pre><p>这段代码看似两个独立执行的函数表达式，但是其实第三组括号被理解为传参，导致抛出错误。</p><h3>以数组开头的语句</h3><p>除了括号，以数组开头的语句也十分危险：</p><pre><code class="language-JavaScript">var a = [[]]/*这里没有被自动插入分号*/
+[3, 2, 1, 0].forEach(e =&gt; console.log(e))
+</code></pre><p>这段代码本意是一个变量a赋值，然后对一个数组执行forEach，但是因为没有自动插入分号，被理解为下标运算符和逗号表达式，我这个例子展示的情况，甚至不会抛出错误，这对于代码排查问题是个噩梦。</p><h3>以正则表达式开头的语句</h3><p>正则表达式开头的语句也值得你去多注意一下。我们来看这个例子。</p><pre><code class="language-JavaScript">var x = 1, g = {test:()=&gt;0}, b = 1/*这里没有被自动插入分号*/
+/(a)/g.test("abc")
+console.log(RegExp.$1)
+</code></pre><p>这段代码本意是声明三个变量，然后测试一个字符串中是否含有字母a，但是因为没有自动插入分号，正则的第一个斜杠被理解成了除号，后面的意思就都变了。</p><p>注意，我构造的这个例子跟上面的例子一样，同样不会抛错，凡是这一类情况，都非常致命。</p><h3>以Template开头的语句</h3><p>以Template开头的语句比较少见，但是跟正则配合时，仍然不是不可能出现：</p><pre><code class="language-JavaScript">
+var f = function(){
+  return "";
+}
+var g = f/*这里没有被自动插入分号*/
+`Template`.match(/(a)/);
+console.log(RegExp.$1)
+</code></pre><p>这段代码本意是声明函数f，然后赋值给g，再测试Template中是否含有字母a。但是因为没有自动插入分号，函数f被认为跟Template一体的，进而被莫名其妙地执行了一次。</p><h2>总结</h2><p>这一节课，我们讨论了要不要加分号的问题。</p><p>首先我们介绍了自动插入分号机制，又对JavaScript语法中的no line terminator规则做了个整理，最后，我挑选了几种情况，为你介绍了不写分号需要注意的一些常见的错误。</p><p>最后留给你一个问题，请找一些开源项目，看看它们的编码规范是否要求加分号，欢迎留言讨论。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/17/a5/7a0cbb55.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>本末倒置っ</span>
+  </div>
+  <div class="_2_QraFYR_0">几年前，各种各样的书大致上都推荐你加分号。<br>几年前，曾经由于构建工具有一些问题，导致不加分号可能会出问题。<br>jquery依然留着分号，vue源码不用分号。<br><br>尤雨溪曾经在知乎说：真正会导致上下行解析出问题的 token 有 5 个：括号，方括号，正则开头的斜杠，加号，减号。我还从没见过实际代码中用正则、加号、减号作为行首的情况，所以总结下来就是一句话：一行开头是括号或者方括号的时候加上分号就可以了，其他时候全部不需要。<br>哦当然再加个反引号。<br><br>可是写分号已经习惯了，又何必花力气改习惯去掉它。不加只要不写出bug，也很好。<br>反正分号有和没有，对eslint fix来说，只是瞬间的事。。。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-27 20:49:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJ26xdibLibk37rdrIA3zStsayOo9b0SGiasibNGfic6n2EIJiba1ptZOtWqV797wkszdjDM8aQkz1A2vibw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jacklovepdf</span>
+  </div>
+  <div class="_2_QraFYR_0">总结一下，不加分号可能会有问题，加分号一定不会有问题。那为什么不加?</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-06-24 10:36:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/f9/bc/cbc0207b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Scorpio</span>
+  </div>
+  <div class="_2_QraFYR_0">写了几年一直不写分号。。。等出了问题再说吧。。。我懒。。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-25 08:05:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/10/fb/c054968d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Rock</span>
+  </div>
+  <div class="_2_QraFYR_0">一直有加分号的习惯，一是不写分号我有强迫症，二是不写分号webstorm会提示</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-19 15:45:11</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/fc/e6/2cff4a89.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>醉月</span>
+  </div>
+  <div class="_2_QraFYR_0">用了cli写vue以后就很少用分号了<br>以前学js写原生的时候强迫症一样写分号<br>这东西就是见仁见智<br>前端真的是娱乐圈，，<br>为个分号还能争起来。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-25 11:31:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/b8/11/26838646.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>彧豪</span>
+  </div>
+  <div class="_2_QraFYR_0">另外我个人也是不写分号，然后使用的是双引号，诸位不写分号党，如果想要写上分号，用的eslint和vs code那么可以这么搞：<br>1. eslintrc中加入这条规则：&quot;semi&quot;: [&quot;error&quot;, &quot;always&quot;]<br>2. vsc中设置一下：&quot;eslint.autoFixOnSave&quot;: true<br>此时，你保存的时候，vsc会自动帮你在需要加分号的地方加上分号</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-26 20:03:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Dylan-Tseng</span>
+  </div>
+  <div class="_2_QraFYR_0">个人觉得还是加分号比较好，至少能保证加上去之后今天老师说的问题都能够得到我们想要的答案。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-25 09:29:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/3a/2f/70c1007f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>梦星魂</span>
+  </div>
+  <div class="_2_QraFYR_0">加封号更好看一点，更有终止感。而且能明显和if else 这样的语句区分开来。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-02 11:36:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJDSY5xBJ2PH4lqNtWJqhe1HcYkP7S9ibAXChONgCBX5pJ2gaU3icXhltQgqhzDyML3EzFicxPeE4Tiag/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_0bb537</span>
+  </div>
+  <div class="_2_QraFYR_0">自动补齐和自动驾驶一样 不特么靠谱！稳妥点 养成写分号的习惯！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-15 10:05:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c8/eb/7e6898af.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>fish·jade</span>
+  </div>
+  <div class="_2_QraFYR_0">采用eslint是不会写的，不采用会写上</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-25 09:11:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/f8/f7/1150bedc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>陆同春</span>
+  </div>
+  <div class="_2_QraFYR_0">react源码规范需要分号</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-23 08:58:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/72/31/06f8ada8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>WoodyYip鲜森</span>
+  </div>
+  <div class="_2_QraFYR_0">同意winter老师的观点，除非团队每位成员永远都是高水平的存在，否则我们就不能自己想当然，因为自己知道特殊情况不代表所有人都知道，不代表所有人都不会出上述不抛错的隐匿bug，工程化的时候要考虑团队所有人的平均水平，我们庙小，团队技术水平不高，而且有时也会有新人，所以我们还是倾向于约定俗成要求大家养成靠自己加分号的好习惯，虽然我们的eslint也配成了需要加分号，但这只是辅助手段，很容易就能想到，假如eslint都能正确插入分号，浏览器肯定也能，反之，如果像老师所说的会出问题的地方，eslint同样会抓瞎。 </div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-26 14:36:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/39/73/317ea03c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>joker</span>
+  </div>
+  <div class="_2_QraFYR_0">现在的编程环境根本不需要担心。格式代码化或eslint 都可以避免这些问题。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-29 21:55:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/f9/bc/cbc0207b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Scorpio</span>
+  </div>
+  <div class="_2_QraFYR_0">写了几年一直不写分号。。。等出了问题再说吧。。。我懒。。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-25 08:05:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/7a/aa/a90ec203.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>四叶草</span>
+  </div>
+  <div class="_2_QraFYR_0">启用了eslint检查都会要把分号去掉，这样编译后不是可能有问题？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-23 08:24:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c5/dd/5a482cab.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杜森垚</span>
+  </div>
+  <div class="_2_QraFYR_0">不写分号需要注意的情况，第三种，以正则表达式开头的语句，那个例子会报错，正则的第一个斜杠被理解成除号，后面小括号中的a，会被理解为普通标识符，会报： a is not defined</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-11 23:36:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/26/22/dd505e6d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Yully</span>
+  </div>
+  <div class="_2_QraFYR_0">vue没有分号，react有分号。对于是不是加分号，个人服从集体，代码服从项目，主要看项目的eslint配置，如果项目中设置的有分号，那就加，如果没有分号，那就不加。可无缝切换。主要还是项目的代码风格统一。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-07 14:31:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/74/1c/2a78a51a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>千虑必有一得</span>
+  </div>
+  <div class="_2_QraFYR_0">swift中不写分号，到了js自然也习惯不写分号</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-26 09:16:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/25/57/ce27b9ad.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>昔忆落落</span>
+  </div>
+  <div class="_2_QraFYR_0">感觉加分号好看一点，读起来也方便一点，所以一直保留着加分号的习惯</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-20 17:15:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/4e/c7/cb93c786.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Ranjay</span>
+  </div>
+  <div class="_2_QraFYR_0">eslint是你自己配置的。。。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-15 18:52:37</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

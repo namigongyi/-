@@ -1,0 +1,460 @@
+<audio title="34_编译原理（下）：编译原理给我们带来了什么？" src="https://static001.geekbang.org/resource/audio/64/9f/643079faee20d3e9859839426e60e39f.mp3" controls="controls"></audio> 
+<p>你好，我是大圣。</p><p>上一讲我们深入研究了 Vue 里的 compiler-dom 和 compiler-core 的流程，相信学完之后，你已经对编译原理的基础知识很熟悉了。</p><p>这时候你肯定会有一个疑问，AST、transform、generate这些概念以前工作中也没遇见过，难道学了这个就只能面试用吗？ 当然不是，编译原理作为计算机世界的一个重要的学科，除了探究原理和源码之外，我们工作中也有很多地方可以用到。</p><p>从宏观视角来看，编译原理实现的功能就是代码之间的转换。哪怕我们只是掌握了入门知识，也能可以实现Vue中 template到render函数转化这样的功能。</p><p>现在的前端发展，很大程度上离不开编译原理在前端圈的落地实践，只要是我们想做自动化代码转化的地方，都可以看到编译的身影。</p><p>举个例子，Babel把ES6中的新语法转换成低版本浏览器支持的语法，我们才能在项目中愉快地使用箭头函数等特性，把浏览器的兼容性交给Babel来处理，甚至现在社区内还出现了gogocode这种把Vue 2代码转换成Vue 3代码的工具。</p><p>在工作中我们可以借助Babel和vite提供给我们的能力，parse，transform，generate等代码都不需要我们自己实现，只需要考虑代码转换的逻辑就可以了，下面我给你举几个小例子。</p><!-- [[[read_end]]] --><h2>vite 插件</h2><p>首先我们在项目中使用了script setup来组织我们的代码，虽然组件引入之后有了自动注册的功能，但是每一个组件内部都肯定要用到ref、computed等Vue提供的API。我们还想要多一步，项目大了只引入ref的语句就写了几百行，就会非常地繁琐，这时候就可以使用编译的思想来解决这个问题。</p><p>首先ref、computed、watch等Vue提供的API，我们在后面的代码调用可以通过正则匹配的方式，完全可以分析出来当前组件依赖的API有哪些。这样，我们就可以在组件执行之前自动导入这些API。</p><p>我们在weiyouyi项目中使用vite插件的形式来完成这个工作。社区内已经有可用的 <a href="https://github.com/antfu/unplugin-auto-import">auto-imput</a> 插件了，不过这里为了加深对技术的理解，咱们还是自己来实现一个。</p><p>首先我们进入到根目录下的vite.config.js文件中，导入autoPlugin插件后，配置在vite的plugins插件中。</p><pre><code class="language-javascript">import vue from '@vitejs/plugin-vue'
+import autoPlgin from './src/auto-import'
+export default defineConfig({
+  plugins: [vue(),autoPlgin()]
+})
+
+</code></pre><p>然后我们来实现autoPlugin函数，vite的插件开发文档你可以在<a href="https://cn.vitejs.dev/guide/api-plugin.html">官网中</a>查询，这里就不赘述了。</p><p>我们直接看代码，我们先定义了Vue 3提供的API数组，有ref、computed等等。然后，autoImportPlugin函数对外导出一个对象，transform函数就是核心要实现的逻辑。</p><p>这里的helper和我们在32讲中的工具函数实现逻辑一致，通过new Regexp创建每个函数匹配的正则。如果匹配到对应的API，就把API的名字加入到helper集合中，最后在script setup的最上方加入一行import语句。</p><pre><code class="language-javascript">
+const vue3 = [
+  'ref',
+  'computed',
+  'reactive',
+  'onMounted',
+  'watchEffect',
+  'watch'
+] // 还有很多....
+
+export default function autoImportPlugin() {
+  return {
+    name: 'vite-plugin-auto-import', // 必须的，将会在 warning 和 error 中显示
+    enforce:'pre',
+    transform(code,id){
+      vueReg = /\.vue$/
+      if(vueReg.test(id)){
+        const helpers = new Set()
+        vue3.forEach(api=&gt;{
+          const reg = new RegExp(api+"(.*)")
+          if(reg.test(code)){
+            helpers.add(api)
+          }
+        })
+        return code.replace('&lt;script setup&gt;',`&lt;script setup&gt;
+
+import {${[...helpers].join(',')}} from 'vue' //俺是自动导入的        
+`)
+      }
+      return code
+    }
+  }
+}
+</code></pre><p>接着，我们在项目的src目录下新建App.vue。下面的代码实现了一个简易的累加器，并且还会在onMount之后打印一条信息，这里的ref、computed和onMounted都是没有导入的。我们在浏览器就能看到页面可以正常显示，这时我们在浏览器调试窗口的sources页面中，就可以看到App.vue的代码已经自动加上了import语句。</p><pre><code class="language-javascript">&lt;template&gt;
+  &lt;div @click="add"&gt;
+    {{num}} * 2 = {{double}}
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;script setup&gt;
+let num = ref(1)
+let double = computed(()=&gt;num.value*2)
+
+function add(){
+  num.value++
+}
+onMounted(()=&gt;{
+  console.log('mounted')
+})
+
+&lt;/script&gt;
+</code></pre><h2><img src="https://static001.geekbang.org/resource/image/77/fd/77db83e745d7345a146f03364d93cbfd.png?wh=1662x790" alt="图片"></h2><p>这里的代码都是硬编码实现的，逻辑也比较简单。不过，实际场景中判断ref等API调用的正则和导入import的方式，都不会这么简单。如果我们自己每次都写一个parse模块比较麻烦，所以我们实际开发中会借助现有的工具对代码进行解析，而代码转换的场景下最成熟的工具就是Babel。</p><h2>Babel</h2><p>我们在项目中异步的任务有很多，经常使用async+ await的语法执行异步任务，比如网络数据的获取。但<strong> await是异步任务</strong>，如果报错，我们需要使用try catch语句进行错误处理，每个catch语句都是一个打印语句会让代码变得冗余，但我们有了代码转化的思路后，这一步就能用编译的思路自动来完成。</p><p>首先我们在根目录的src/main.js中新增下面代码，我们使用delyError函数模拟异步的任务报错，在代码中使用await来模拟异步任务。</p><p>这里我们希望每个await都能跟着一个try代码，在catch中能够打印错误消息提示的同时，还能够使用调用错误监控的函数，把当前错误信息发给后端服务器进行报警，当然也可以打印一个自动去stackoverflow查询的链接。</p><pre><code class="language-javascript">function delyError(message){
+  return new Promise((resolve,reject)=&gt;{
+    setTimeout(()=&gt;{
+      reject({message})
+    },1000)
+  })
+}
+async function test(){
+    await delyError('ref is not defined')
+}
+// 我们期望的代码
+async function test(){
+  try{
+        await delyError('ref is not defined')
+  }catche(e){
+    console.error(e.message)
+    _errorTrack(e.message,location.pathname)
+     console.log('https://stackoverflow.com/search?q=[js]+'+encodeURI(e.message))
+  }
+
+}
+test()
+</code></pre><p>页面中await语句变多了之后，手动替换的成本就比较高，我们可以继续使用vite的插件来实现。这次我们就是用Babel提供好的代码解析能力对代码进行转换。Babel都提供了哪些API，你可以在<a href="https://babel.docschina.org/docs/en/babel-parser">Babel的官网</a>进行深入学习。</p><p>Babel提供了完整的编译代码的功能后函数，包括AST的解析、语义分析、代码生成等，我们可以通过下面的函数去实现自己的插件。</p><ul>
+<li>@babel/parser提供了代码解析的能力，能够把js代码解析成AST，代码就从字符串变成了树形结构，方便我们进行操作；</li>
+<li>@babel/traverse提供了遍历AST的能力，我们可以从travser中获取每一个节点的信息后去修改它；</li>
+<li>@babe/types提供了类型判断的函数，我们可以很方便的判断每个节点的类型；</li>
+<li>@babel/core提供了代码转化的能力。</li>
+</ul><p>下面的代码中我们实现了vite-plugin-auto-try插件，由babel/parer解析成为AST，通过travser遍历整个AST节点，配置的AwaitExpression会识别出AST中的await调用语句，再用isTryStatement判断await外层是否已经包裹了try语句。如果没有try语句的话，就使用tryStatement函数生成新的AST节点。</p><p>这个AST包裹当前的节点，并且我们在内部加上了stackoverflow链接的打印。最后，使用babel/core提供的transformFromAstSync函数，把优化后的AST生成新的JavaScript代码，自动新增try代码的插件就实现了。</p><pre><code class="language-javascript">
+
+import { parse } from '@babel/parser'
+import traverse from '@babel/traverse'
+import {
+  isTryStatement,
+  tryStatement,
+  isBlockStatement,
+  catchClause,
+  identifier,
+  blockStatement,
+} from '@babel/types'
+import { transformFromAstSync } from '@babel/core'
+
+const catchStatement = parse(`
+  console.error(err)
+  console.log('https://stackoverflow.com/search?q=[js]+'+encodeURI(err.message))
+`).program.body
+
+export default function autoImportPlugin() {
+  return {
+    name: 'vite-plugin-auto-try', // 必须的，将会在 warning 和 error 中显示
+    enforce:'pre',
+    transform(code,id){
+        fileReg = /\.js$/
+        if(fileReg.test(id)){
+        const ast = parse(code, {
+          sourceType: 'module'
+        })
+        traverse(ast, {
+          AwaitExpression(path){
+            console.log(path)
+            if (path.findParent((path) =&gt; isTryStatement(path.node))) {
+              // 已经有try了
+              return 
+            }
+            // isBlockStatement 是否函数体
+            const blockParentPath = path.findParent((path) =&gt; isBlockStatement(path.node))
+            const tryCatchAst  = tryStatement(
+              blockParentPath.node,
+              // ast中新增try的ast
+              catchClause(
+                identifier('err'),
+                blockStatement(catchStatement),
+              )
+            )
+            // 使用有try的ast替换之前的ast
+            blockParentPath.replaceWithMultiple([tryCatchAst])
+
+          }
+        })
+        // 生成代码，generate
+        code = transformFromAstSync(ast,"",{
+          configFile:false
+        }).code
+
+        return code
+      }
+      return code
+    }
+  }
+}
+</code></pre><p>然后，我们在根目录下的src/main.js中写入下面的代码。两个await语句一个使用try包裹，一个没有使用try包裹。</p><p>接着我们启动项目后，就来到了浏览器的调试窗口中的source页面，可以看到下图中解析后的main.js代码，现在没有try的await语句已经自动加上了try语句。</p><p>你看，<strong>这次我们基于babel来实现，就省去了我们写正则的开发成本</strong>。Babel提供了一整套关于JavaScirpt中语句的转化函数，有兴趣的同学可以去Babel官网了解。</p><pre><code class="language-javascript">import { createApp } from "vue";
+import App from './App.vue'
+
+createApp(App)
+  .mount('#app')
+
+async function test(){
+  await delyError('ref is not defined')
+}
+
+async function test2(){
+  try{
+    await delyError('reactive is not defined')
+  }catch(e){
+    console.error(e)
+  }
+}
+test()
+function delyError(message){
+  return new Promise((resolve,reject)=&gt;{
+    setTimeout(()=&gt;{
+      reject({message})
+    },1000)
+  })
+}
+
+</code></pre><h2><img src="https://static001.geekbang.org/resource/image/0a/f9/0a00c01yyfdf020eec114fc5a70344f9.png?wh=1920x1056" alt="图片"></h2><p>有了Babel提供的能力之后，我们可以只关注于代码中需要转换的逻辑，比如我们可以使用Babel实现国际化，把每种语言在编译的时候自动替换语言，打包成独立的项目；也可以实现页面的自动化监控，在一些操作函数里面加入监控的代码逻辑。你可以自行发挥想象力，使用编译的思想来提高日常的开发效率。</p><p>最后我们回顾一下Vue中的compiler。Vue中的compiler-dom提供了compile函数，具体的compile逻辑我们在上一讲中已经详细学习了。其实我们也可以手动导入compiler-dom包之后，自己实现对vue template的解析。另外，Vue中还提供了@vue/compiler-sfc包，用来实现单文件组件.vue的解析，还有@vue/compiler-ssr包，它实现了服务端渲染的解析。</p><p>下一讲我们一起来手写vite的代码内容，我们就需要在nodejs中实现对Vue单文件组件的解析工作，实现浏览器中直接导入单文件组件的功能，敬请期待。</p><h2>总结</h2><p>最后我们总结一下今天学到的内容。</p><p>我们把Vue内部的compiler原理融会贯通之后，今天尝试把template到render转化过程的思想应用到实际项目中。Vue中的compiler在转化的过程中还做了静态标记的优化，我们在实际开发中可以借鉴编译的思路，提高开发的效率。</p><p>我们一起回顾一下代码自动导入的操作思路。首先我们可以实现页面中ref、computed的API的自动化导入，在vite插件的transform函数中获取到待转换的代码，通过对代码的内容进行正则匹配，实现如果出现了ref，computed等函数的调用，我们可以把这些依赖的函数收集在helper中。最终在script setup标签之前新增import语句来导入依赖的API，最终就可以实现代码的自动导入。</p><p><strong>实际开发中，我们可以把使用到的组件库Element3，工具函数vueuse等框架都进行语法的解析，实现函数和组件的自动化导入和按需加载。这样能在提高开发效率的同时，也提高我们书写vite插件的能力</strong>。</p><h2>思考题</h2><p>最后留一个思考题吧，你觉得在工作项目中有哪里需要用到代码转化的思路呢？欢迎在评论区分享你的答案，也欢迎你把这一讲的内容分享给你的同事和朋友们，我们下一讲再见！</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/cd/ed/825d84ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>费城的二鹏</span>
+  </div>
+  <div class="_2_QraFYR_0">很多魔板代码都可以通过代码转化的方式实现，我们的网络请求代码非常固定，打算试试用这种方式减少模板代码</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-01-09 16:19:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/ruxj2Ko6lpWdmf4ePtUCjZU0LpicbVUuTicWaSDRkGHGMB78b3vQNNbfhlqMWlibxCLX6V0IfueFxUyxs5BlryzVQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>SjmBreadrain</span>
+  </div>
+  <div class="_2_QraFYR_0">除了留言之外还有别的互动方式不？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 课程介绍页有个微信群</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-01-08 17:49:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/98/e5/46c5235b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>烛火星光</span>
+  </div>
+  <div class="_2_QraFYR_0">比如我们可以使用 Babel 实现国际化<br><br>想问一下，这玩意怎么实现，能给一个简单示例么</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-09-05 21:37:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/25/91/09/6f0b987a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>陈坚泓</span>
+  </div>
+  <div class="_2_QraFYR_0">这节不错 非常实用 可以减少很多重复性操作 </div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-05-20 15:47:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/3f/a8/8da58e53.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>海阔天空</span>
+  </div>
+  <div class="_2_QraFYR_0">厉害厉害，以前用得比较多的就是css的编译，less 函数的编译处理兼容性问题等。部分用到登录信息的处理。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-01-10 07:40:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/yyibGRYCArsUNBfCAEAibua09Yb9D5AdO8TkCmXymhAepibqmlz0hzg06ggBLxyvXicnjqFVGr7zYF0rQoZ0aXCBAg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>james</span>
+  </div>
+  <div class="_2_QraFYR_0">不错不错</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-01-08 21:16:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/3c/1c/47e5b7aa.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Johnson</span>
+  </div>
+  <div class="_2_QraFYR_0">很实用。😁</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-01-07 07:38:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/31/0d/cd/791d0f5e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Mr_shaojun</span>
+  </div>
+  <div class="_2_QraFYR_0">厉害厉害，打开了新世界的大门</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-12-30 16:00:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/3c/1c/47e5b7aa.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Johnson</span>
+  </div>
+  <div class="_2_QraFYR_0">试了一下，下面的代码放在main.js时会自动增加try...catch，但是代码放在组件中无法自动增加，这个要怎么解决处理呢？<br>async function test() {<br>  await delayError(&quot;ref is not defined&quot;);<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-07-15 10:45:09</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/2a/ad/5ea1a719.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>henry</span>
+  </div>
+  <div class="_2_QraFYR_0">工具库自动导入如何跟ts的类型系统一起用呢？ts类型检查和类型提示应该不能正常工作了...</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-07-05 23:51:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/a1/8e/03aeb9df.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Rocky</span>
+  </div>
+  <div class="_2_QraFYR_0">高</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-05-02 16:22:12</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

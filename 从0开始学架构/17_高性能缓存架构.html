@@ -1,0 +1,500 @@
+<audio title="17_高性能缓存架构" src="https://static001.geekbang.org/resource/audio/f7/bf/f7117309a31732185fcc58b850f014bf.mp3" controls="controls"></audio> 
+<p>虽然我们可以通过各种手段来提升存储系统的性能，但在某些复杂的业务场景下，单纯依靠存储系统的性能提升不够的，典型的场景有：</p>
+<ul>
+<li>需要经过复杂运算后得出的数据，存储系统无能为力</li>
+</ul>
+<p>例如，一个论坛需要在首页展示当前有多少用户同时在线，如果使用MySQL来存储当前用户状态，则每次获取这个总数都要“count(*)”大量数据，这样的操作无论怎么优化MySQL，性能都不会太高。如果要实时展示用户同时在线数，则MySQL性能无法支撑。</p>
+<ul>
+<li>读多写少的数据，存储系统有心无力</li>
+</ul>
+<p>绝大部分在线业务都是读多写少。例如，微博、淘宝、微信这类互联网业务，读业务占了整体业务量的90%以上。以微博为例：一个明星发一条微博，可能几千万人来浏览。如果使用MySQL来存储微博，用户写微博只有一条insert语句，但每个用户浏览时都要select一次，即使有索引，几千万条select语句对MySQL数据库的压力也会非常大。</p>
+<p>缓存就是为了弥补存储系统在这些复杂业务场景下的不足，其基本原理是将可能重复使用的数据放到内存中，一次生成、多次使用，避免每次使用都去访问存储系统。</p>
+<p>缓存能够带来性能的大幅提升，以Memcache为例，单台Memcache服务器简单的key-value查询能够达到TPS 50000以上，其基本的架构是：</p>
+<p><img src="https://static001.geekbang.org/resource/image/c7/15/c70fdcaab49fe730380d2207017c4215.jpg?wh=3065*2187" alt="" /></p>
+<p>缓存虽然能够大大减轻存储系统的压力，但同时也给架构引入了更多复杂性。架构设计时如果没有针对缓存的复杂性进行处理，某些场景下甚至会导致整个系统崩溃。今天，<span class="orange">我来逐一分析缓存的架构设计要点。</span></p>
+<!-- [[[read_end]]] -->
+<h2>缓存穿透</h2>
+<p><strong>缓存穿透</strong>是指缓存没有发挥作用，业务系统虽然去缓存查询数据，但缓存中没有数据，业务系统需要再次去存储系统查询数据。通常情况下有两种情况：</p>
+<p>1.存储数据不存在</p>
+<p>第一种情况是被访问的数据确实不存在。一般情况下，如果存储系统中没有某个数据，则不会在缓存中存储相应的数据，这样就导致用户查询的时候，在缓存中找不到对应的数据，每次都要去存储系统中再查询一遍，然后返回数据不存在。缓存在这个场景中并没有起到分担存储系统访问压力的作用。</p>
+<p>通常情况下，业务上读取不存在的数据的请求量并不会太大，但如果出现一些异常情况，例如被黑客攻击，故意大量访问某些读取不存在数据的业务，有可能会将存储系统拖垮。</p>
+<p>这种情况的解决办法比较简单，如果查询存储系统的数据没有找到，则直接设置一个默认值（可以是空值，也可以是具体的值）存到缓存中，这样第二次读取缓存时就会获取到默认值，而不会继续访问存储系统。</p>
+<p>2.缓存数据生成耗费大量时间或者资源</p>
+<p>第二种情况是存储系统中存在数据，但生成缓存数据需要耗费较长时间或者耗费大量资源。如果刚好在业务访问的时候缓存失效了，那么也会出现缓存没有发挥作用，访问压力全部集中在存储系统上的情况。</p>
+<p>典型的就是电商的商品分页，假设我们在某个电商平台上选择“手机”这个类别查看，由于数据巨大，不能把所有数据都缓存起来，只能按照分页来进行缓存，由于难以预测用户到底会访问哪些分页，因此业务上最简单的就是每次点击分页的时候按分页计算和生成缓存。通常情况下这样实现是基本满足要求的，但是如果被竞争对手用爬虫来遍历的时候，系统性能就可能出现问题。</p>
+<p>具体的场景有：</p>
+<ul>
+<li>
+<p>分页缓存的有效期设置为1天，因为设置太长时间的话，缓存不能反应真实的数据。</p>
+</li>
+<li>
+<p>通常情况下，用户不会从第1页到最后1页全部看完，一般用户访问集中在前10页，因此第10页以后的缓存过期失效的可能性很大。</p>
+</li>
+<li>
+<p>竞争对手每周来爬取数据，爬虫会将所有分类的所有数据全部遍历，从第1页到最后1页全部都会读取，此时很多分页缓存可能都失效了。</p>
+</li>
+<li>
+<p>由于很多分页都没有缓存数据，从数据库中生成缓存数据又非常耗费性能（order by limit操作），因此爬虫会将整个数据库全部拖慢。</p>
+</li>
+</ul>
+<p>这种情况并没有太好的解决方案，因为爬虫会遍历所有的数据，而且什么时候来爬取也是不确定的，可能是每天都来，也可能是每周，也可能是一个月来一次，我们也不可能为了应对爬虫而将所有数据永久缓存。通常的应对方案要么就是识别爬虫然后禁止访问，但这可能会影响SEO和推广；要么就是做好监控，发现问题后及时处理，因为爬虫不是攻击，不会进行暴力破坏，对系统的影响是逐步的，监控发现问题后有时间进行处理。</p>
+<h2>缓存雪崩</h2>
+<p><strong>缓存雪崩</strong>是指当缓存失效（过期）后引起系统性能急剧下降的情况。当缓存过期被清除后，业务系统需要重新生成缓存，因此需要再次访问存储系统，再次进行运算，这个处理步骤耗时几十毫秒甚至上百毫秒。而对于一个高并发的业务系统来说，几百毫秒内可能会接到几百上千个请求。由于旧的缓存已经被清除，新的缓存还未生成，并且处理这些请求的线程都不知道另外有一个线程正在生成缓存，因此所有的请求都会去重新生成缓存，都会去访问存储系统，从而对存储系统造成巨大的性能压力。这些压力又会拖慢整个系统，严重的会造成数据库宕机，从而形成一系列连锁反应，造成整个系统崩溃。</p>
+<p>缓存雪崩的常见解决方法有两种：<strong>更新锁机制</strong>和<strong>后台更新机制</strong>。</p>
+<p>1.更新锁</p>
+<p>对缓存更新操作进行加锁保护，保证只有一个线程能够进行缓存更新，未能获取更新锁的线程要么等待锁释放后重新读取缓存，要么就返回空值或者默认值。</p>
+<p>对于采用分布式集群的业务系统，由于存在几十上百台服务器，即使单台服务器只有一个线程更新缓存，但几十上百台服务器一起算下来也会有几十上百个线程同时来更新缓存，同样存在雪崩的问题。因此分布式集群的业务系统要实现更新锁机制，需要用到分布式锁，如ZooKeeper。</p>
+<p>2.后台更新</p>
+<p>由后台线程来更新缓存，而不是由业务线程来更新缓存，缓存本身的有效期设置为永久，后台线程定时更新缓存。</p>
+<p>后台定时机制需要考虑一种特殊的场景，当缓存系统内存不够时，会“踢掉”一些缓存数据，从缓存被“踢掉”到下一次定时更新缓存的这段时间内，业务线程读取缓存返回空值，而业务线程本身又不会去更新缓存，因此业务上看到的现象就是数据丢了。解决的方式有两种：</p>
+<ul>
+<li>
+<p>后台线程除了定时更新缓存，还要频繁地去读取缓存（例如，1秒或者100毫秒读取一次），如果发现缓存被“踢了”就立刻更新缓存，这种方式实现简单，但读取时间间隔不能设置太长，因为如果缓存被踢了，缓存读取间隔时间又太长，这段时间内业务访问都拿不到真正的数据而是一个空的缓存值，用户体验一般。</p>
+</li>
+<li>
+<p>业务线程发现缓存失效后，通过消息队列发送一条消息通知后台线程更新缓存。可能会出现多个业务线程都发送了缓存更新消息，但其实对后台线程没有影响，后台线程收到消息后更新缓存前可以判断缓存是否存在，存在就不执行更新操作。这种方式实现依赖消息队列，复杂度会高一些，但缓存更新更及时，用户体验更好。</p>
+</li>
+</ul>
+<p>后台更新既适应单机多线程的场景，也适合分布式集群的场景，相比更新锁机制要简单一些。</p>
+<p>后台更新机制还适合业务刚上线的时候进行缓存预热。缓存预热指系统上线后，将相关的缓存数据直接加载到缓存系统，而不是等待用户访问才来触发缓存加载。</p>
+<h2>缓存热点</h2>
+<p>虽然缓存系统本身的性能比较高，但对于一些特别热点的数据，如果大部分甚至所有的业务请求都命中同一份缓存数据，则这份数据所在的缓存服务器的压力也很大。例如，某明星微博发布“我们”来宣告恋爱了，短时间内上千万的用户都会来围观。</p>
+<p><strong>缓存热点的解决方案就是复制多份缓存副本，将请求分散到多个缓存服务器上，减轻缓存热点导致的单台缓存服务器压力</strong>。以微博为例，对于粉丝数超过100万的明星，每条微博都可以生成100份缓存，缓存的数据是一样的，通过在缓存的key里面加上编号进行区分，每次读缓存时都随机读取其中某份缓存。</p>
+<p>缓存副本设计有一个细节需要注意，就是不同的缓存副本不要设置统一的过期时间，否则就会出现所有缓存副本同时生成同时失效的情况，从而引发缓存雪崩效应。正确的做法是设定一个过期时间范围，不同的缓存副本的过期时间是指定范围内的随机值。</p>
+<h2>实现方式</h2>
+<p>由于缓存的各种访问策略和存储的访问策略是相关的，因此上面的各种缓存设计方案通常情况下都是集成在存储访问方案中，可以采用“程序代码实现”的中间层方式，也可以采用独立的中间件来实现。</p>
+<h2>小结</h2>
+<p>今天我为你讲了高性能架构设计中缓存设计需要注意的几个关键点，这些关键点本身在技术上都不复杂，但可能对业务产生很大的影响，轻则系统响应变慢，重则全站宕机，架构师在设计架构的时候要特别注意这些细节，希望这些设计关键点和技术方案对你有所帮助。</p>
+<p>这就是今天的全部内容，留一道思考题给你吧，分享一下你所在的业务发生过哪些因为缓存导致的线上问题？采取了什么样的解决方案？效果如何？</p>
+<p>欢迎你把答案写到留言区，和我一起讨论。相信经过深度思考的回答，也会让你对知识的理解更加深刻。（编辑乱入：精彩的留言有机会获得丰厚福利哦！）</p>
+
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/ce/46/67c145ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>bluefantasy</span>
+  </div>
+  <div class="_2_QraFYR_0">我们的系统就出现过类似的问题，开始的时候没有缓存，每次做活动访问量大的时候就会导致反应特别慢。后来通过加redis缓存解决了问题。<br><br> 对于缓存雪崩问题，我们采取了双key策略：要缓存的key过期时间是t，key1没有过期时间。每次缓存读取不到key时就返回key1的内容，然后触发一个事件。这个事件会同时更新key和key1。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很有创意👍👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 08:30:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/05/e5/aa579968.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>王磊</span>
+  </div>
+  <div class="_2_QraFYR_0">经常我说到缓存的时候，面试官问我，数据库自身不是有缓存吗，标准答案是怎么回击他?</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我对mysql比较熟，以下仅限mysql：<br>1. mysql第一种缓存叫sql语句结果缓存，但条件比较苛刻，程序员不可控，我们的dba线上都关闭这个功能，具体实现可以查一下<br>2. mysql第二种缓存是innodb buffer pool，缓存的是磁盘上的分页数据，不是sql的查询结果，sql的执行过程省不了。而mc，redis这些实际上都是缓存sql的结果，两种缓存方式，性能差很远。<br><br>因此，可控性，性能是数据库缓存和独立缓存的主要区别</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 21:10:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/c0/95/6f0aad03.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>loveluckystar</span>
+  </div>
+  <div class="_2_QraFYR_0">讲一个头两天发生的事情，我们的一个业务背后是es做db，之前是通过redis做缓存，缓存一段时间后失效再从es读取，是业务访问加载缓存的方式。有一天线上es集群机器单台出现问题，返回慢，由于分布式的缘故，渐渐拖满了所有请求，缓存失效来查询es发生了超时，加载失败，于是下次访问还是直接访问es。最终缓存全部失效，qps翻了好多倍，直接雪崩，es集群彻底没有响应了。。。之后我们只好先下线这个缓存加载功能，让集群活过来，最终改造缓存加载方式，用后台进程去更新缓存，而不用业务访问加载。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 现学现用的案例，很赞👍👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 09:33:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/ca/e4/f15a1cf0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>三月沙@wecatch</span>
+  </div>
+  <div class="_2_QraFYR_0">好的缓存方案应该从这几个方面入手设计：<br>1.什么数据应该缓存<br>2.什么时机触发缓存和以及触发方式是什么<br>3.缓存的层次和粒度（ 网关缓存如 nginx，本地缓存如单机文件，分布式缓存如redis cluster，进程内缓存如全局变量）<br>4.缓存的命名规则和失效规则<br>5.缓存的监控指标和故障应对方案<br>6.可视化缓存数据如 redis 具体 key 内容和大小</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 确实，细节不少，可以写本书了😃</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 10:45:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/05/d8/cd269378.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>一叶</span>
+  </div>
+  <div class="_2_QraFYR_0">笔记：<br>书籍：<br>《高性能Mysql》<br>《unix编程艺术》：宁花机器一分，不花程序员一秒<br><br>提升性能：<br>先单机，有压力后优先考虑sql优化、db参数调优，还有硬件性能(32核&#47;16G&#47;SSD)优化，不行还可以再考虑业务逻辑优化、缓存。不要一上来就读写分离、集群等，能单库搞定的就毫不犹豫的单库。<br><br>---<br><br>主从读写分离<br>适用于单机无法应付所有请求，且读比写多时，读写分离还可以分别针对读写节点建索引来优化。<br>对实时性要求不高：刚写入就读会有延迟，同步数据特别大时，延迟可能达到分钟级（可用缓存解决：2-8原则，挑选占访问量80%的前20%来缓存）。<br>TODO主从还能设置自增长key不一样？<br><br>分库分表（甚用，增加很多复杂度）<br>几千万或上亿<br>分库时机：单机性能瓶颈，1业务不复杂，但整体数据量影响到数据库性能；2业务复杂，需要分系统由不同团队开发，使用分库减少团队耦合。（分库导致不能join和事务（有方案但性能太低用了跟没分库差别不大，用最终一致性&#47;事件驱动））<br>分表时机：单表数据量大拖慢了sql性能，做垂直（将常用和不常用字段分开）或水平拆分（id分段、hash路由、添加路由表等）提高速度。（那么join、count、分页排序等就变得复杂）<br>TODO环状hash 一致性hash？<br><br>nosql<br>（nosql——not noly sql 本质上是牺牲ACID中的某个或某几个属性，以解决关系数据库某些复杂的问题）<br>关系数据库：强大的sql功能和ACID属性，发展了几十年技术相当成熟 Mysql &#47; Postgresql <br>k-v存储：解决关系数据库无法存储数据结构的问题 Redis &#47; Memcache （redis不太适合key的value特别大，这种情况会导致整个redis变慢，这种场景mc更好-&gt;参考IO模型 redis单Reactor单进程读写大value会阻塞所有业务 持久化也会）<br>文档数据库：解决关系数据库强schema约束，查询不存在的列会报错，扩充很麻烦还会长时间锁表  MongoDB <br>列式数据库：解决关系数据库处理大数据分析或统计时IO高的问题，关系数据库即使只处理某列也会把整行查询到内存中 HBase &#47; Greenplum<br>全文搜索引擎：解决关系数据库全文搜索like扫描全表性能问题 ElasticSearch &#47; solr<br>LevelDB 内存型？<br>时序数据库？：实时计算统计实时监控 influxDB<br>OLAP OLTP HTAP？<br><br>缓存（千万千万不要设计复杂的缓存，到时候各种不一致问题烦死你）<br>cdn、nginx缓存、网关缓存、数据层缓存redis、db本身也有缓存(sql结果缓存、读取的磁盘分页缓存)<br>缓存穿透：1本身无数据(添加默认值缓存&#47;布隆过滤器[整型自增key？]) 2未生成缓存(识别爬虫并禁止 但可能影响seo)<br>缓存雪崩：缓存实效后大家都在更新缓存导致系统性能急剧下降（1消息队列通知后台更新、2使用分布式更新锁）<br>缓存热点：大部分业务都会命中的同一份缓存，比如1000w+粉丝的微博消息，复制多分缓存副本，key里面加副本编号将请求分散，且设置过期范围，而不是所有副本固定同一过期时间。<br>缓存框架看一下设计思路：echcache、网友分享https:&#47;&#47;github.com&#47;qiujiayu&#47;AutoLoadCache<br><br><br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很用心，赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-09-23 21:30:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/b7/a2/0ce9b8df.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>家榆</span>
+  </div>
+  <div class="_2_QraFYR_0">我是实现了个框架:https:&#47;&#47;github.com&#47;qiujiayu&#47;AutoLoadCache，用于解决一下问题:<br>1. 缓存操作与业务代码耦合问题；<br>2. 缓存穿透问题；<br>3. 异步在缓存快要过期时，异步刷新缓存；<br>4. 使用“拿来主义机制”，降低回源并发量；</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-07-05 20:48:11</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/9f/d5/bc83e702.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>mapping</span>
+  </div>
+  <div class="_2_QraFYR_0">计算机界两大难题：命名和缓存过期。没用缓存的时候，想着怎么用缓存提升性能，用了缓存又担心数据更新不及时。技术上希望所有的请求都能命中缓存，业务上又恨不得数据实时最新。所以就会引入各种缓存过期策略，如设置过期时间，按规则删除，打版本。这些应该在前期设计缓存系统时规划好，我们最早是将 sql md5 作 key 查询结果存入缓存，结果业务系统数据不一致，要清除缓存简直是噩梦，只能祭出绝招重启 memcache，后面改成按规则删除，在 key 中加上业务和用户的前缀，可以很方便删除某个业务或某个用户的缓存。以上过期策略在前端浏览器也是这样，最简单就是 web 服务器设置静态资源缓存过期时间，如果业务频繁发新版本，过期时间不宜设置太长，但其实每次变动的文件很少，这种策略会导致大部分缓存命中率不高。按规则删除，早期很多网站上会有诊断助手类的东西，页面加载错误点下诊断助手就帮你清除缓存，原理就是对静态文件逐一带上 no-cache 请求头发送 ajax 请求强制覆盖缓存（跟 DevTools 中 disable cache 原理一样）。打版本其实就相当于让浏览器请求一个新版本文件，对于老版本文件就让它在缓存中自生自灭。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你们的缓存设计有点复杂，还不如调整业务，越复杂的方案越容易出错，参考架构设计原则</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 09:20:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/9e/10/3cb10bf7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>醇梨子</span>
+  </div>
+  <div class="_2_QraFYR_0">华仔，请教一下，针对这种高并发缓存架构设计中，缓存和存储系统一致性问题怎么保证？比如说商品浏览人数，需要存库，然后又需要放缓存，需要频繁更新数据库。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 没法保证，这类数据允许一定的不一致，一定范围内的对用户也没有影响，不要只从技术的角度考虑问题，结合业务考虑技术</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-17 09:41:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/77/b3/991f3f9b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>公号-技术夜未眠</span>
+  </div>
+  <div class="_2_QraFYR_0">上缓存架构的时候，结合以前的实际经历，会有几个值得注意的地方:<br><br>1 哪些数据才真正的需要缓存？缓存也并非银弹。既然允许数据缓存，那么在你是可以接受在一定时间区间内的数据不一致性的。(当然可以做到最终一致性)<br><br>2 确定好1后，就需要会数据类型进行分类，比如业务数据缓存，http缓存等<br><br>3 根据数据类型及访问特点的不同选择不同缓存类型的技术方案。<br><br>请问华仔，热点数据存在相当的突发性，临时的扩容似乎也来不及，能否从缓存架构角度如何避免类似微博宕机的事件？<br><br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1. 限流<br>2. 容器化+动态化<br>3. 业务降级，例如限制评论</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 09:22:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/67/f4/9a1feb59.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>钱</span>
+  </div>
+  <div class="_2_QraFYR_0">我们的服务严重依赖缓存，正好顺便回顾一下：<br>1：使用缓存的目的？<br>1-1：加快速度，提升性能<br><br><br>2：刷新缓存的方式？<br>2-1：定时任务，每天一刷<br>2-2：手动触发，随时随地<br>2-3：为防止数据量大有间隙，先增后删<br>2-4：为防止数据量大任务多，采用分布式刷新<br>2-5：刷入缓存的信息基本会经过加工处理<br>2-6：使用缓存时，会填充本地缓存<br>2-7：可控制本地缓存是否失效<br><br>3：使用缓存的方式？<br>3-1：字符串类型使用最多,有时也用字典和列表<br>3-2：计数<br>3-3：共享回话信息<br>3-4：队列<br>3-5：分布式锁<br>3-6：如果缓存没有，我们不会读库，怕库扛不住<br><br>4：使用缓存遇到的问题？<br>4-1：重启服务导致缓存读不到，可用率下降<br>4-2：缓存集群扩缩容缓存读不到，可用率下降<br>4-3：大value，导致性能下降<br>4-4：大value，导致带宽打满<br>4-5：公用机器别的服务打满连接跟踪表，导致不能新建链接<br>4-6：之前还有先删后插，数据量大时有间隙，读不到缓存，可用率下降<br>4-7：代码逻辑存在问题，导致缓存错乱引起的问题<br>4-8：昨晚遇到一个，写本地缓存的bug，控制不住缓本地存啦，导致业务异常<br><br>5：缓存集群的维护？<br>维护的事比较弱，公司有专门的基础架构部，专门提供各种缓存、MQ、RPC、数据库中间件、容器扩缩容、监控等的团队，业务开发主要以使用为主，出问题可以一起排查。<br>这种分工，好处是专业的人负责专业的事，不过也会让业务开发技术实力更弱，一些基础服务大概知道原理，实现细节不太深入。<br>当然，学习是自己的事情，自己最好要积极主动。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-28 08:58:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/dd/bd/9b93ea26.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>blacknccccc</span>
+  </div>
+  <div class="_2_QraFYR_0">对于像淘宝商品列表筛选项特别多，组合起来会更多，这样在后台做更新缓存怎么处理，难道是把每一种组合的分页数据都缓存下来吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 淘宝的具体实现没有研究，我们有类似的案例，针对常用的分类会统一缓存，缓存会主动更新；不常用的根据查询条件计算md5作为key 进行缓存，缓存时间不长，例如60分钟，防止短时间内大量访问压垮存储，例如爬虫</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-07-22 10:56:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/87/57/645159ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>鹅米豆发</span>
+  </div>
+  <div class="_2_QraFYR_0">       1、最早也是采用后台用数据库，前台用关系型数据库+被动缓存的模式。结果是经常的性能抖动，且缓存一致性问题很难解决。后来我们的多数系统，都采用了前后台分离的模式——后台原始数据仍然是关系型数据库，前台使用缓存作为数据源，两者之间数据实时同步+定时同步+人工触发结合。<br>       这个模式，基本根除了穿透，雪崩，不一致，性能抖动这些。但带来了新的问题，比如数据丢失且不可恢复。我们的做法是，让缓存具备相对可靠的持久化机制+运维体系。<br>       2、遇到过几次热点问题，感觉这个更加棘手些。第一种情况，单Key数据结构本身过大，单个分片出现热点，单次访问的复杂度变大。这个相对容易，可以对key进行拆分，使用hashtag机制分片。第二种情况，数据分片普遍不均衡，较少遇到，遇到就比较棘手。第三种情况，数据分片均衡，但访问不均衡，可以增加副本数量。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 缓存持久化是一个不错的方法</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 11:02:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/d6/60/f21b2164.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jacy</span>
+  </div>
+  <div class="_2_QraFYR_0">商品列表中，像商品描述等信息，缓存更新不及时影响不大，但某些重要数据，如价格，需要及时更新的数据，有没什么好的办法做到刷新。对于价格这种关键数据，不缓存，直接从数据库查询，是否可行。或者在用户查看商品详情时再去数据库查询价格，但可能出现列表中的价格和详情页中的价格不一致。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 通常有几种做法：<br>1. 同步刷新缓存：当更新了某些信息后，立刻让缓存失效。<br>这种做法的优点是用户体验好，缺点是修改一个数据可能需要让很多缓存失效<br>2. 适当容忍不一致：例如某东的商品就是这样，我查询的时候显示有货，下单的时候提示我没货了<br>3. 关键信息不缓存：库存，价格等不缓存，因为这类信息查询简单，效率高，关系数据库查询性能也很高</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 21:57:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/c6/e5/7e86498f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>cqc</span>
+  </div>
+  <div class="_2_QraFYR_0">1个问题：关于后台更新，既然缓存服务器内存不足，需要剔除数据，那么后台更新再次触发查询，是否又会导致其他一些缓存数据被剔除，这感觉像是陷入一个循环了<br>1个思路：我们之前的web项目，对于缓存热点数据，为了减少服务器的压力，在客户端引入了缓存：CDN加local storage，感觉对服务器端压力分散还是很有效果的。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1.是的，所以加内存才是根本解决方式<br>2. 这是分级缓存策略</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 09:39:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/ca/61/b3f00e6f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>byte</span>
+  </div>
+  <div class="_2_QraFYR_0">业务上通过Redis集群缓存网络数据，分布在北上广三地，3个数据中心，集群规模是80台物理机共1000个左右实例1主3从。线上出现过跨地域集群数据频繁全量同步打爆交换机的问题，导致整个服务不可用。通过排查发现是网络延时导致频繁全量同步以及服务器电源过热导致从服务器频繁重启。解决方案是跨地数据同步通过kafka试下，再接入各地Redis集群，电源问题通过更换硬件解决。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 缓存集群间一般不要跨数据中心同步，存储可以用跨数据中心同步</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 09:26:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/6c/3d/f9ec02ea.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>倔强小小🐤</span>
+  </div>
+  <div class="_2_QraFYR_0">我们系统是做美术馆的3d展示的，后台配置的数据有点多，画框数据有几m，单个模型数据有几百k，最早直接mysql直接读取，后来用redis但是感觉效果不理想，又引入ehcache，发现不经过网络传输性能很好，经过网络传输后网络一般还是卡的很，后来又在前端用local storage进行缓存，后端通过rabbitmq进行消息通知前端清除本地缓存，缓存设置有效期都是一天，请问下我们这种情况有更好的方案吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 前后端分离，在node上缓存和渲染试试</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 08:43:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/1d/a1/459e4bd5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>刘磊</span>
+  </div>
+  <div class="_2_QraFYR_0">对缓存的key也需要进行valid，避免无效的key查询缓存</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-05 07:12:51</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/50/31/98e2c8e9.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>🔰夏天的味道</span>
+  </div>
+  <div class="_2_QraFYR_0">线上遇到的一个错误：业务查询的结果序列化后放到redis，下次从redis取出来时报错。原来是结果类虽然实现了Serializable接口，但是没有重写serialVersionUID，导致不能成功反序列化。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-06 10:16:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/fc/34/c733b116.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>何磊</span>
+  </div>
+  <div class="_2_QraFYR_0">遇到过一次缓存失效导致缓存穿透，很多请求的压力直接到了db。为了处理这种情况，我采用的方案就是：key永不过期，后台有个进程定时更新所有缓存。<br>文中提到的结合消息队列来更新更具有时效性，非常棒，看到评论中的有一个双key机制，设计很巧妙，不过成本太高了。相当于成本翻倍。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 除非特殊场景，一般我还是建议尽量用简单直观甚至粗暴的方案😂</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-06 09:11:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/58/50/abb7bfe3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>june peng</span>
+  </div>
+  <div class="_2_QraFYR_0">你好，在缓存雪崩后台更新策略里，比如1000个同时访问一个失效的缓存key，如果给这个key加读写锁，这样保证只有一个访问存储系统，其它999个人虽然慢点，但是至少能保证业务不会挂。如果用消息队列，就是前台只拿缓存key里的数据（不能访问存储系统），如果key不存在就发给消息队列更新，如果启多个进程去接受这些消息，依然不能避免后台击穿存储系统，难道只有启用一个进程？这样又太慢，可否进一步说明这种方案的复杂点在哪？谢谢</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你的分析很对👍<br>具体在实现的时候，后台更新线程既不能只有一个，也不能和业务线程一样多，一般8~32个就差不多了，因为缓存更新并不会非常频繁。<br>假如8个线程后台更新也可能导致缓存雪崩，那就要做更多事情了，例如：后台线程更新前先读取一下缓存，存在就不更新。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-06-06 08:43:48</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

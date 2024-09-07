@@ -1,0 +1,562 @@
+<audio title="13_经典控件（二）：UITableViewListView在Flutter中是什么？" src="https://static001.geekbang.org/resource/audio/76/4c/760c496fca059dda4e3941d02329614c.mp3" controls="controls"></audio> 
+<p>你好，我是陈航。</p><p>在上一篇文章中，我和你一起学习了文本、图片和按钮这3大经典组件在Flutter中的使用方法，以及如何在实际开发中根据不同的场景，去自定义展示样式。</p><p>文本、图片和按钮这些基本元素，需要进行排列组合，才能构成我们看到的UI视图。那么，当这些基本元素的排列布局超过屏幕显示尺寸（即超过一屏）时，我们就需要引入列表控件来展示视图的完整内容，并根据元素的多少进行自适应滚动展示。</p><p>这样的需求，在Android中是由ListView或RecyclerView实现的，在iOS中是用UITableView实现的；而在Flutter中，实现这种需求的则是列表控件ListView。</p><h2>ListView</h2><p>在Flutter中，ListView可以沿一个方向（垂直或水平方向）来排列其所有子Widget，因此常被用于需要展示一组连续视图元素的场景，比如通信录、优惠券、商家列表等。</p><p>我们先来看看ListView怎么用。<strong>ListView提供了一个默认构造函数ListView</strong>，我们可以通过设置它的children参数，很方便地将所有的子Widget包含到ListView中。</p><p>不过，这种创建方式要求提前将所有子Widget一次性创建好，而不是等到它们真正在屏幕上需要显示时才创建，所以有一个很明显的缺点，就是性能不好。因此，<strong>这种方式仅适用于列表中含有少量元素的场景</strong>。</p><!-- [[[read_end]]] --><p>如下所示，我定义了一组列表项组件，并将它们放在了垂直滚动的ListView中：</p><pre><code>ListView(
+  children: &lt;Widget&gt;[
+    //设置ListTile组件的标题与图标 
+    ListTile(leading: Icon(Icons.map),  title: Text('Map')),
+    ListTile(leading: Icon(Icons.mail), title: Text('Mail')),
+    ListTile(leading: Icon(Icons.message), title: Text('Message')),
+  ]);
+</code></pre><blockquote>
+<p>备注：ListTile是Flutter提供的用于快速构建列表项元素的一个小组件单元，用于1~3行（leading、title、subtitle）展示文本、图标等视图元素的场景，通常与ListView配合使用。<br>
+上面这段代码中用到ListTile，是为了演示ListView的能力。关于ListTile的具体使用细节，并不是本篇文章的重点，如果你想深入了解的话，可以参考<a href="https://api.flutter.dev/flutter/material/ListTile-class.html">官方文档</a>。</p>
+</blockquote><p>运行效果，如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/b1/01/b152f47246c851c3c1878564f07de101.png?wh=828*1792" alt=""></p><center><span class="reference">图1 ListView默认构造函数</span></center><p>除了默认的垂直方向布局外，ListView还可以通过设置scrollDirection参数支持水平方向布局。如下所示，我定义了一组不同颜色背景的组件，将它们的宽度设置为140，并包在了水平布局的ListView中，让它们可以横向滚动：</p><pre><code>ListView(
+    scrollDirection: Axis.horizontal,
+    itemExtent: 140, //item延展尺寸(宽度)
+    children: &lt;Widget&gt;[
+      Container(color: Colors.black),
+      Container(color: Colors.red),
+      Container(color: Colors.blue),
+      Container(color: Colors.green),
+      Container(color: Colors.yellow),
+      Container(color: Colors.orange),
+    ]);
+</code></pre><p>运行效果，如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/df/ac/df382224daeca7067d3a9c5acc5febac.gif?wh=640*1136" alt=""></p><center><span class="reference">图2 水平滚动的ListView</span></center><p>在这个例子中，我们一次性创建了6个子Widget。但从图2的运行效果可以看到，由于屏幕的宽高有限，同一时间用户只能看到3个Widget。也就是说，是否一次性提前构建出所有要展示的子Widget，与用户而言并没有什么视觉上的差异。</p><p>所以，考虑到创建子Widget产生的性能问题，更好的方法是抽象出创建子Widget的方法，交由ListView统一管理，在真正需要展示该子Widget时再去创建。</p><p><strong>ListView的另一个构造函数ListView.builder，则适用于子Widget比较多的场景</strong>。这个构造函数有两个关键参数：</p><ul>
+<li>itemBuilder，是列表项的创建方法。当列表滚动到相应位置时，ListView会调用该方法创建对应的子Widget。</li>
+<li>itemCount，表示列表项的数量，如果为空，则表示ListView为无限列表。</li>
+</ul><p>同样地，我通过一个案例，与你说明itemBuilder与itemCount这两个参数的具体用法。</p><p>我定义了一个拥有100个列表元素的ListView，在列表项的创建方法中，分别将index的值设置为ListTile的标题与子标题。比如，第一行列表项会展示title 0 body 0：</p><pre><code>ListView.builder(
+    itemCount: 100, //元素个数
+    itemExtent: 50.0, //列表项高度
+    itemBuilder: (BuildContext context, int index) =&gt; ListTile(title: Text(&quot;title $index&quot;), subtitle: Text(&quot;body $index&quot;))
+);
+</code></pre><p>这里需要注意的是，<strong>itemExtent并不是一个必填参数。但，对于定高的列表项元素，我强烈建议你提前设置好这个参数的值。</strong></p><p>因为如果这个参数为null，ListView会动态地根据子Widget创建完成的结果，决定自身的视图高度，以及子Widget在ListView中的相对位置。在滚动发生变化而列表项又很多时，这样的计算就会非常频繁。</p><p>但如果提前设置好itemExtent，ListView则可以提前计算好每一个列表项元素的相对位置，以及自身的视图高度，省去了无谓的计算。</p><p>因此，在ListView中，指定itemExtent比让子Widget自己决定自身高度会更高效。</p><p>运行这个示例，效果如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/d6/5a/d654c5a28056afc017fe3f085230745a.png?wh=828*1792" alt=""></p><center><span class="reference">图3 ListView.builder构造函数</span></center><p>可能你已经发现了，我们的列表还缺少分割线。在ListView中，有两种方式支持分割线：</p><ul>
+<li>一种是，在itemBuilder中，根据index的值动态创建分割线，也就是将分割线视为列表项的一部分；</li>
+<li>另一种是，使用ListView的另一个构造方法ListView.separated，单独设置分割线的样式。</li>
+</ul><p>第一种方式实际上是视图的组合，之前的分享中我们已经多次提及，对你来说应该已经比较熟悉了，这里我就不再过多地介绍了。接下来，我和你演示一下<strong>如何使用ListView.separated设置分割线。</strong></p><p>与ListView.builder抽离出了子Widget的构建方法类似，ListView.separated抽离出了分割线的创建方法separatorBuilder，以便根据index设置不同样式的分割线。</p><p>如下所示，我针对index为偶数的场景，创建了绿色的分割线，而针对index为奇数的场景，创建了红色的分割线：</p><pre><code>//使用ListView.separated设置分割线
+ListView.separated(
+    itemCount: 100,
+    separatorBuilder: (BuildContext context, int index) =&gt; index %2 ==0? Divider(color: Colors.green) : Divider(color: Colors.red),//index为偶数，创建绿色分割线；index为奇数，则创建红色分割线
+    itemBuilder: (BuildContext context, int index) =&gt; ListTile(title: Text(&quot;title $index&quot;), subtitle: Text(&quot;body $index&quot;))//创建子Widget
+)
+</code></pre><p>运行效果，如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/5e/3b/5e1ef0977150346fa95f23232d628e3b.png?wh=828*1792" alt=""></p><center><span class="reference">图4 ListView.separated构造函数</span></center><p>好了，我已经与你分享完了ListView的常见构造函数。接下来，我准备了一张表格，总结了ListView常见的构造方法及其适用场景，供你参考，以便理解与记忆：</p><p><img src="https://static001.geekbang.org/resource/image/00/18/00e6c9f8724fcf50757b4a76fa4c9b18.png?wh=932*340" alt=""></p><center><span class="reference">图5 ListView常见的构造方法及其适用场景</span></center><h2>CustomScrollView</h2><p>好了，ListView实现了单一视图下可滚动Widget的交互模型，同时也包含了UI显示相关的控制逻辑和布局模型。但是，对于某些特殊交互场景，比如多个效果联动、嵌套滚动、精细滑动、视图跟随手势操作等，还需要嵌套多个ListView来实现。这时，各自视图的滚动和布局模型就是相互独立、分离的，就很难保证整个页面统一一致的滑动效果。</p><p>那么，<strong>Flutter是如何解决多ListView嵌套时，页面滑动效果不一致的问题的呢？</strong></p><p>在Flutter中有一个专门的控件CustomScrollView，用来处理多个需要自定义滚动效果的Widget。在CustomScrollView中，<strong>这些彼此独立的、可滚动的Widget被统称为Sliver</strong>。</p><p>比如，ListView的Sliver实现为SliverList，AppBar的Sliver实现为SliverAppBar。这些Sliver不再维护各自的滚动状态，而是交由CustomScrollView统一管理，最终实现滑动效果的一致性。</p><p>接下来，我通过一个滚动视差的例子，与你演示CustomScrollView的使用方法。</p><p><strong>视差滚动</strong>是指让多层背景以不同的速度移动，在形成立体滚动效果的同时，还能保证良好的视觉体验。 作为移动应用交互设计的热点趋势，越来越多的移动应用使用了这项技术。</p><p>以一个有着封面头图的列表为例，我们希望封面头图和列表这两层视图的滚动联动起来，当用户滚动列表时，头图会根据用户的滚动手势，进行缩小和展开。</p><p>经分析得出，要实现这样的需求，我们需要两个Sliver：作为头图的SliverAppBar，与作为列表的SliverList。具体的实现思路是：</p><ul>
+<li>在创建SliverAppBar时，把flexibleSpace参数设置为悬浮头图背景。flexibleSpace可以让背景图显示在AppBar下方，高度和SliverAppBar一样；</li>
+<li>而在创建SliverList时，通过SliverChildBuilderDelegate参数实现列表项元素的创建；</li>
+<li>最后，将它们一并交由CustomScrollView的slivers参数统一管理。</li>
+</ul><p>具体的示例代码如下所示：</p><pre><code>CustomScrollView(
+  slivers: &lt;Widget&gt;[
+    SliverAppBar(//SliverAppBar作为头图控件
+      title: Text('CustomScrollView Demo'),//标题
+      floating: true,//设置悬浮样式
+      flexibleSpace: Image.network(&quot;https://xx.jpg&quot;,fit:BoxFit.cover),//设置悬浮头图背景
+      expandedHeight: 300,//头图控件高度
+    ),
+    SliverList(//SliverList作为列表控件
+      delegate: SliverChildBuilderDelegate(
+            (context, index) =&gt; ListTile(title: Text('Item #$index')),//列表项创建方法
+        childCount: 100,//列表元素个数
+      ),
+    ),
+  ]);
+</code></pre><p>运行一下，视差滚动效果如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/dc/21/dcf89204e537f828d197dc3b916ca321.gif?wh=776*1592" alt=""></p><center><span class="reference">图6 CustomScrollView示例</span></center><h2>ScrollController与ScrollNotification</h2><p>现在，你应该已经知道如何实现滚动视图的视觉和交互效果了。接下来，我再与你分享一个更为复杂的问题：在某些情况下，我们希望获取视图的滚动信息，并进行相应的控制。比如，列表是否已经滑到底（顶）了？如何快速回到列表顶部？列表滚动是否已经开始，或者是否已经停下来了？</p><p>对于前两个问题，我们可以使用ScrollController进行滚动信息的监听，以及相应的滚动控制；而最后一个问题，则需要接收ScrollNotification通知进行滚动事件的获取。下面我将分别与你介绍。</p><p>在Flutter中，因为Widget并不是渲染到屏幕的最终视觉元素（RenderObject才是），所以我们无法像原生的Android或iOS系统那样，向持有的Widget对象获取或设置最终渲染相关的视觉信息，而必须通过对应的组件控制器才能实现。</p><p>ListView的组件控制器则是ScrollControler，我们可以通过它来获取视图的滚动信息，更新视图的滚动位置。</p><p>一般而言，获取视图的滚动信息往往是为了进行界面的状态控制，因此ScrollController的初始化、监听及销毁需要与StatefulWidget的状态保持同步。</p><p>如下代码所示，我们声明了一个有着100个元素的列表项，当滚动视图到特定位置后，用户可以点击按钮返回列表顶部：</p><ul>
+<li>首先，我们在State的初始化方法里，创建了ScrollController，并通过_controller.addListener注册了滚动监听方法回调，根据当前视图的滚动位置，判断当前是否需要展示“Top”按钮。</li>
+<li>随后，在视图构建方法build中，我们将ScrollController对象与ListView进行了关联，并且在RaisedButton中注册了对应的回调方法，可以在点击按钮时通过_controller.animateTo方法返回列表顶部。</li>
+<li>最后，在State的销毁方法中，我们对ScrollController进行了资源释放。</li>
+</ul><pre><code>class MyAPPState extends State&lt;MyApp&gt; {
+  ScrollController _controller;//ListView控制器
+  bool isToTop = false;//标示目前是否需要启用&quot;Top&quot;按钮
+  @override
+  void initState() {
+    _controller = ScrollController();
+    _controller.addListener(() {//为控制器注册滚动监听方法
+      if(_controller.offset &gt; 1000) {//如果ListView已经向下滚动了1000，则启用Top按钮
+        setState(() {isToTop = true;});
+      } else if(_controller.offset &lt; 300) {//如果ListView向下滚动距离不足300，则禁用Top按钮
+        setState(() {isToTop = false;});
+      }
+    });
+    super.initState();
+  }
+
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        ...
+        //顶部Top按钮，根据isToTop变量判断是否需要注册滚动到顶部的方法
+        RaisedButton(onPressed: (isToTop ? () {
+                  if(isToTop) {
+                    _controller.animateTo(.0,
+                        duration: Duration(milliseconds: 200),
+                        curve: Curves.ease
+                    );//做一个滚动到顶部的动画
+                  }
+                }:null),child: Text(&quot;Top&quot;),)
+        ...
+        ListView.builder(
+                controller: _controller,//初始化传入控制器
+                itemCount: 100,//列表元素总数
+                itemBuilder: (context, index) =&gt; ListTile(title: Text(&quot;Index : $index&quot;)),//列表项构造方法
+               )      
+        ...   
+    );
+
+  @override
+  void dispose() {
+    _controller.dispose(); //销毁控制器
+    super.dispose();
+  }
+}
+</code></pre><p>ScrollController的运行效果如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/61/1b/61533dc0e445bd529879698ad3491b1b.gif?wh=768*1592" alt=""></p><center><span class="reference">图7 ScrollController示例</span></center><p>介绍完了如何通过ScrollController来监听ListView滚动信息，以及怎样进行滚动控制之后，接下来我们再看看<strong>如何获取ScrollNotification通知，从而感知ListView的各类滚动事件</strong>。</p><p>在Flutter中，ScrollNotification通知的获取是通过NotificationListener来实现的。与ScrollController不同的是，NotificationListener是一个Widget，为了监听滚动类型的事件，我们需要将NotificationListener添加为ListView的父容器，从而捕获ListView中的通知。而这些通知，需要通过onNotification回调函数实现监听逻辑：</p><pre><code>Widget build(BuildContext context) {
+  return MaterialApp(
+    title: 'ScrollController Demo',
+    home: Scaffold(
+      appBar: AppBar(title: Text('ScrollController Demo')),
+      body: NotificationListener&lt;ScrollNotification&gt;(//添加NotificationListener作为父容器
+        onNotification: (scrollNotification) {//注册通知回调
+          if (scrollNotification is ScrollStartNotification) {//滚动开始
+            print('Scroll Start');
+          } else if (scrollNotification is ScrollUpdateNotification) {//滚动位置更新
+            print('Scroll Update');
+          } else if (scrollNotification is ScrollEndNotification) {//滚动结束
+            print('Scroll End');
+          }
+        },
+        child: ListView.builder(
+          itemCount: 30,//列表元素个数
+          itemBuilder: (context, index) =&gt; ListTile(title: Text(&quot;Index : $index&quot;)),//列表项创建方法
+        ),
+      )
+    )
+  );
+}
+</code></pre><p>相比于ScrollController只能和具体的ListView关联后才可以监听到滚动信息；通过NotificationListener则可以监听其子Widget中的任意ListView，不仅可以得到这些ListView的当前滚动位置信息，还可以获取当前的滚动事件信息 。</p><h2>总结</h2><p>在处理用于展示一组连续、可滚动的视图元素的场景，Flutter提供了比原生Android、iOS系统更加强大的列表组件ListView与CustomScrollView，不仅可以支持单一视图下可滚动Widget的交互模型及UI控制模型，对于某些特殊交互，需要嵌套多重可滚动Widget的场景，也提供了统一管理的机制，最终实现体验一致的滑动效果。这些强大的组件，使得我们不仅可以开发出样式丰富的界面，更可以实现复杂的交互。</p><p>接下来，我们简单回顾一下今天的内容，以便加深你的理解与记忆。</p><p>首先，我们认识了ListView组件。它同时支持垂直方向和水平方向滚动，不仅提供了少量一次性创建子视图的默认构造方式，也提供了大量按需创建子视图的ListView.builder机制，并且支持自定义分割线。为了节省性能，对于定高的列表项视图，提前指定itemExtent比让子Widget自己决定要更高效。</p><p>随后，我带你学习了CustomScrollView组件。它引入了Sliver的概念，将多重嵌套的可滚动视图的交互与布局进行统一接管，使得像视差滚动这样的高级交互变得更加容易。</p><p>最后，我们学习了ScrollController与NotificationListener，前者与ListView绑定，进行滚动信息的监听，进行相应的滚动控制；而后者，通过将ListView纳入子Widget，实现滚动事件的获取。</p><p>我把今天分享讲的三个例子（视差、ScrollController、ScrollNotification）放到了<a href="https://github.com/cyndibaby905/13_listview_demo">GitHub</a>上，你可以下载后在工程中实际运行，并对照着今天的知识点进行学习，体会ListView的一些高级用法。</p><h2>思考题</h2><p>最后，我给你留下两个小作业吧：</p><ol>
+<li>在ListView.builder方法中，ListView根据Widget是否将要出现在可视区域内，按需创建。对于一些场景，为了避免Widget渲染时间过长（比如图片下载），我们需要提前将可视区域上下一定区域内的Widget提前创建好。那么，在Flutter中，如何才能实现呢？</li>
+<li>请你使用NotificationListener，来实现图7 ScrollController示例中同样的功能。</li>
+</ol><p>欢迎你在评论区给我留言分享你的观点，我会在下一篇文章中等待你！感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/1d/64/52a5863b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>大土豆</span>
+  </div>
+  <div class="_2_QraFYR_0">我想问的最关键的一点是，flutter的列表有重用的概念吗？1000条数据，是会渲染出1000个视图对象还是像Androd或者iOS原生的那样重用机制，就渲染屏幕当中的的视图对象</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 后者</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-27 12:19:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/34/01/30ca98e6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>arronK</span>
+  </div>
+  <div class="_2_QraFYR_0">1. cacheExtent<br>2. notification.metrics</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-12 11:10:31</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/30/e8/6898e576.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>季末灬离殇</span>
+  </div>
+  <div class="_2_QraFYR_0">double offsetY = scrollNotification.metrics.pixels;<br>滚动过程中通过偏移量更改isTop即可。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-27 14:39:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/1a/be/18c99af2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>NASA</span>
+  </div>
+  <div class="_2_QraFYR_0">希望每节能配有小demo，毕竟每个人水平都不同</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 更新了github链接</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-30 11:35:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/d0/1c/509e54ba.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>有妖气</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，NestedScrollView中body是一个customScrollview。这个customScrollview中包含一个listview，那么怎么知道listview已经滑动到了底部，目前想在内部的listview中做一个上拉刷新的操作。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 通过NotificationListener的metrics：<br><br>NotificationListener&lt;ScrollNotification&gt;(<br>  onNotification: (ScrollNotification scrollInfo) {<br>    if (scrollInfo.metrics.pixels ==<br>        scrollInfo.metrics.maxScrollExtent) {<br>      loadMore();<br>    }<br>  },<br>  child: ListView.builder(<br>    &#47;&#47; ...<br>  ),<br>),<br></p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-08 09:44:24</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/4d/fd/0aa0e39f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>许童童</span>
+  </div>
+  <div class="_2_QraFYR_0">老师你好，CustomScrollView 的sliver还是不是特别理解，可以再给点参考资料吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以看看这个https:&#47;&#47;medium.com&#47;@greg.perry&#47;decode-customscrollview-d5a60fcfb9fb</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-27 14:04:31</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epzwbJGbUmgEC77J6QY6A5pLPdPbw7sqk4DcsHK8qPw7OiaiaMD7pjzb8uHlkY5uLZRibWVvPDDAgM5A/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>mersa</span>
+  </div>
+  <div class="_2_QraFYR_0">有两个问题想请教一下<br>1.listView滚动动画效果和原生的iOS差太多了，感觉阻尼系数很大，很缓慢，不像在用iOS的App。现在这个效果和webview自己写js的那种scroll很类似。可以调整这种系数么？或者有什么第三方库<br>2.ScrollNotification和ScrollController 怎么设置让它可以点击状态栏回到顶部。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-30 15:31:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/bc/0e/c76861eb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jianwei</span>
+  </div>
+  <div class="_2_QraFYR_0">if (scrollNotification.metrics.pixels &gt; 500) {<br> setState(() {<br>   isToTop = true;<br> });<br>} else if (scrollNotification.metrics.pixels &lt; 300) {<br> setState(() {<br>   isToTop = false;<br> });<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-07 15:28:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/ODicJCxia34EqbeBCwQeyWxcc0F25RP9fnI1r3o1Nt7S3ibRCvQI6zUlUKORL0kZic0PmCGX912bCZ5ERXPE785ZTw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>咖啡凉了</span>
+  </div>
+  <div class="_2_QraFYR_0">    _controller.addListener(() {&#47;&#47; 为控制器注册滚动监听方法<br><br>      if(_controller.offset &gt; 1000) {&#47;&#47; 如果 ListView 已经向下滚动了 1000，则启用 Top 按钮<br><br>        setState(() {isToTop = true;});<br><br>      } else if(_controller.offset &lt; 300) {&#47;&#47; 如果 ListView 向下滚动距离不足 300，则禁用 Top 按钮<br><br>        setState(() {isToTop = false;});<br><br>      }<br><br>    });<br>这里的setstate在滚动中会一直重复调用吧，会不会影响性能呢</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是会重复调用，因为Element与Renderboject会复用，所以整体渲染性能不受影响。但Widget确实会频繁重建，可以考虑在外层做一个简单判断，不重复设置。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-02 16:16:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/fc/a2/7da62426.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Dominic</span>
+  </div>
+  <div class="_2_QraFYR_0">有没有完整的代码放github上，后端程序表示片段代码，运行不起来</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 更新了github链接</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-31 11:52:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/9e/3c/0e2a08b1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杨闯</span>
+  </div>
+  <div class="_2_QraFYR_0">你好，我们现在需要在debug的时候引用一些库，而在release的时候不引用一些库，而这个库使用了fmdb，因此有以下两个问题<br>1、在dart代码中，如何通过判断来决定要不要将import这个库和使用这个库的相关方法，而现在不能完成编译。<br>2、如果将这个库放到dev_dependencies里面，在编译release的时候，这个库没有被引入进来，但是fmdb被引入进来了，怎么避免fmdb给引用进来，是哪里出现问题了吗，还是哪里需要进行特别的设置</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1.试试assert<br>2.你可以把这个库的所有依赖都完全展开，放到dev_dependencies中</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-29 17:13:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/9d/f4/7d74c9bb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Longwei243</span>
+  </div>
+  <div class="_2_QraFYR_0">这个sliver里面想要一个可折叠的多级列表有对应的控件吗？还是需要自己来实现一个</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 自己实现一个吧</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-28 10:44:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/4d/4a/e13779af.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>CoderAndy</span>
+  </div>
+  <div class="_2_QraFYR_0">关于作者说的，为了性能，固定元素的高度。但是，如果列表中要有好几种元素，他们的高度各不相同，应该如何处理？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-09-07 22:05:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/56/72/9bb38c81.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>NFT</span>
+  </div>
+  <div class="_2_QraFYR_0">Expanded(<br>            child: NotificationListener&lt;ScrollNotification&gt;(<br>                onNotification: (scrollNotification) {<br>                  if (scrollNotification is ScrollEndNotification) {<br>                    print(&#39;Scroll End&#39;);<br>                    if (_controller.offset &gt; 1000) {<br>                      setState(() {<br>                        isToTop = true;<br>                      });<br>                    } else if (_controller.offset &lt; 300) {<br>                      setState(() {<br>                        isToTop = false;<br>                      });<br>                    }<br>                  }<br>                  return true;<br>                },<br>                child: ListView.builder(<br>                  controller: _controller,<br>                  itemCount: 100,<br>                  itemBuilder: (context, index) =&gt;<br>                      ListTile(title: Text(&quot;Index : $index&quot;)), <br>                )),<br>          ),</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-04-21 14:06:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/uyyCHGeo0gayHkjPqr5wlcB0BulhNwkSHkvq0vWOvRlArTBb4dGTE8kvtJzAbbNkwZreiab3Mq1BibayhfujU4Ww/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Lgh</span>
+  </div>
+  <div class="_2_QraFYR_0">为什么ScrollController是个普通对象，而NotificationListener是个控件？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-09-28 09:41:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTLamEuaeZHo2oAnWLiajpmv3icHnyQJLpZrWKAeUHibVMMZkI30pvic9seRtXRoHhib7tpH61mSfIql59w/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张平（研一）</span>
+  </div>
+  <div class="_2_QraFYR_0">有点感觉了啊<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-09-26 15:37:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/44/59/b607b8c0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>毛成方</span>
+  </div>
+  <div class="_2_QraFYR_0">动手加动脑 </div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-05-16 10:52:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/35/b5/a139a821.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>王子晨</span>
+  </div>
+  <div class="_2_QraFYR_0">老师不知道为什么你这节课的demo，我在运行时，点击tab切换时，控制台会报：The getter “focusScopeNode” was called on null！<br>不知道哪里出的报错，希望老师能讲解一下</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-03 18:52:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/4f/e5/381ca282.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>展飞</span>
+  </div>
+  <div class="_2_QraFYR_0">请问一下，在哪儿可以看flutter的开发文档（Api以及各种类的文档）。http:&#47;&#47;flutter.io&#47;docs这个是不是被墙了，都打不开。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-25 11:06:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJjkibwInXV0IDWMF4aaN7rzrEXs1bVJVP26RUKVAA3gWm4suplQq9icd6F6SR5EySd2QlDS14G0ibLQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>木乃伊</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，请教你一个问题，类似于聊天页面初始化进入的时候，都会从最后一条数据开始展示，但是如果数据比较少，又需要从上到下展示，所以reverse不能用。在测试scollercontroller的时候直接滚到到底部发现会有卡顿，有什么优化建议吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-06 08:32:01</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

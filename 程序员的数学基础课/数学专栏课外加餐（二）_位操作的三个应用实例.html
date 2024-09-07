@@ -1,0 +1,495 @@
+<audio title="数学专栏课外加餐（二）_位操作的三个应用实例" src="https://static001.geekbang.org/resource/audio/51/18/5171039ec2a0ad7ea56e8ce968860d18.mp3" controls="controls"></audio> 
+<p>你好，我是黄申。欢迎来到第二次课外加餐时间。</p><h2>位操作的应用实例</h2><p>留言里很多同学对位操作比较感兴趣，我这里通过计算机中的位操作的几个应用，来帮你理解位操作。</p><h3>1.验证奇偶数</h3><p>在<a href="https://time.geekbang.org/column/article/72163">第2节</a>里，我提到了，奇偶数其实也是余数的应用。编程中，我们也可以用位运算来判断奇偶数。</p><p>仔细观察，你会发现偶数的二进制最后一位总是0，而奇数的二进制最后一位总是1，因此对于给定的某个数字，我们可以把它的二进制和数字1的二进制进行按位“与”的操作，取得这个数字的二进制最后一位，然后再进行判断。</p><p>我这里写了一段代码，比较了使用位运算和模运算的效率，我统计了进行1亿次奇偶数判断，使用这两种方法各花了多少毫秒。如果在你的机器上两者花费的时间差不多，你可以尝试增加统计的次数。在我的机器上测试下来，同样次数的奇偶判断，使用位运算的方法耗时明显更低。</p><pre><code>public class Lesson1_append1 {
+ 
+ public static void main(String[] args) {
+  
+  int even_cnt = 0, odd_cnt = 0;
+  long start = 0, end = 0;
+  
+  start = System.currentTimeMillis();
+  for (int i = 0; i &lt; 100000000; i++) {
+   
+   if((i &amp; 1) == 0){
+       even_cnt ++;
+   }else{
+       odd_cnt ++;
+   }
+   
+  }
+  end = System.currentTimeMillis();
+  System.out.println(end - start);
+  System.out.println(even_cnt + &quot; &quot; + odd_cnt);
+  
+  even_cnt = 0;
+  odd_cnt = 0;
+  start = 0;
+  end = 0;
+  
+  start = System.currentTimeMillis();
+  for (int i = 0; i &lt; 100000000; i++) {
+   
+   if((i % 2) == 0){
+       even_cnt ++;
+   }else{
+       odd_cnt ++;
+   }
+   
+  }
+  end = System.currentTimeMillis();
+  System.out.println(end - start);
+  System.out.println(even_cnt + &quot; &quot; + odd_cnt);
+
+ }
+}
+</code></pre><h3>2.交换两个数字</h3><p>你应该知道，要想在计算机中交换两个变量的值，通常都需要一个中间变量，来临时存放被交换的值。不过，利用异或的特性，我们就可以避免这个中间变量。具体的代码如下：</p><pre><code>x = (x ^ y);
+y = x ^ y;
+x = x ^ y;
+</code></pre><p>把第一步代入第二步中，可以得到：</p><pre><code>y = (x ^ y) ^ y = x ^ (y ^ y) = x ^ 0 = x
+</code></pre><p>把第一步和第二步的结果代入第三步中，可以得到：</p><!-- [[[read_end]]] --><pre><code>x = (x ^ y) ^ x = (x ^ x) ^ y = 0 ^ y = y 
+</code></pre><p>这里用到异或的两个特性，第一个是两个相等的数的异或为0，比如x^x= 0；第二个是任何一个数和0异或之后，还是这个数不变，比如0^y=y。</p><h3>3.集合操作</h3><p>集合和逻辑的概念是紧密相连的，因此集合的操作也可以通过位的逻辑操作来实现。</p><p>假设我们有两个集合{1, 3, 8}和{4, 8}。我们先把这两个集合转为两个8位的二进制数，从右往左以1到8依次来编号。</p><p>如果某个数字在集合中，相应的位置1，否则置0。那么第一个集合就可以转换为10000101，第二个集合可以转换为10001000。那么这两个二进制数的按位与就是10000000，只有第8位是1，代表了两个集合的交为{8}。而这两个二进制数的按位或就是10001101，第8位、第4位、第3位和第1位是1，代表了两个集合的并为{1, 3, 4, 8}。</p><p>说到这里，不禁让我想起Elasticsearch的BitSet。我曾经使用Elasticsearch这个开源的搜索引擎来实现电商平台的搜索。</p><p>当时为了提升查询的效率，我使用了Elasticsearch的Filter查询。我研究了一下这个Filter查询的原理，发现它并没有考虑各种文档的相关性得分，因此它可以把文档匹配关键字的情况，转换成了一个BitSet。</p><p>你可以把BitSet想成一个巨大的位数组。每一位对应了某篇文档是否和给定的关键词匹配，如果匹配，这一位就置1，否则就置0。每个关键词都可以拥有一个BitSet，用于表示哪些文档和这个关键词匹配。那么要查看同时命中多个关键词的文档有哪些，就是对多个BitSet求交集。利用上面介绍的按位与，这点是很容易实现的，而且效率相当之高。</p><h2>二分查找时的两个细节</h2><p><a href="https://time.geekbang.org/column/article/72243">第3节</a>我介绍了迭代法，并讲解了相关的代码实现。其中，有两个细节我在这里补充说明一下。</p><p>第一个是关于<strong>中间值的计算</strong>。我优化了两处代码，分别是Lesson3_2的第16行和Lesson3_3的第22行。</p><p>其中，Lesson3_2的第16行由原来的：</p><pre><code>double middle = (min + max) / 2;
+</code></pre><p>改为：</p><pre><code>double middle = min + (max - min) / 2;
+</code></pre><p>Lesson3_3的第22行由原来的：</p><pre><code>int middle = (left + right) / 2;
+</code></pre><p>改为：</p><pre><code>int middle = left + (right - left) / 2;
+</code></pre><p>这两处改动的初衷都是一样的，是为了避免溢出。在第一篇加餐中，介绍负数的加法时，我已经解释了什么是溢出。那这里为什么会发生溢出呢？我以第二处代码为例来讲解下。</p><p>从理论上来说，(left+right)/2=left+(right-left)/2。可是，我们之前说过，计算机系统有自身的局限性，无论是何种数据类型，都有一个上限或者下限。一旦某个数字超过了这些限定，就会发生溢出。</p><p>对于变量left和right而言，在定义的时候都指定了数据类型，因此不会超出范围。可是，left+right的和就不一定了。从下图可以看出，当left和right都已经很接近某个数据类型的最大值时，两者的和就会超过这个最大值，发生上溢出。这也是为什么最好不用通过(left+right)/2来求两者的中间值。</p><p><img src="https://static001.geekbang.org/resource/image/35/cc/35e891800614511659e0cbf11060b5cc.jpg?wh=1142*487" alt=""></p><p>那么为什么left + (right -left)/2就不会溢出呢？首先，right是没有超过最大值的，那么(right -left)/2自然也就没有超过范围，即使left加上了(right -left)/2，也不会超过right的值，所以运算的整个过程都不会产生溢出。</p><p>第二个是关于误差百分比和绝对误差。在Lesson3_2中有这么一行：</p><pre><code>double delta = Math.abs((square / n) - 1);
+
+</code></pre><p>这里我使用了误差的百分比，也就是误差值占输入值n的比例。其实绝对误差也是可以的，不过我在这里考虑了n的大小。比如，如果n是一个很小的正整数，比如个位数，那么误差可能要精确到0.00001。但是如果n是一个很大的数呢？比如几个亿，那么精确到0.00001可能没有多大必要，也许精确到0.1也就可以了。所以，使用误差的百分比可以避免由于不同的n，导致的迭代次数有过大差异。</p><p>由于这里n是大于1的正整数，所以可以直接拿平方值square去除以n。否则，我们要单独判断n为0的情况，并使用绝对误差。</p><h2>关于迭代法、数学归纳法和递归</h2><p>从第3节到第6节，我连续介绍了迭代法、数学归纳法、递归。这些概念之间存在相互联系，又不完全一样，很多同学对此也有一些疑惑。所以，这里我来帮你梳理一下。</p><p>迭代法和递归都是通过不断反复的步骤，计算数值或进行操作的方法。迭代一般适合正向思维，而递归一般适合逆向思维。而递归回溯的时候，也体现了正向递推的思维。它们本身都是抽象的流程，可以有不同的编程实现。</p><p>对于某些重复性的计算，数学归纳法可以从理论上证明某个结论是否成立。如果成立，它可以大大节约迭代法中数值计算部分的时间。不过，在使用数学归纳法之前，我们需要通过一些数学知识，假设命题，并证明该命题成立。</p><p>对于那些无法使用数学归纳法来证明的迭代问题，我们可以通过编程实现。这里需要注意的是，广义上来说，递归也是迭代法的一种。不过，在计算机编程中，我们所提到的迭代是一种具体的编程实现，是指使用循环来实现的正向递推，而递归是指使用函数的嵌套调用来实现的逆向递推。当然，两种实现通常是可以相互转换的。</p><p>循环的实现很容易理解，对硬件资源的开销比较小。不过，循环更适合“单线剧情”，例如计算2^n，n!，1+2+3+…+n等等。而对于存在很多“分支剧情”的复杂案例而言，使用递归调用更加合适。</p><p>利用函数的嵌套调用，递归编程可以存储很多中间变量。我们可以很轻松地跟踪不同的分支，而所有这些对程序员基本是透明的。如果这时使用循环，我们不得不自己创建并保存很多中间变量。当然，正是由于这个特性，递归比较消耗硬件资源。</p><p>递归编程本身就体现了分治的思想，这个思想还可以延伸到集群的分布式架构中。最近几年比较主流的MapReduce框架也体现了这种思想。</p><p>综合上面说的几点，你可以大致遵循这样的原则：</p><ul>
+<li>
+<p>如果一个问题可以被迭代法解决，而且是有关数值计算的，那你就看看是否可以假设命题，并优先考虑使用数学归纳法来证明；</p>
+</li>
+<li>
+<p>如果需要借助计算机，那么优先考虑是否可以使用循环来实现。如果问题本身过于复杂，再考虑函数的嵌套调用，是否可以通过递归将问题逐级简化；</p>
+</li>
+<li>
+<p>如果数据量过大，可以考虑采用分治思想的分布式系统来处理。</p>
+</li>
+</ul><p>最后，给你留一道思考题吧。</p><p>在1到n的数字中，有且只有唯一的一个数字m重复出现了，其它的数字都只出现一次。请把这个数字找出来。提示：可以充分利用异或的两个特性。</p><p>好了，前面6讲的补充内容就到这里了。<span class="orange">欢迎你留言给我。你也可以点击“请朋友读”，把今天的内容分享给你的好友，和他一起精进。</span></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/63/14/06eff9a4.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jerry银银</span>
+  </div>
+  <div class="_2_QraFYR_0">我的天，昨天才为老师的加餐点过赞，今天又来一篇干货。谢谢老师，看了这两篇加餐，心里的很多疑惑被解除了。买老师的专栏，值了。<br><br>——<br>思考题：<br><br>需要考虑不同的数量级，分两种情况：<br>1. 内存能容纳这n个数<br><br>方法1：暴力查找，两层循环遍历，时间复杂度为O(n^2)，空间复杂度为O(1)<br><br>方法2：用快排先进行排序，然后遍历一次，比较前一个数和后一个数，若相等，则查找完成，时间复杂度O(nlogn)，空间复杂度为O(1)<br><br>方法3：利用hash表(或set)，进行一次遍历，同时将遍历到的数放入hash表，放入之前判断hash表是否存在，若存在，则找到了重复的数，时间复杂度为O(n)，空间复杂度为O(n)<br><br>方法4：使用位向量，遍历给到的n个数，对于出现的数，将对应位标记为1，如果已经是1则查找成功，时间复杂度为O(n)，空间复杂度为(n)，这种方法类似方法3，虽然渐进的空间复杂度和方法3相同，但是其实小很多很多，毕竟只要用1bit就能表示有或无<br><br><br>2.  内存无法容纳给到的n个数<br><br>依然可以用上述方法4来解决，其它的方法有的不能用，有的效率不高。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 感谢支持，思考题分析的很透彻，各种情况都考虑到了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 07:57:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/cd/12/deb6fa64.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>科哥</span>
+  </div>
+  <div class="_2_QraFYR_0">根据异或的两个特点，任何两个相同的数异或的结果都为0，任何数与0异或都为这个数，因此将所有的数依次异或得到的结果就是除了两个重复数的所有数的异或结果，假设为T。而将1到n依次异或的结果为T^重复数。因此，重复数=T^T^重复数。即:所有数异或的结果再异或1到n所有数异或的结果</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很好的思路👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 10:06:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/3d/77/45e5e06d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>胡鹏</span>
+  </div>
+  <div class="_2_QraFYR_0">看到 Brian Wang 的回答, 您说了正解, 我才想明白:<br>  推到应该是: <br>  原始数据: 1,2...m,m,...n (是否有序对此题不重要)<br>  所有数字: 1,2,...m,...n<br>因为 x^x = 0<br>令a = 1^2...^m...^n<br>   b = 1^2...^m^m...^n<br>则有: a^b = (1^2...^m...^n)^(1^2...^m...^n)^m = 0^m = m<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的 👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-30 18:00:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/9c/17/6ffd80f6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>李嘉鹏</span>
+  </div>
+  <div class="_2_QraFYR_0">看了大家留言，1－n必须是连续以1递增才有简化解的吧。从原题并未审出这一点。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 07:50:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/d3/98/60d13550.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Bryan</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题：对于有的全部数字进行异或再和 1-n 这 n 个数字进行异或，最终得出的结果就是 m</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 正解</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 08:30:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/0c/0f/93d1c8eb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>mickey</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;**<br> 在1到n的数字中，有且只有唯一的一个数字m重复出现了，其它的数字都只出现一次。 <br>请把这个数字找出来。 <br>提示：可以充分利用异或的两个特性。<br>  *&#47;<br>public class LessonE02_2 {<br>	public static void main(String[] args) {		<br>		int[] arr = { 6, 3, 9, 5, 4, 8, 2, 5, 7, 1 };<br><br>		int temp = arr[0];<br>		int max = 0;<br>		for (int i = 1; i &lt; arr.length; i++) {<br>			temp ^= arr[i];<br>			max = max &lt; arr[i] ? arr[i] : max;<br>		}<br>		int t = 1;<br>		for (int i = 2; i &lt;= max; i++) {<br>			t ^= i;<br>		}<br>		System.out.println(t ^ temp);<br>	}<br>}<br><br>题目不够严谨，m 重复偶数次才能用位运算吧。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 13:39:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f9/3d/3e20a86a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>樊少皇</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题：<br>public static int getSpecialNum(int[] oArr, int n){<br>		int result = 0;<br>		for(int i = 0; i &lt; oArr.length; i++){<br>			result = (result^oArr[i]);<br>		}<br>		for(int j = 1; j &lt;= n; j++){<br>			result = result^j;<br>		}<br>		return result;<br>	}<br><br>最开始不太理解。后来明白题意应该是说总共有n+1或者更多个数字，这些数字都在1--n内，并且除数字m外，其余的数字有且只有一个。举例：{1,2,3,4,5,5,6,7}满足条件；{1,2,3,5,5,5,6,7}不满足条件。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 18:01:09</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6b/85/28fc85c5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>指间砂的宿命</span>
+  </div>
+  <div class="_2_QraFYR_0">将所有结果异或再和1到n的不重复结果异或，最后剩余的值就是重复值，真的好神奇，这种异或用法</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 嗯 异或的妙用</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 09:35:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c1/0e/2b987d54.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>蜉蝣</span>
+  </div>
+  <div class="_2_QraFYR_0">如果给出的数字不连续，Python中不妨这样使用：<br>```python<br>from itertools import chain<br><br>nums_list = [1, 2, 10, 8, 2, 3]<br>nums_set = set(nums_list)<br><br>start = 0  # 任何数与 0 异或得到自己，所以作为初始值使用<br>for num in chain(nums_list, nums_set):<br>    start = start ^ num<br>    <br>print(start)<br>```</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 正确</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-08 13:49:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/bd/a5/4b0cefed.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张雷</span>
+  </div>
+  <div class="_2_QraFYR_0">请教老师，用异或交换两个变量值感觉不太懂：<br>第一步代入第二步时，y已经=x了，<br>再把第二步代入第三步，此时y的值已经是x，怎么还能利用它把原y值传给x呢？<br>感觉还是要临时变量做过渡啊？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 因为此时新的x值还是x^y，而新y已经是原来的x，两种异或，就是y了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 11:22:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/89/e7/015d82b1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>夏飞</span>
+  </div>
+  <div class="_2_QraFYR_0">假设我们有两个集合{1, 3, 8}和{4, 8}。我们先把这两个集合转为两个 8 位的二进制数，从右往左以 1 到 8 依次来编号。<br><br>如果某个数字在集合中，相应的位置 1，否则置 0。那么第一个集合就可以转换为 10000101，第二个集合可以转换为 10001000。<br><br><br>怎么转的？没看懂</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 10000101最高位（第8位）的1表示集合中的8，第3位的1表示集合中的3，最低位的1表示集合中的1，以此类推。然后两个集合的交集就专为两个二进制数的按位与</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 09:45:11</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/18/34/c082419c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>风轨</span>
+  </div>
+  <div class="_2_QraFYR_0">不等关系是“最没用”的关系，没有传递性，更没有序性。<br>如果没有额外空间，直接暴力比较，时间复杂度O(n平方); 如果这n个数字本身是有序的，需要时间复杂度O(n)，排序时间复杂度O(nlog(n))。<br>如果额外空间充足，在数据聚集度较高甚至连续时，可以使用桶，时间复杂度O(n);如果数据很分散，数据范围远远大于数据量，可以考虑用桶加hash，时间复杂度O(n)，但需要考虑hash碰撞问题。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很好的总结！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 09:28:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/a2/95/8f34237c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>I keep my ideals💤</span>
+  </div>
+  <div class="_2_QraFYR_0">不太明白，1到n不就是所有数吗，所有数异或所有数不就是0了吗😔😔😔</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 原题可能没有说清楚，非重复的数字只异或一次，所以为0，而重复的数字会异或两次，成为最后的结果。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-06-28 00:18:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/mfS8oicmVTKoHkQnveMdIibF9oENB7DNRhE70eTXjkIh4iaANwvBr7X6sbQicyFOFerUr3Ur93R7JAtBnQP1ia0R6iaw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>bnhjk76</span>
+  </div>
+  <div class="_2_QraFYR_0">集合｛1，3，8｝最大的数是8所以用8位数？那如果最大的数是999999999...那这个2进制的位数会很大，这个时候也用这个方法进行运算吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以把大的数切分为不同的组，例如第一个32位二进制表示前32个元素，第二个二进制表示第33到第64的元素</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-04 08:53:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/66/52/052b84c6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>梦开始的地方</span>
+  </div>
+  <div class="_2_QraFYR_0">对于有的全部数字进行异或再和 1-n 这 n 个数字进行异或，最终得出的结果就是 m<br>老师，我对于两全部数字异或，在和1-n异或，就能得出m不太懂</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-27 23:57:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/69/4d/81c44f45.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>拉欧</span>
+  </div>
+  <div class="_2_QraFYR_0">集合中的数字和1到n的数字组成的2n+1个数，只有m出现了3次，其他的数是2次，全部亦或一遍之后就剩下了m</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 正解</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 09:16:06</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/d3/98/60d13550.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Bryan</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题：把所有的数字进行异或，结果就是要的答案</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-26 08:28:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杨芸芸</span>
+  </div>
+  <div class="_2_QraFYR_0">已知：x^x=0, 0^x=x <br>从n个元素中选两个元素，如果二者异或为0，则此值就是m，复杂度o(n**2)<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2023-02-03 17:39:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>013923</span>
+  </div>
+  <div class="_2_QraFYR_0">位操作应用实例学习！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-09-23 14:07:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/51/86/b5fd8dd8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>建强</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题：如果这个数字m是连续重复的，即重复的数字都是相邻的，那么依次把每个数字都和其相邻的数字做异或操作，如果结果是0，那么这个数字必然是重复的。但如果重复的数字是分散在序列中的，这个方法就不适用了。分散的情况，我的思路是再用一个辅助的数组，其下标范围就是1到n，全部初始为0，然后依次对这n个数字，和辅助数组中对应其下标的元素做异或，如果没有重复，则每次操作的结果都不是0，如果某次操作后结果是0，那么这次操作的那个数字就是重复的</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-02-04 08:35:32</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

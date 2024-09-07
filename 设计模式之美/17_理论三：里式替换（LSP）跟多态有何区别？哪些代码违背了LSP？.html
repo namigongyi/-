@@ -1,0 +1,506 @@
+<audio title="17_理论三：里式替换（LSP）跟多态有何区别？哪些代码违背了LSP？" src="https://static001.geekbang.org/resource/audio/2f/15/2fd63965f381663489f14545fa3dd115.mp3" controls="controls"></audio> 
+<p>在上两节课中，我们学习了SOLID原则中的单一职责原则和开闭原则，这两个原则都比较重要，想要灵活应用也比较难，需要你在实践中多加练习、多加体会。今天，我们再来学习SOLID中的“L”对应的原则：里式替换原则。</p><p>整体上来讲，这个设计原则是比较简单、容易理解和掌握的。今天我主要通过几个反例，带你看看，哪些代码是违反里式替换原则的？我们该如何将它们改造成满足里式替换原则？除此之外，这条原则从定义上看起来，跟我们之前讲过的“多态”有点类似。所以，我今天也会讲一下，它跟多态的区别。</p><p>话不多说，让我们正式开始今天的学习吧！</p><h2>如何理解“里式替换原则”？</h2><p>里式替换原则的英文翻译是：Liskov Substitution Principle，缩写为LSP。这个原则最早是在1986年由Barbara Liskov提出，他是这么描述这条原则的：</p><blockquote>
+<p>If S is a subtype of T, then objects of type T may be replaced with objects of type S, without breaking the program。</p>
+</blockquote><p>在1996年，Robert Martin在他的SOLID原则中，重新描述了这个原则，英文原话是这样的：</p><!-- [[[read_end]]] --><blockquote>
+<p>Functions that use pointers of references to base classes must be able to use objects of derived classes without knowing it。</p>
+</blockquote><p>我们综合两者的描述，将这条原则用中文描述出来，是这样的：子类对象（object of subtype/derived class）能够替换程序（program）中父类对象（object of base/parent class）出现的任何地方，并且保证原来程序的逻辑行为（behavior）不变及正确性不被破坏。</p><p>这么说还是比较抽象，我们通过一个例子来解释一下。如下代码中，父类Transporter使用org.apache.http库中的HttpClient类来传输网络数据。子类SecurityTransporter继承父类Transporter，增加了额外的功能，支持传输appId和appToken安全认证信息。</p><pre><code>public class Transporter {
+  private HttpClient httpClient;
+  
+  public Transporter(HttpClient httpClient) {
+    this.httpClient = httpClient;
+  }
+
+  public Response sendRequest(Request request) {
+    // ...use httpClient to send request
+  }
+}
+
+public class SecurityTransporter extends Transporter {
+  private String appId;
+  private String appToken;
+
+  public SecurityTransporter(HttpClient httpClient, String appId, String appToken) {
+    super(httpClient);
+    this.appId = appId;
+    this.appToken = appToken;
+  }
+
+  @Override
+  public Response sendRequest(Request request) {
+    if (StringUtils.isNotBlank(appId) &amp;&amp; StringUtils.isNotBlank(appToken)) {
+      request.addPayload(&quot;app-id&quot;, appId);
+      request.addPayload(&quot;app-token&quot;, appToken);
+    }
+    return super.sendRequest(request);
+  }
+}
+
+public class Demo {    
+  public void demoFunction(Transporter transporter) {    
+    Reuqest request = new Request();
+    //...省略设置request中数据值的代码...
+    Response response = transporter.sendRequest(request);
+    //...省略其他逻辑...
+  }
+}
+
+// 里式替换原则
+Demo demo = new Demo();
+demo.demofunction(new SecurityTransporter(/*省略参数*/););
+</code></pre><p>在上面的代码中，子类SecurityTransporter的设计完全符合里式替换原则，可以替换父类出现的任何位置，并且原来代码的逻辑行为不变且正确性也没有被破坏。</p><p>不过，你可能会有这样的疑问，刚刚的代码设计不就是简单利用了面向对象的多态特性吗？多态和里式替换原则说的是不是一回事呢？从刚刚的例子和定义描述来看，里式替换原则跟多态看起来确实有点类似，但实际上它们完全是两回事。为什么这么说呢？</p><p>我们还是通过刚才这个例子来解释一下。不过，我们需要对SecurityTransporter类中sendRequest()函数稍加改造一下。改造前，如果appId或者appToken没有设置，我们就不做校验；改造后，如果appId或者appToken没有设置，则直接抛出NoAuthorizationRuntimeException未授权异常。改造前后的代码对比如下所示：</p><pre><code>// 改造前：
+public class SecurityTransporter extends Transporter {
+  //...省略其他代码..
+  @Override
+  public Response sendRequest(Request request) {
+    if (StringUtils.isNotBlank(appId) &amp;&amp; StringUtils.isNotBlank(appToken)) {
+      request.addPayload(&quot;app-id&quot;, appId);
+      request.addPayload(&quot;app-token&quot;, appToken);
+    }
+    return super.sendRequest(request);
+  }
+}
+
+// 改造后：
+public class SecurityTransporter extends Transporter {
+  //...省略其他代码..
+  @Override
+  public Response sendRequest(Request request) {
+    if (StringUtils.isBlank(appId) || StringUtils.isBlank(appToken)) {
+      throw new NoAuthorizationRuntimeException(...);
+    }
+    request.addPayload(&quot;app-id&quot;, appId);
+    request.addPayload(&quot;app-token&quot;, appToken);
+    return super.sendRequest(request);
+  }
+}
+</code></pre><p>在改造之后的代码中，如果传递进demoFunction()函数的是父类Transporter对象，那demoFunction()函数并不会有异常抛出，但如果传递给demoFunction()函数的是子类SecurityTransporter对象，那demoFunction()有可能会有异常抛出。尽管代码中抛出的是运行时异常（Runtime Exception），我们可以不在代码中显式地捕获处理，但子类替换父类传递进demoFunction函数之后，整个程序的逻辑行为有了改变。</p><p>虽然改造之后的代码仍然可以通过Java的多态语法，动态地用子类SecurityTransporter来替换父类Transporter，也并不会导致程序编译或者运行报错。但是，从设计思路上来讲，SecurityTransporter的设计是不符合里式替换原则的。</p><p>好了，我们稍微总结一下。虽然从定义描述和代码实现上来看，多态和里式替换有点类似，但它们关注的角度是不一样的。多态是面向对象编程的一大特性，也是面向对象编程语言的一种语法。它是一种代码实现的思路。而里式替换是一种设计原则，是用来指导继承关系中子类该如何设计的，子类的设计要保证在替换父类的时候，不改变原有程序的逻辑以及不破坏原有程序的正确性。</p><h2>哪些代码明显违背了LSP？</h2><p>实际上，里式替换原则还有另外一个更加能落地、更有指导意义的描述，那就是“Design By Contract”，中文翻译就是“按照协议来设计”。</p><p>看起来比较抽象，我来进一步解读一下。子类在设计的时候，要遵守父类的行为约定（或者叫协议）。父类定义了函数的行为约定，那子类可以改变函数的内部实现逻辑，但不能改变函数原有的行为约定。这里的行为约定包括：函数声明要实现的功能；对输入、输出、异常的约定；甚至包括注释中所罗列的任何特殊说明。实际上，定义中父类和子类之间的关系，也可以替换成接口和实现类之间的关系。</p><p>为了更好地理解这句话，我举几个违反里式替换原则的例子来解释一下。</p><h3>1.子类违背父类声明要实现的功能</h3><p>父类中提供的sortOrdersByAmount()订单排序函数，是按照金额从小到大来给订单排序的，而子类重写这个sortOrdersByAmount()订单排序函数之后，是按照创建日期来给订单排序的。那子类的设计就违背里式替换原则。</p><h3>2.子类违背父类对输入、输出、异常的约定</h3><p>在父类中，某个函数约定：运行出错的时候返回null；获取数据为空的时候返回空集合（empty collection）。而子类重载函数之后，实现变了，运行出错返回异常（exception），获取不到数据返回null。那子类的设计就违背里式替换原则。</p><p>在父类中，某个函数约定，输入数据可以是任意整数，但子类实现的时候，只允许输入数据是正整数，负数就抛出，也就是说，子类对输入的数据的校验比父类更加严格，那子类的设计就违背了里式替换原则。</p><p>在父类中，某个函数约定，只会抛出ArgumentNullException异常，那子类的设计实现中只允许抛出ArgumentNullException异常，任何其他异常的抛出，都会导致子类违背里式替换原则。</p><h3>3.子类违背父类注释中所罗列的任何特殊说明</h3><p>父类中定义的withdraw()提现函数的注释是这么写的：“用户的提现金额不得超过账户余额……”，而子类重写withdraw()函数之后，针对VIP账号实现了透支提现的功能，也就是提现金额可以大于账户余额，那这个子类的设计也是不符合里式替换原则的。</p><p>以上便是三种典型的违背里式替换原则的情况。除此之外，判断子类的设计实现是否违背里式替换原则，还有一个小窍门，那就是拿父类的单元测试去验证子类的代码。如果某些单元测试运行失败，就有可能说明，子类的设计实现没有完全地遵守父类的约定，子类有可能违背了里式替换原则。</p><p>实际上，你有没有发现，里式替换这个原则是非常宽松的。一般情况下，我们写的代码都不怎么会违背它。所以，只要你能看懂我今天讲的这些，这个原则就不难掌握，也不难应用。</p><h2>重点回顾</h2><p>今天的内容到此就讲完了。我们来一块总结回顾一下，你需要掌握的重点内容。</p><p>里式替换原则是用来指导，继承关系中子类该如何设计的一个原则。理解里式替换原则，最核心的就是理解“design by contract，按照协议来设计”这几个字。父类定义了函数的“约定”（或者叫协议），那子类可以改变函数的内部实现逻辑，但不能改变函数原有的“约定”。这里的约定包括：函数声明要实现的功能；对输入、输出、异常的约定；甚至包括注释中所罗列的任何特殊说明。</p><p>理解这个原则，我们还要弄明白里式替换原则跟多态的区别。虽然从定义描述和代码实现上来看，多态和里式替换有点类似，但它们关注的角度是不一样的。多态是面向对象编程的一大特性，也是面向对象编程语言的一种语法。它是一种代码实现的思路。而里式替换是一种设计原则，用来指导继承关系中子类该如何设计，子类的设计要保证在替换父类的时候，不改变原有程序的逻辑及不破坏原有程序的正确性。</p><h2>课堂讨论</h2><p>把复杂的东西讲简单，把简单的东西讲深刻，都是比较难的事情。而里式替换原则存在的意义可以说不言自喻，非常简单明确，但是越是这种不言自喻的道理，越是难组织成文字或语言来描述，有点儿只可意会不可言传的意思，所以，今天的课堂讨论的话题是：请你有条理、有深度地讲一讲里式替换原则存在的意义。</p><p>欢迎在留言区写下你的想法，和同学一起交流和分享。如果有收获，也欢迎你把这篇文章分享给你的朋友。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/e7/07/0e9d85c3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>年轻的我们</span>
+  </div>
+  <div class="_2_QraFYR_0">个人理解里氏替换就是子类完美继承父类的设计初衷，并做了增强对吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 理解的没错</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-13 08:25:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/ef/89/8c73a24d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Chen</span>
+  </div>
+  <div class="_2_QraFYR_0">135看设计模式，246看数据结构与算法。争哥大法好</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 07:35:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/50/d7/f82ed283.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>辣么大</span>
+  </div>
+  <div class="_2_QraFYR_0">LSP的意义：<br>一、改进已有实现。例如程序最开始实现时采用了低效的排序算法，改进时使用LSP实现更高效的排序算法。<br>二、指导程序开发。告诉我们如何组织类和子类（subtype），子类的方法（非私有方法）要符合contract。<br>三、改进抽象设计。如果一个子类中的实现违反了LSP，那么是不是考虑抽象或者设计出了问题。<br><br>补充：<br>Liskov是美国历史上第一个女计算机博士，曾获得过图灵奖。<br>In 1968 she became one of the first women in the United States to be awarded a Ph.D from a computer science department when she was awarded her degree from Stanford University. At Stanford she worked with John McCarthy and was supported to work in artificial intelligence.<br><br>https:&#47;&#47;en.wikipedia.org&#47;wiki&#47;Barbara_Liskov</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 08:53:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/d8/d6/47da34bf.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>任鹏斌</span>
+  </div>
+  <div class="_2_QraFYR_0">里氏替换就是说父亲能干的事儿子也别挑，该怎么干就怎么干，儿子可以比父亲更有能力，但传统不能变</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 19:52:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f2/aa/32fc0d54.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>失火的夏天</span>
+  </div>
+  <div class="_2_QraFYR_0">里氏替换最终一句话还是对扩展开放，对修改关闭，不能改变父类的入参，返回，但是子类可以自己扩展方法中的逻辑。父类方法名很明显限定了逻辑内容，比如按金额排序这种，子类就不要去重写金额排序，改成日期排序之类的，而应该抽出一个排序方法，然后再写一个获取排序的方法，父类获取排序调用金额排序，子类就重写调用排序方法，获取日期排序。<br><br>个人感觉也是为了避免“二意性”，这里是只父类的逻辑和子类逻辑差别太多，读代码的人会感觉模棱两可，父类一套，子类一套，到底应该读哪种。感觉会混乱。<br><br>总之就是，子类的重写最好是扩展父类，而不要修改父类。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 08:07:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/17/27/ec30d30a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jxin</span>
+  </div>
+  <div class="_2_QraFYR_0">里式替换是细力度的开闭原则。这个准则应用的场景，往往是在方法功能的调整上，要达到的效果是：该方法对已经调用的代码的效果不变，并能支撑新的功能或提供更好的性能。换句话说，就是在保证兼容的前提条件下做扩展和调整。<br><br>spring对里式替换贯彻得不错，从1.x到4.x能看到大部分代码都坚强的保留着兼容性。<br>但springboot就有点跳脱了，1.x小版本就会有违背里式替换的破坏性升级。1.x到2.x更是出现跳票重灾的情况。带来的损失相信做过springboot版本升级的人都很有感触，而这份损失也表达出坚守里式替换原则的重要性。不过，既然springboot会违背经营多年的原则（向下兼容），那么绝非空穴来风，相信在他们看来，违背里式替换做的升级，带来的价值能够盖过损失。所以我觉得里式替换依旧是个权衡项，在日常开发中我们要坚守，但当发现不合理，比如设计缺陷或则业务场景质变时，做破坏性改造也意味着即使止损，是一个可选项。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 12:51:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/f5/94/67fabf8e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Kevinlvlc</span>
+  </div>
+  <div class="_2_QraFYR_0">我觉得可以从两个角度谈里式替换原则的意义。<br>首先，从接口或父类的角度出发，顶层的接口&#47;父类要设计的足够通用，并且可扩展，不要为子类或实现类指定实现逻辑，尽量只定义接口规范以及必要的通用性逻辑，这样实现类就可以根据具体场景选择具体实现逻辑而不必担心破坏顶层的接口规范。<br>从子类或实现类角度出发，底层实现不应该轻易破坏顶层规定的接口规范或通用逻辑，也不应该随意添加不属于这个类要实现的功能接口，这样接口的外部使用者可以不必关心具体实现，安全的替换任意实现类，同时内部各个不同子类既可以根据不同场景做各自的扩展，又不破坏顶层的设计，从维护性和扩展性来说都能得到保证</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 06:43:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/a3/eb/d26459ae.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>时光勿念</span>
+  </div>
+  <div class="_2_QraFYR_0">呃，我不知道这样理解对不对。<br>多态是一种特性、能力，里氏替换是一种原则、约定。<br>虽然多态和里氏替换不是一回事，但是里氏替换这个原则 需要 多态这种能力 才能实现。<br>里氏替换最重要的就是替换之后原本的功能一点不能少。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 07:41:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/23/a1/b08f3ee7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>何妨</span>
+  </div>
+  <div class="_2_QraFYR_0">多态是语法特性，是一种实现方法。里式替换是设计原则，是一种规范。其存在的意义是用来规范我们对方法的使用，即指导我们如何正确的使用多态。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 08:34:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/47/fd/895f0c27.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Cy23</span>
+  </div>
+  <div class="_2_QraFYR_0">听完感觉就是，子类可以无损替换父类，就是里氏替换原则。对否</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 08:14:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/9d/9c/2d5eac97.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>destiny</span>
+  </div>
+  <div class="_2_QraFYR_0">VIP提现可透支这种情况如何不违背里氏替换原则？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-12 12:36:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/19/69/bf/50a824a4.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>王加武</span>
+  </div>
+  <div class="_2_QraFYR_0">在继承当中，尽量不要去重写父类的方法<br>里氏替换原则告诉我们，继承实际上是提高了两个类的耦合性，在适当的情况下，我们可以使用组合，依赖，聚合等来解决问题！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-19 17:14:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/93/da/0e47c76e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ladidili</span>
+  </div>
+  <div class="_2_QraFYR_0">多态是工具，是实在的东西。里式替换是设计思路，是虚的东西。<br><br>多态做到外壳，做到结构一致。<br>里式替换在结构一致的前提下还要保持底层逻辑一致。<br><br>设计模式都是用来指导开发的。里式替换指导父类更加抽象复用，子类更加贴近最初的原则。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-23 11:10:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/37/4e/5c3153b2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>知行合一</span>
+  </div>
+  <div class="_2_QraFYR_0">多态是种能力，里氏是一种约定。能力是摆在那里的，约定却不一定强制遵守，有时候可能会打破约定。需要权衡</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 08:46:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/5c/c2/8ffd2ad0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>qqq</span>
+  </div>
+  <div class="_2_QraFYR_0">遵守协议，保证一致性</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 10:38:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/49/a5/e4c1c2d4.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小文同学</span>
+  </div>
+  <div class="_2_QraFYR_0">父类假如在协议上约定得非常细，方法命名中说明了实现细节，就会导致子类扩展受限，也是对里氏替换的一种限制。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-22 23:32:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/30/ff/b3e54147.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>雨幕下的稻田</span>
+  </div>
+  <div class="_2_QraFYR_0">LSP感觉是在多态的基础上强调了协议的重要性</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-20 12:27:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/54/d0/4e1fc664.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>帆大肚子</span>
+  </div>
+  <div class="_2_QraFYR_0">在可拔插的设计中，保证原有代码的正确性</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-11 09:18:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/aa/3d/c14e338e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>建锋</span>
+  </div>
+  <div class="_2_QraFYR_0">带着镣铐舞蹈</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-03-20 22:41:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/9c/1d/34c96367.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>G</span>
+  </div>
+  <div class="_2_QraFYR_0">我感觉里式替换对心智的负担比较大，虽然没有改写父类，但实际父类不再使用了，等同于修改了父类。这种重构让我想起了js的痛苦，逻辑都要在运行时才能知道，而且静态编译时，编译器无法帮助推断，还不如多态直接告诉编译器。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-22 20:58:25</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

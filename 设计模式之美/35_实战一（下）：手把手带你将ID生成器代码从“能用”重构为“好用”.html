@@ -1,0 +1,714 @@
+<audio title="35_实战一（下）：手把手带你将ID生成器代码从“能用”重构为“好用”" src="https://static001.geekbang.org/resource/audio/bc/1d/bc63de6342a76d9c2604f9f11d220d1d.mp3" controls="controls"></audio> 
+<p>上一节课中，我们结合ID生成器代码讲解了如何发现代码质量问题。虽然ID生成器的需求非常简单，代码行数也不多，但看似非常简单的代码，实际上还是有很多优化的空间。综合评价一下的话，小王的代码也只能算是“能用”、勉强及格。我们大部分人写出来的代码都能达到这个程度。如果想要在团队中脱颖而出，我们就不能只满足于这个60分及格，大家都能做的事情，我们要做得更好才行。</p><p>上一节课我们讲了，为什么这份代码只能得60分，这一节课我们再讲一下，如何将60分的代码重构为80分、90分，让它从“能用”变得“好用”。话不多说，让我们正式开始今天的学习吧！</p><h2>回顾代码和制定重构计划</h2><p>为了方便你查看和对比，我把上一节课中的代码拷贝到这里。</p><pre><code>public class IdGenerator {
+  private static final Logger logger = LoggerFactory.getLogger(IdGenerator.class);
+
+  public static String generate() {
+    String id = &quot;&quot;;
+    try {
+      String hostName = InetAddress.getLocalHost().getHostName();
+      String[] tokens = hostName.split(&quot;\\.&quot;);
+      if (tokens.length &gt; 0) {
+        hostName = tokens[tokens.length - 1];
+      }
+      char[] randomChars = new char[8];
+      int count = 0;
+      Random random = new Random();
+      while (count &lt; 8) {
+        int randomAscii = random.nextInt(122);
+        if (randomAscii &gt;= 48 &amp;&amp; randomAscii &lt;= 57) {
+          randomChars[count] = (char)('0' + (randomAscii - 48));
+          count++;
+        } else if (randomAscii &gt;= 65 &amp;&amp; randomAscii &lt;= 90) {
+          randomChars[count] = (char)('A' + (randomAscii - 65));
+          count++;
+        } else if (randomAscii &gt;= 97 &amp;&amp; randomAscii &lt;= 122) {
+          randomChars[count] = (char)('a' + (randomAscii - 97));
+          count++;
+        }
+      }
+      id = String.format(&quot;%s-%d-%s&quot;, hostName,
+              System.currentTimeMillis(), new String(randomChars));
+    } catch (UnknownHostException e) {
+      logger.warn(&quot;Failed to get the host name.&quot;, e);
+    }
+
+    return id;
+  }
+}
+</code></pre><p>前面讲到系统设计和实现的时候，我们多次讲到要循序渐进、小步快跑。重构代码的过程也应该遵循这样的思路。每次改动一点点，改好之后，再进行下一轮的优化，保证每次对代码的改动不会过大，能在很短的时间内完成。所以，我们将上一节课中发现的代码质量问题，分成四次重构来完成，具体如下所示。</p><ul>
+<li>第一轮重构：提高代码的可读性</li>
+<li>第二轮重构：提高代码的可测试性</li>
+<li>第三轮重构：编写完善的单元测试</li>
+<li>第四轮重构：所有重构完成之后添加注释</li>
+</ul><!-- [[[read_end]]] --><h2>第一轮重构：提高代码的可读性</h2><p>首先，我们要解决最明显、最急需改进的代码可读性问题。具体有下面几点：</p><ul>
+<li>hostName变量不应该被重复使用，尤其当这两次使用时的含义还不同的时候；</li>
+<li>将获取hostName的代码抽离出来，定义为getLastfieldOfHostName()函数；</li>
+<li>删除代码中的魔法数，比如，57、90、97、122；</li>
+<li>将随机数生成的代码抽离出来，定义为generateRandomAlphameric()函数；</li>
+<li>generate()函数中的三个if逻辑重复了，且实现过于复杂，我们要对其进行简化；</li>
+<li>对IdGenerator类重命名，并且抽象出对应的接口。</li>
+</ul><p>这里我们重点讨论下最后一个修改。实际上，对于ID生成器的代码，有下面三种类的命名方式。你觉得哪种更合适呢？</p><p><img src="https://static001.geekbang.org/resource/image/8f/6b/8f0de72351eeb9138c7a3b8199767a6b.jpg?wh=1843*673" alt=""></p><p>我们来逐一分析一下三种命名方式。</p><p>第一种命名方式，将接口命名为IdGenerator，实现类命名为LogTraceIdGenerator，这可能是很多人最先想到的命名方式了。在命名的时候，我们要考虑到，以后两个类会如何使用、会如何扩展。从使用和扩展的角度来分析，这样的命名就不合理了。</p><p>首先，如果我们扩展新的日志ID生成算法，也就是要创建另一个新的实现类，因为原来的实现类已经叫LogTraceIdGenerator了，命名过于通用，那新的实现类就不好取名了，无法取一个跟LogTraceIdGenerator平行的名字了。</p><p>其次，你可能会说，假设我们没有日志ID的扩展需求，但要扩展其他业务的ID生成算法，比如针对用户的（UserldGenerator）、订单的（OrderIdGenerator），第一种命名方式是不是就是合理的呢？答案也是否定的。基于接口而非实现编程，主要的目的是为了方便后续灵活地替换实现类。而LogTraceIdGenerator、UserIdGenerator、OrderIdGenerator三个类从命名上来看，涉及的是完全不同的业务，不存在互相替换的场景。也就是说，我们不可能在有关日志的代码中，进行下面这种替换。所以，让这三个类实现同一个接口，实际上是没有意义的。</p><pre><code>IdGenearator idGenerator = new LogTraceIdGenerator();
+替换为:
+IdGenearator idGenerator = new UserIdGenerator();
+</code></pre><p>第二种命名方式是不是就合理了呢？答案也是否定的。其中，LogTraceIdGenerator接口的命名是合理的，但是HostNameMillisIdGenerator实现类暴露了太多实现细节，只要代码稍微有所改动，就可能需要改动命名，才能匹配实现。</p><p>第三种命名方式是我比较推荐的。在目前的ID生成器代码实现中，我们生成的ID是一个随机ID，不是递增有序的，所以，命名成RandomIdGenerator是比较合理的，即便内部生成算法有所改动，只要生成的还是随机的ID，就不需要改动命名。如果我们需要扩展新的ID生成算法，比如要实现一个递增有序的ID生成算法，那我们可以命名为SequenceIdGenerator。</p><p>实际上，更好的一种命名方式是，我们抽象出两个接口，一个是IdGenerator，一个是LogTraceIdGenerator，LogTraceIdGenerator继承IdGenerator。实现类实现接口LogTraceIdGenerator，命名为RandomIdGenerator、SequenceIdGenerator等。这样，实现类可以复用到多个业务模块中，比如前面提到的用户、订单。</p><p>根据上面的优化策略，我们对代码进行第一轮的重构，重构之后的代码如下所示：</p><pre><code>public interface IdGenerator {
+  String generate();
+}
+
+public interface LogTraceIdGenerator extends IdGenerator {
+}
+
+public class RandomIdGenerator implements LogTraceIdGenerator {
+  private static final Logger logger = LoggerFactory.getLogger(RandomIdGenerator.class);
+
+  @Override
+  public String generate() {
+    String substrOfHostName = getLastfieldOfHostName();
+    long currentTimeMillis = System.currentTimeMillis();
+    String randomString = generateRandomAlphameric(8);
+    String id = String.format(&quot;%s-%d-%s&quot;,
+            substrOfHostName, currentTimeMillis, randomString);
+    return id;
+  }
+
+  private String getLastfieldOfHostName() {
+    String substrOfHostName = null;
+    try {
+      String hostName = InetAddress.getLocalHost().getHostName();
+      String[] tokens = hostName.split(&quot;\\.&quot;);
+      substrOfHostName = tokens[tokens.length - 1];
+      return substrOfHostName;
+    } catch (UnknownHostException e) {
+      logger.warn(&quot;Failed to get the host name.&quot;, e);
+    }
+    return substrOfHostName;
+  }
+
+  private String generateRandomAlphameric(int length) {
+    char[] randomChars = new char[length];
+    int count = 0;
+    Random random = new Random();
+    while (count &lt; length) {
+      int maxAscii = 'z';
+      int randomAscii = random.nextInt(maxAscii);
+      boolean isDigit= randomAscii &gt;= '0' &amp;&amp; randomAscii &lt;= '9';
+      boolean isUppercase= randomAscii &gt;= 'A' &amp;&amp; randomAscii &lt;= 'Z';
+      boolean isLowercase= randomAscii &gt;= 'a' &amp;&amp; randomAscii &lt;= 'z';
+      if (isDigit|| isUppercase || isLowercase) {
+        randomChars[count] = (char) (randomAscii);
+        ++count;
+      }
+    }
+    return new String(randomChars);
+  }
+}
+
+//代码使用举例
+LogTraceIdGenerator logTraceIdGenerator = new RandomIdGenerator();
+</code></pre><h2>第二轮重构：提高代码的可测试性</h2><p>关于代码可测试性的问题，主要包含下面两个方面：</p><ul>
+<li>generate()函数定义为静态函数，会影响使用该函数的代码的可测试性；</li>
+<li>generate()函数的代码实现依赖运行环境（本机名）、时间函数、随机函数，所以generate()函数本身的可测试性也不好。</li>
+</ul><p>对于第一点，我们已经在第一轮重构中解决了。我们将RandomIdGenerator类中的generate()静态函数重新定义成了普通函数。调用者可以通过依赖注入的方式，在外部创建好RandomIdGenerator对象后注入到自己的代码中，从而解决静态函数调用影响代码可测试性的问题。</p><p>对于第二点，我们需要在第一轮重构的基础之上再进行重构。重构之后的代码如下所示，主要包括以下几个代码改动。</p><ul>
+<li>从getLastfieldOfHostName()函数中，将逻辑比较复杂的那部分代码剥离出来，定义为getLastSubstrSplittedByDot()函数。因为getLastfieldOfHostName()函数依赖本地主机名，所以，剥离出主要代码之后这个函数变得非常简单，可以不用测试。我们重点测试getLastSubstrSplittedByDot()函数即可。</li>
+<li>将generateRandomAlphameric()和getLastSubstrSplittedByDot()这两个函数的访问权限设置为protected。这样做的目的是，可以直接在单元测试中通过对象来调用两个函数进行测试。</li>
+<li>给generateRandomAlphameric()和getLastSubstrSplittedByDot()两个函数添加Google Guava的annotation @VisibleForTesting。这个annotation没有任何实际的作用，只起到标识的作用，告诉其他人说，这两个函数本该是private访问权限的，之所以提升访问权限到protected，只是为了测试，只能用于单元测试中。</li>
+</ul><pre><code>public class RandomIdGenerator implements LogTraceIdGenerator {
+  private static final Logger logger = LoggerFactory.getLogger(RandomIdGenerator.class);
+
+  @Override
+  public String generate() {
+    String substrOfHostName = getLastfieldOfHostName();
+    long currentTimeMillis = System.currentTimeMillis();
+    String randomString = generateRandomAlphameric(8);
+    String id = String.format(&quot;%s-%d-%s&quot;,
+            substrOfHostName, currentTimeMillis, randomString);
+    return id;
+  }
+
+  private String getLastfieldOfHostName() {
+    String substrOfHostName = null;
+    try {
+      String hostName = InetAddress.getLocalHost().getHostName();
+      substrOfHostName = getLastSubstrSplittedByDot(hostName);
+    } catch (UnknownHostException e) {
+      logger.warn(&quot;Failed to get the host name.&quot;, e);
+    }
+    return substrOfHostName;
+  }
+
+  @VisibleForTesting
+  protected String getLastSubstrSplittedByDot(String hostName) {
+    String[] tokens = hostName.split(&quot;\\.&quot;);
+    String substrOfHostName = tokens[tokens.length - 1];
+    return substrOfHostName;
+  }
+
+  @VisibleForTesting
+  protected String generateRandomAlphameric(int length) {
+    char[] randomChars = new char[length];
+    int count = 0;
+    Random random = new Random();
+    while (count &lt; length) {
+      int maxAscii = 'z';
+      int randomAscii = random.nextInt(maxAscii);
+      boolean isDigit= randomAscii &gt;= '0' &amp;&amp; randomAscii &lt;= '9';
+      boolean isUppercase= randomAscii &gt;= 'A' &amp;&amp; randomAscii &lt;= 'Z';
+      boolean isLowercase= randomAscii &gt;= 'a' &amp;&amp; randomAscii &lt;= 'z';
+      if (isDigit|| isUppercase || isLowercase) {
+        randomChars[count] = (char) (randomAscii);
+        ++count;
+      }
+    }
+    return new String(randomChars);
+  }
+}
+</code></pre><p>在上一节课的课堂讨论中，我们提到，打印日志的Logger对象被定义为static final的，并且在类内部创建，这是否影响到代码的可测试性？是否应该将Logger对象通过依赖注入的方式注入到类中呢？</p><p>依赖注入之所以能提高代码可测试性，主要是因为，通过这样的方式我们能轻松地用mock对象替换依赖的真实对象。那我们为什么要mock这个对象呢？这是因为，这个对象参与逻辑执行（比如，我们要依赖它输出的数据做后续的计算）但又不可控。对于Logger对象来说，我们只往里写入数据，并不读取数据，不参与业务逻辑的执行，不会影响代码逻辑的正确性，所以，我们没有必要mock Logger对象。</p><p>除此之外，一些只是为了存储数据的值对象，比如String、Map、UseVo，我们也没必要通过依赖注入的方式来创建，直接在类中通过new创建就可以了。</p><h2>第三轮重构：编写完善的单元测试</h2><p>经过上面的重构之后，代码存在的比较明显的问题，基本上都已经解决了。我们现在为代码补全单元测试。RandomIdGenerator类中有4个函数。</p><pre><code>public String generate();
+private String getLastfieldOfHostName();
+@VisibleForTesting
+protected String getLastSubstrSplittedByDot(String hostName);
+@VisibleForTesting
+protected String generateRandomAlphameric(int length);
+</code></pre><p>我们先来看后两个函数。这两个函数包含的逻辑比较复杂，是我们测试的重点。而且，在上一步重构中，为了提高代码的可测试性，我们已经将这两个部分代码跟不可控的组件（本机名、随机函数、时间函数）进行了隔离。所以，我们只需要设计完备的单元测试用例即可。具体的代码实现如下所示（注意，我们使用了JUnit测试框架）：</p><pre><code>public class RandomIdGeneratorTest {
+  @Test
+  public void testGetLastSubstrSplittedByDot() {
+    RandomIdGenerator idGenerator = new RandomIdGenerator();
+    String actualSubstr = idGenerator.getLastSubstrSplittedByDot(&quot;field1.field2.field3&quot;);
+    Assert.assertEquals(&quot;field3&quot;, actualSubstr);
+
+    actualSubstr = idGenerator.getLastSubstrSplittedByDot(&quot;field1&quot;);
+    Assert.assertEquals(&quot;field1&quot;, actualSubstr);
+
+    actualSubstr = idGenerator.getLastSubstrSplittedByDot(&quot;field1#field2#field3&quot;);
+    Assert.assertEquals(&quot;field1#field2#field3&quot;, actualSubstr);
+  }
+
+  // 此单元测试会失败，因为我们在代码中没有处理hostName为null或空字符串的情况
+  // 这部分优化留在第36、37节课中讲解
+  @Test
+  public void testGetLastSubstrSplittedByDot_nullOrEmpty() {
+    RandomIdGenerator idGenerator = new RandomIdGenerator();
+    String actualSubstr = idGenerator.getLastSubstrSplittedByDot(null);
+    Assert.assertNull(actualSubstr);
+
+    actualSubstr = idGenerator.getLastSubstrSplittedByDot(&quot;&quot;);
+    Assert.assertEquals(&quot;&quot;, actualSubstr);
+  }
+
+  @Test
+  public void testGenerateRandomAlphameric() {
+    RandomIdGenerator idGenerator = new RandomIdGenerator();
+    String actualRandomString = idGenerator.generateRandomAlphameric(6);
+    Assert.assertNotNull(actualRandomString);
+    Assert.assertEquals(6, actualRandomString.length());
+    for (char c : actualRandomString.toCharArray()) {
+         Assert.assertTrue(('0' &lt;= c &amp;&amp; c &lt;= '9') || ('a' &lt;= c &amp;&amp; c &lt;= 'z') || ('A' &lt;= c &amp;&amp; c &lt;= 'Z'));
+    }
+  }
+
+  // 此单元测试会失败，因为我们在代码中没有处理length&lt;=0的情况
+  // 这部分优化留在第36、37节课中讲解
+  @Test
+  public void testGenerateRandomAlphameric_lengthEqualsOrLessThanZero() {
+    RandomIdGenerator idGenerator = new RandomIdGenerator();
+    String actualRandomString = idGenerator.generateRandomAlphameric(0);
+    Assert.assertEquals(&quot;&quot;, actualRandomString);
+
+    actualRandomString = idGenerator.generateRandomAlphameric(-1);
+    Assert.assertNull(actualRandomString);
+  }
+}
+</code></pre><p>我们再来看generate()函数。这个函数也是我们唯一一个暴露给外部使用的public函数。虽然逻辑比较简单，最好还是测试一下。但是，它依赖主机名、随机函数、时间函数，我们该如何测试呢？需要mock这些函数的实现吗？</p><p>实际上，这要分情况来看。我们前面讲过，写单元测试的时候，测试对象是函数定义的功能，而非具体的实现逻辑。这样我们才能做到，函数的实现逻辑改变了之后，单元测试用例仍然可以工作。那generate()函数实现的功能是什么呢？这完全是由代码编写者自己来定义的。</p><p>比如，针对同一份generate()函数的代码实现，我们可以有3种不同的功能定义，对应3种不同的单元测试。</p><ol>
+<li>如果我们把generate()函数的功能定义为：“生成一个随机唯一ID”，那我们只要测试多次调用generate()函数生成的ID是否唯一即可。</li>
+<li>如果我们把generate()函数的功能定义为：“生成一个只包含数字、大小写字母和中划线的唯一ID”，那我们不仅要测试ID的唯一性，还要测试生成的ID是否只包含数字、大小写字母和中划线。</li>
+<li>如果我们把generate()函数的功能定义为：“生成唯一ID，格式为：{主机名substr}-{时间戳}-{8位随机数}。在主机名获取失败时，返回：null-{时间戳}-{8位随机数}”，那我们不仅要测试ID的唯一性，还要测试生成的ID是否完全符合格式要求。</li>
+</ol><p><strong>总结一下，单元测试用例如何写，关键看你如何定义函数。</strong>针对generate()函数的前两种定义，我们不需要mock获取主机名函数、随机函数、时间函数等，但对于第3种定义，我们需要mock获取主机名函数，让其返回null，测试代码运行是否符合预期。</p><p>最后，我们来看下getLastfieldOfHostName()函数。实际上，这个函数不容易测试，因为它调用了一个静态函数（InetAddress.getLocalHost().getHostName();），并且这个静态函数依赖运行环境。但是，这个函数的实现非常简单，肉眼基本上可以排除明显的bug，所以我们可以不为其编写单元测试代码。毕竟，我们写单元测试的目的是为了减少代码bug，而不是为了写单元测试而写单元测试。</p><p>当然，如果你真的想要对它进行测试，我们也是有办法的。一种办法是使用更加高级的测试框架。比如PowerMock，它可以mock静态函数。另一种方式是将获取本机名的逻辑再封装为一个新的函数。不过，后一种方法会造成代码过度零碎，也会稍微影响到代码的可读性，这个需要你自己去权衡利弊来做选择。</p><h2>第四轮重构：添加注释</h2><p>前面我们提到，注释不能太多，也不能太少，主要添加在类和函数上。有人说，好的命名可以替代注释，清晰的表达含义。这点对于变量的命名来说是适用的，但对于类或函数来说就不一定对了。类或函数包含的逻辑往往比较复杂，单纯靠命名很难清晰地表明实现了什么功能，这个时候我们就需要通过注释来补充。比如，前面我们提到的对于generate()函数的3种功能定义，就无法用命名来体现，需要补充到注释里面。</p><p>对于如何写注释，你可以参看我们在<a href="https://time.geekbang.org/column/article/188622">第31节课</a>中的讲解。总结一下，主要就是写清楚：做什么、为什么、怎么做、怎么用，对一些边界条件、特殊情况进行说明，以及对函数输入、输出、异常进行说明。</p><pre><code>/**
+ * Id Generator that is used to generate random IDs.
+ *
+ * &lt;p&gt;
+ * The IDs generated by this class are not absolutely unique,
+ * but the probability of duplication is very low.
+ */
+public class RandomIdGenerator implements LogTraceIdGenerator {
+  private static final Logger logger = LoggerFactory.getLogger(RandomIdGenerator.class);
+
+  /**
+   * Generate the random ID. The IDs may be duplicated only in extreme situation.
+   *
+   * @return an random ID
+   */
+  @Override
+  public String generate() {
+    //...
+  }
+
+  /**
+   * Get the local hostname and
+   * extract the last field of the name string splitted by delimiter '.'.
+   *
+   * @return the last field of hostname. Returns null if hostname is not obtained.
+   */
+  private String getLastfieldOfHostName() {
+    //...
+  }
+
+  /**
+   * Get the last field of {@hostName} splitted by delemiter '.'.
+   *
+   * @param hostName should not be null
+   * @return the last field of {@hostName}. Returns empty string if {@hostName} is empty string.
+   */
+  @VisibleForTesting
+  protected String getLastSubstrSplittedByDot(String hostName) {
+    //...
+  }
+
+  /**
+   * Generate random string which
+   * only contains digits, uppercase letters and lowercase letters.
+   *
+   * @param length should not be less than 0
+   * @return the random string. Returns empty string if {@length} is 0
+   */
+  @VisibleForTesting
+  protected String generateRandomAlphameric(int length) {
+    //...
+  }
+}
+</code></pre><h2>重点回顾</h2><p>好了，今天的内容到此就讲完了。我们一块来总结回顾一下，你需要掌握的重点内容。</p><p>在这节课中，我带你将小王写的凑活能用的代码，重构成了结构更加清晰、更加易读、更易测试的代码，并且为其补全了单元测试。这其中涉及的知识点都是我们在理论篇中讲过的内容，比较细节和零碎，我就不一一带你回顾了，如果哪里不是很清楚，你可以回到前面章节去复习一下。</p><p>实际上，通过这节课，我更想传达给你的是下面这样几个开发思想，我觉得这比我给你讲解具体的知识点更加有意义。</p><ol>
+<li>即便是非常简单的需求，不同水平的人写出来的代码，差别可能会很大。我们要对代码质量有所追求，不能只是凑活能用就好。花点心思写一段高质量的代码，比写100段凑活能用的代码，对你的代码能力提高更有帮助。</li>
+<li>知其然知其所以然，了解优秀代码设计的演变过程，比学习优秀设计本身更有价值。知道为什么这么做，比单纯地知道怎么做更重要，这样可以避免你过度使用设计模式、思想和原则。</li>
+<li>设计思想、原则、模式本身并没有太多“高大上”的东西，都是一些简单的道理，而且知识点也并不多，关键还是锻炼具体代码具体分析的能力，把知识点恰当地用在项目中。</li>
+<li>我经常讲，高手之间的竞争都是在细节。大的架构设计、分层、分模块思路实际上都差不多。没有项目是靠一些不为人知的设计来取胜的，即便有，很快也能被学习过去。所以，关键还是看代码细节处理得够不够好。这些细节的差别累积起来，会让代码质量有质的差别。所以，要想提高代码质量，还是要在细节处下功夫。</li>
+</ol><h2>课堂讨论</h2><ol>
+<li>获取主机名失败的时候，generate()函数应该返回什么最合适呢？是特殊ID、null、空字符，还是异常？在小王的代码实现中，获取主机名失败异常在IdGenerator内部被吞掉了，打印一条报警日志，并没有继续往上抛出，这样的异常处理是否得当？</li>
+<li>为了隐藏代码实现细节，我们把getLastSubstrSplittedByDot(String hostName)函数命名替换成getLastSubstrByDelimiter(String hostName)，这样是否更加合理？为什么？</li>
+</ol><p>欢迎在留言区写下你的答案，和同学一起交流和分享。如果有收获，也欢迎你把这篇文章分享给你的朋友。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/a0/6b/0a21b2b8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>迷羊</span>
+  </div>
+  <div class="_2_QraFYR_0">1.应该需要继续抛出，因为在实际的业务开发中，会有对应的异常处理器，抛出可以让调用者明白哪出错了，而不是只是简单的打印日志。<br>2.命名getLastSubstrSplittedByDot替换成getLastSubstrByDelimiter，具体要看需求会不会经常变化，如果经常变化，替换没有任何问题，因为有可能后面根据别的符号来分割，这种情况下我个人认为getLastFiledOfHostName()函数命名应该替换成getLastFiled()，命名不应该暴露太多细节，要是以后不是根据HostName获取最后一个字段呢，之前的所有用到该命名的地方都需要替换，不然可读性不是很好。<br>如果需求不经常变化，那文中的命名就足够了。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 08:06:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/e7/cd/08088f14.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>马哲富</span>
+  </div>
+  <div class="_2_QraFYR_0">看到有人说这个专栏写得不好，我忍不住要留个言给这个专栏叫叫好，这个专栏写得很好，非常好，只恨自己水平有限，不能完全吸收，顶这个专栏！</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">编辑回复: 哈哈，没事的，各有自己的判断，不可能让大家都觉得好，我们虚心相待，尽力而为。遇到问题，解决问题。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-15 13:20:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/47/31/f35367c8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小晏子</span>
+  </div>
+  <div class="_2_QraFYR_0">在获取主机名失败的时候，generate函数应该能正常返回，因为是随机id，所以只要有个满足要求的id就行了，用户并不关心能不能拿到主机名字，所以在获取主机名失败的时候，可以返回一个默认的主机名，之后在拼接上时间戳和随机数也是满足需求的id，所以我认为generate函数在主机名失败的时候应该使用默认主机名正常返回。另外对于小王的异常处理我认为是可以捕获处理的，只是不能该让整个函数都返回一个空id，而是应该捕获异常时使用一个默认主机名继续后面的逻辑。<br>第二个问题：为了隐藏代码实现细节，我们把 getLastSubstrSplittedByDot(String hostName) 函数命名替换成 getLastSubstrByDelimiter(String hostName)，这样是否更加合理？为什么？<br>我认为是合理的，命名和代码的逻辑不绑定，避免了以后修改代码逻辑还要修改函数名的麻烦，比如将来可能不用点去分割hostname了，用空格分割，这时byDot函数名就不合适了，如果修改，那么所有使用到这个函数的地方都要改，大大增加了出错的概率。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 09:07:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/50/d7/f82ed283.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>辣么大</span>
+  </div>
+  <div class="_2_QraFYR_0">这两期争哥讲重构，我把Uncle Bob的《重构2》的第一章看了，大呼过瘾。自己也要操刀试一下！<br><br>他和Kent Beck强调重构时要用baby step（小步骤），什么是baby step呢？就是一次改一小点，例如改一个变量名字都需要进行 modify-build-test的步骤。<br><br>对于争哥的例子，我参考Uncle Bob书中的方法：<br>第一步、先写好测试<br>第二步、开始逐步重构（baby step）<br>第三步、修改-&gt; 测试<br><br>经过重构之后代码总计50行。重构之后代码易读，且结构清晰。<br>https:&#47;&#47;github.com&#47;gdhucoder&#47;Algorithms4&#47;blob&#47;master&#47;designpattern&#47;u35&#47;RandomLogTraceIDGenerator.java</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 22:07:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/1d/de/62bfa83f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>aoe</span>
+  </div>
+  <div class="_2_QraFYR_0">小争哥一波英文注释，猝不及防啊</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-18 16:56:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/50/d7/f82ed283.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>辣么大</span>
+  </div>
+  <div class="_2_QraFYR_0">对于在ID generator中方法里写到<br>void foo(){<br>    Random random = new Random();<br>}<br>有个疑问：<br><br>1、为什么不声明成静态变量？<br>2、能用成员变量么？而不是写成局部变量<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 也可以，不过尽量的缩小变量的作用域，代码可读性也好，毕竟random只会用在某个函数中，而不是用在多个函数中，放到局部函数中，也符合封装的特性，不暴露太多细节。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 22:15:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/dc/48/9796286e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>林子er</span>
+  </div>
+  <div class="_2_QraFYR_0">更正我的上一条回复。个人觉得从类名RandomIdGenerator看，并没有告知外界这里跟hostName有关，因而如果抛出hostName异常，对外界来说不是期望的异常结果：我只是要个随机数组成的id，跟hostName有何关系？更好的做法是生成器内部自动切换成其他随机算法（hostName只是众多随机策略的一种）。相反如果类名中包含了hostName字眼，则要抛出异常。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-22 09:05:11</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/9b/92/c0863297.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>evolution</span>
+  </div>
+  <div class="_2_QraFYR_0">代码的演变过程，真的是干货满满。不知道争哥有没有架构方面的演变课程？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 感谢认可，暂时没有呢</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 10:18:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/ef/5b/ff28088f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>郑大钱</span>
+  </div>
+  <div class="_2_QraFYR_0">看到评论我很吃惊，居然还有人认为这个课程不好。调整了心态，对自己说不同人都有不同的理解。<br>感谢争哥，感谢你的分享，你的课程确实帮到了我，让我长成了一个更好的程序员。<br><br>由于客户端的模版模式，通常都是系统方法里完成业务代码，如果业务代码太多，再把业务代码抽象成函数或模块。<br>如果一开始就预见业务代码会多到需要拆分，才会应用自己浅薄的设计思路来编写代码。<br>由于代码都是根据需求“生长”出来的，所以对异常和边界的处理非常薄弱。往往是测试同学发现缺失的异常逻辑，线上用户撞出没考虑到的边界条件，这些都指出你不是一个靠谱的程序员。<br>“单元测试依赖函数的定义”提醒我要主动定义一个有边界的函数、模块。这也有助于遵循里式替换，保持函数的流程正确。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-11-03 15:10:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/44/47/3ddb94d0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>javaadu</span>
+  </div>
+  <div class="_2_QraFYR_0">1. 目前习惯是抛异常，并且是包装过的业务异常，这样写代码，调用方拿到结果后不需要再处理特殊结果的情况；另外，这个问题还涉及到异常处理的思路，异常处理可以在模块的最上层做统一的捕获和转换，每层都捕获太麻烦了，也会影响代码的可读性<br>2. 这个名字目前是专门为.这种分隔符服务的，考虑到传入的参数就是主机名，如果有计划将该方法设计的更通用，那么也要将这个方法换个位置，抽取到某个字符串工具类中</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-26 23:04:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/2f/ed/a87bb8fa.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>此鱼不得水</span>
+  </div>
+  <div class="_2_QraFYR_0">问题1：<br>首先要明白当前业务Id生成类的业务使用场景，因为是日志id（能接受部分重复），而日志又是非核心链路的业务，所以这里我认为应该在异常的时候返回一个默认值比较合适。<br>如果返回了异常信息的话，那上层业务难道要每次记录日志的时候都直接捕获异常处理吗？未必太麻烦了<br>如果当前的id生成代码是在重要的业务场景中使用的话，那就有必要抛出异常信息，让业务趁早的感知到问题。<br>问题2：<br>这里的名字已经不需要进一步修改了，已经到了业务实现的末端环节，没必要为了扩展而扩展，毕竟现在的方法名字可读性能佳。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-23 16:50:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/d8/58/1f5f7aed.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>提姆</span>
+  </div>
+  <div class="_2_QraFYR_0">老師你好，想問一下有關測試的問題RandomIdGeneratorTest，為什麼不是分幾個Test Case去對generate做測試而是要拆出protected方法去做測試呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 拆出来的目的并非为了单元测试，更重要的是逻辑清晰，可读性好。之所以设置成potected的，是因为private的没法写单元测试。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-13 17:34:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/39/8c/745a513e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小乙哥</span>
+  </div>
+  <div class="_2_QraFYR_0">1.抛出不抛出异常，关键要看使用generate的方式。如果调用generate的地方，收到异常之后，也没有办法处理，那么返回特殊ID、null、空字符串，肯定要好于抛出异常。同时，特殊ID因为是一种特殊标识，查看日志的时候，能够很快知道是因为主机名获取不到的原因，所以特殊ID要好于null和空字符串。返回null有可能造成NPE，所以空字符串要好于null。如果调用方能够处理这种异常，比如采用降级方案等，这个时候异常是绝对不能吞掉的<br>2.如果不明确函数细节，建议增加第二个参数delimiter，让调用者指定分隔符。不然明确细节的函数名会相对好一点</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-09-06 17:33:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/29/0a/0ba09c68.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>一颗大白菜</span>
+  </div>
+  <div class="_2_QraFYR_0">34行代码是不是写错了？<br>Assert.assertTrue((&#39;0&#39; &lt; c &amp;&amp; c &gt; &#39;9&#39;) || (&#39;a&#39; &lt; c &amp;&amp; c &gt; &#39;z&#39;) || (&#39;A&#39; &lt; c &amp;&amp; c &lt; &#39;Z&#39;));</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 好像没有吧</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 15:54:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/19/49/d8/533b1968.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>王泽</span>
+  </div>
+  <div class="_2_QraFYR_0">看到 Delimiter 就在想，提不提倡用函数默认值呢？比如 getLastSubstrByDelimiter(hostName, delimiter = &#39;.&#39;)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-05-05 17:29:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/36/70/00122b24.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>冬渐暖</span>
+  </div>
+  <div class="_2_QraFYR_0">代码重构流程<br>●第一轮重构:提高代码的可读性。如改魔法值、提取公共方法、将不同的实现封装起来、对复杂的某一段抽成单个方法、修改命名<br>●第二轮重构:提高代码的可测试性。比如将原本private的方法改成protect(后面要改回来的，只是方便再test类可以直接调用)。将容易被外部控制或者无关的数据封装成方法(下次调的时候直接把这些数据弄成假数据来测试，那些没必要的就不用测了)<br>●第三轮重构:编写完善的单元测试。针对里面不同的方法做更细测试，但我平常都是直接debug进去，直接看这一系列方法的对应结果的。<br>●第四轮重构:所有重构完成之后添加注释。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-06 18:24:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/e6/66/fbbf0bb1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>牛顿的烈焰激光剑</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，对于获取 hostname（getLastfieldOfHostName()），我的想法是用 static 代码块，只在类加载的时候执行一次。请问这样处理的话会不会有什么坏处？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 有可能hostname会改变，你的代码就获取不到最新的hostname</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-25 00:19:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/4e/d0/d8a5f720.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Ken张云忠</span>
+  </div>
+  <div class="_2_QraFYR_0">读小争哥的注释就是种欣赏,小争哥的英文表达是怎么一步步积累的?<br>我认为动词和介词是英文的精髓,还有英文的语法</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我英语也不好，多花点心思优化一下，实在不行，写中文注释也是可以的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-22 13:28:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/36/94/0b969588.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>青年祭司</span>
+  </div>
+  <div class="_2_QraFYR_0">InetAddress.getLocalHost().getHostName();<br>这段获取的值是不是可以存起来，下次再请求的时候直接取就行了，不用再调用这个函数了，能优化点性能？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-22 14:41:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/ee/ae/855b7e6e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Gabriel</span>
+  </div>
+  <div class="_2_QraFYR_0">要是我写这个功能估计就和小王是一样的，写一个类，然后一个方法返回就是了。可能我这就是我与大神大差距，大神在写随机生成ID的时候，会想随机生成具体是要做什么的，就像这个是要记录id，然后这个随机id要怎么写，就像这个栗子随机生成id是有三部分组成（hostname+timestamp+nonstr)这样的，然后根据一个业务三个方法，像小王写的，就没有实现单一原则。大神写代码，更加是思想往上层，而不是简单实现业务逻辑就好。学完这堂课，我希望我首先要 转变的整个思考观念和做事方法</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-20 11:37:12</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

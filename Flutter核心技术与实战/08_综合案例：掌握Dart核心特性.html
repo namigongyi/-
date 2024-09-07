@@ -1,0 +1,671 @@
+<audio title="08_综合案例：掌握Dart核心特性" src="https://static001.geekbang.org/resource/audio/a5/b4/a59217af6d166c81eb955952c68988b4.mp3" controls="controls"></audio> 
+<p>你好，我是陈航。</p><p>在前两篇文章中，我首先与你一起学习了Dart程序的基本结构和语法，认识了Dart语言世界的基本构成要素，也就是类型系统，以及它们是怎么表示信息的。然后，我带你学习了Dart面向对象设计的基本思路，知道了函数、类与运算符这些其他编程语言中常见的概念，在Dart中的差异及典型用法，理解了Dart是怎么处理信息的。</p><p>可以看到，Dart吸纳了其他编程语言的优点，在关于如何表达以及处理信息上，既简单又简洁，而且又不失强大。俗话说，纸上得来终觉浅，绝知此事要躬行。那么今天，我就用一个综合案例，把前面学习的关于Dart的零散知识串起来，希望你可以动手试验一下这个案例，借此掌握如何用Dart编程。</p><p>有了前面学习的知识点，再加上今天的综合案例练习，我认为你已经掌握了Dart最常用的80%的特性，可以在基本没有语言障碍的情况下去使用Flutter了。至于剩下的那20%的特性，因为使用较少，所以我不会在本专栏做重点讲解。如果你对这部分内容感兴趣的话，可以访问<a href="https://dart.dev/tutorials">官方文档</a>去做进一步了解。</p><p>此外，关于Dart中的异步和并发，我会在后面的第23篇文章“单线程模型怎么保证UI运行流畅？”中进行深入介绍。</p><h2>案例介绍</h2><!-- [[[read_end]]] --><p>今天，我选择的案例是，先用Dart写一段购物车程序，但先不使用Dart独有的特性。然后，我们再以这段程序为起点，逐步加入Dart语言特性，将其改造为一个符合Dart设计思想的程序。你可以在这个改造过程中，进一步体会到Dart的魅力所在。</p><p>首先，我们来看看在不使用任何Dart语法特性的情况下，一个有着基本功能的购物车程序长什么样子。</p><pre><code>//定义商品Item类
+class Item {
+  double price;
+  String name;
+  Item(name, price) {
+    this.name = name;
+    this.price = price;
+  }
+}
+
+//定义购物车类
+class ShoppingCart {
+  String name;
+  DateTime date;
+  String code;
+  List&lt;Item&gt; bookings;
+
+  price() {
+    double sum = 0.0;
+    for(var i in bookings) {
+      sum += i.price;
+    }
+    return sum;
+  }
+
+  ShoppingCart(name, code) {
+    this.name = name;
+    this.code = code;
+    this.date = DateTime.now();
+  }
+
+  getInfo() {
+    return '购物车信息:' +
+          '\n-----------------------------' +
+          '\n用户名: ' + name+ 
+          '\n优惠码: ' + code + 
+          '\n总价: ' + price().toString() +
+          '\n日期: ' + date.toString() +
+          '\n-----------------------------';
+  }
+}
+
+void main() {
+  ShoppingCart sc = ShoppingCart('张三', '123456');
+  sc.bookings = [Item('苹果',10.0), Item('鸭梨',20.0)];
+  print(sc.getInfo());
+}
+</code></pre><p>在这段程序中，我定义了商品Item类，以及购物车ShoppingCart类。它们分别包含了一个初始化构造方法，将main函数传入的参数信息赋值给对象内部属性。而购物车的基本信息，则通过ShoppingCart类中的getInfo方法输出。在这个方法中，我采用字符串拼接的方式，将各类信息进行格式化组合后，返回给调用者。</p><p>运行这段程序，不出意外，购物车对象sc包括的用户名、优惠码、总价与日期在内的基本信息都会被打印到命令行中。</p><pre><code>购物车信息:
+-----------------------------
+用户名: 张三
+优惠码: 123456
+总价: 30.0
+日期: 2019-06-01 17:17:57.004645
+-----------------------------
+</code></pre><p>这段程序的功能非常简单：我们初始化了一个购物车对象，然后给购物车对象进行加购操作，最后打印出基本信息。可以看到，在不使用Dart语法任何特性的情况下，这段代码与Java、C++甚至JavaScript没有明显的语法差异。</p><p>在关于如何表达以及处理信息上，Dart保持了既简单又简洁的风格。那接下来，<strong>我们就先从表达信息入手，看看Dart是如何优化这段代码的。</strong></p><h2>类抽象改造</h2><p>我们先来看看Item类与ShoppingCart类的初始化部分。它们在构造函数中的初始化工作，仅仅是将main函数传入的参数进行属性赋值。</p><p>在其他编程语言中，在构造函数的函数体内，将初始化参数赋值给实例变量的方式非常常见。而在Dart里，我们可以利用语法糖以及初始化列表，来简化这样的赋值过程，从而直接省去构造函数的函数体：</p><pre><code>class Item {
+  double price;
+  String name;
+  Item(this.name, this.price);
+}
+
+class ShoppingCart {
+  String name;
+  DateTime date;
+  String code;
+  List&lt;Item&gt; bookings;
+  price() {...}
+  //删掉了构造函数函数体
+  ShoppingCart(this.name, this.code) : date = DateTime.now();
+...
+}
+</code></pre><p>这一下就省去了7行代码！通过这次改造，我们有两个新的发现：</p><ul>
+<li>首先，Item类与ShoppingCart类中都有一个name属性，在Item中表示商品名称，在ShoppingCart中则表示用户名；</li>
+<li>然后，Item类中有一个price属性，ShoppingCart中有一个price方法，它们都表示当前的价格。</li>
+</ul><p>考虑到name属性与price属性（方法）的名称与类型完全一致，在信息表达上的作用也几乎一致，因此我可以在这两个类的基础上，再抽象出一个新的基类Meta，用于存放price属性与name属性。</p><p>同时，考虑到在ShoppingCart类中，price属性仅用做计算购物车中商品的价格（而不是像Item类那样用于数据存取），因此在继承了Meta类后，我改写了ShoppingCart类中price属性的get方法：</p><pre><code>class Meta {
+  double price;
+  String name;
+  Meta(this.name, this.price);
+}
+class Item extends Meta{
+  Item(name, price) : super(name, price);
+}
+
+class ShoppingCart extends Meta{
+  DateTime date;
+  String code;
+  List&lt;Item&gt; bookings;
+  
+  double get price {...}
+  ShoppingCart(name, this.code) : date = DateTime.now(),super(name,0);
+  getInfo() {...}
+}
+</code></pre><p>通过这次类抽象改造，程序中各个类的依赖关系变得更加清晰了。不过，目前这段程序中还有两个冗长的方法显得格格不入，即ShoppingCart类中计算价格的price属性get方法，以及提供购物车基本信息的getInfo方法。接下来，我们分别来改造这两个方法。</p><h2>方法改造</h2><p>我们先看看price属性的get方法：</p><pre><code>double get price {
+  double sum = 0.0;
+  for(var i in bookings) {
+    sum += i.price;
+  }
+  return sum;
+} 
+</code></pre><p>在这个方法里，我采用了其他语言常见的求和算法，依次遍历bookings列表中的Item对象，累积相加求和。</p><p>而在Dart中，这样的求和运算我们只需重载Item类的“+”运算符，并通过对列表对象进行归纳合并操作即可实现（你可以想象成，把购物车中的所有商品都合并成了一个商品套餐对象）。</p><p>另外，由于函数体只有一行，所以我们可以使用Dart的箭头函数来进一步简化实现函数：</p><pre><code>class Item extends Meta{
+  ...
+  //重载了+运算符，合并商品为套餐商品
+  Item operator+(Item item) =&gt; Item(name + item.name, price + item.price); 
+}
+
+class ShoppingCart extends Meta{
+  ...
+  //把迭代求和改写为归纳合并
+  double get price =&gt; bookings.reduce((value, element) =&gt; value + element).price;
+  ...
+  getInfo() {...}
+}
+</code></pre><p>可以看到，这段代码又简洁了很多！接下来，我们再看看getInfo方法如何优化。</p><p>在getInfo方法中，我们将ShoppingCart类的基本信息通过字符串拼接的方式，进行格式化组合，这在其他编程语言中非常常见。而在Dart中，我们可以通过对字符串插入变量或表达式，并使用多行字符串声明的方式，来完全抛弃不优雅的字符串拼接，实现字符串格式化组合。</p><pre><code>getInfo () =&gt; '''
+购物车信息:
+-----------------------------
+  用户名: $name
+  优惠码: $code
+  总价: $price
+  Date: $date
+-----------------------------
+''';
+</code></pre><p>在去掉了多余的字符串转义和拼接代码后，getInfo方法看着就清晰多了。</p><p>在优化完了ShoppingCart类与Item类的内部实现后，我们再来看看main函数，从调用方的角度去分析程序还能在哪些方面做优化。</p><h2>对象初始化方式的优化</h2><p>在main函数中，我们使用</p><pre><code>ShoppingCart sc = ShoppingCart('张三', '123456') ;
+</code></pre><p>初始化了一个使用‘123456’优惠码、名为‘张三’的用户所使用的购物车对象。而这段初始化方法的调用，我们可以从两个方面优化：</p><ul>
+<li>首先，在对ShoppingCart的构造函数进行了大量简写后，我们希望能够提供给调用者更明确的初始化方法调用方式，让调用者以“参数名:参数键值对”的方式指定调用参数，让调用者明确传递的初始化参数的意义。在Dart中，这样的需求，我们在声明函数时，可以通过给参数增加{}实现。</li>
+<li>其次，对一个购物车对象来说，一定会有一个有用户名，但不一定有优惠码的用户。因此，对于购物车对象的初始化，我们还需要提供一个不含优惠码的初始化方法，并且需要确定多个初始化方法与父类的初始化方法之间的正确调用顺序。</li>
+</ul><p>按照这样的思路，我们开始对ShoppingCart进行改造。</p><p>需要注意的是，由于优惠码可以为空，我们还需要对getInfo方法进行兼容处理。在这里，我用到了a??b运算符，这个运算符能够大量简化在其他语言中三元表达式(a != null)? a : b的写法：</p><pre><code>class ShoppingCart extends Meta{
+  ...
+  //默认初始化方法，转发到withCode里
+  ShoppingCart({name}) : this.withCode(name:name, code:null);
+  //withCode初始化方法，使用语法糖和初始化列表进行赋值，并调用父类初始化方法
+  ShoppingCart.withCode({name, this.code}) : date = DateTime.now(), super(name,0);
+
+  //??运算符表示为code不为null，则用原值，否则使用默认值&quot;没有&quot;
+  getInfo () =&gt; '''
+购物车信息:
+-----------------------------
+  用户名: $name
+  优惠码: ${code??&quot;没有&quot;}
+  总价: $price
+  Date: $date
+-----------------------------
+''';
+}
+
+void main() {
+  ShoppingCart sc = ShoppingCart.withCode(name:'张三', code:'123456');
+  sc.bookings = [Item('苹果',10.0), Item('鸭梨',20.0)];
+  print(sc.getInfo());
+
+  ShoppingCart sc2 = ShoppingCart(name:'李四');
+  sc2.bookings = [Item('香蕉',15.0), Item('西瓜',40.0)];
+  print(sc2.getInfo());
+}
+</code></pre><p>运行这段程序，张三和李四的购物车信息都会被打印到命令行中：</p><pre><code>购物车信息:
+-----------------------------
+  用户名: 张三
+  优惠码: 123456
+  总价: 30.0
+  Date: 2019-06-01 19:59:30.443817
+-----------------------------
+
+购物车信息:
+-----------------------------
+  用户名: 李四
+  优惠码: 没有
+  总价: 55.0
+  Date: 2019-06-01 19:59:30.451747
+-----------------------------
+</code></pre><p>关于购物车信息的打印，我们是通过在main函数中获取到购物车对象的信息后，使用全局的print函数打印的，我们希望把打印信息的行为封装到ShoppingCart类中。而对于打印信息的行为而言，这是一个非常通用的功能，不止ShoppingCart类需要，Item对象也可能需要。</p><p>因此，我们需要把打印信息的能力单独封装成一个单独的类PrintHelper。但，ShoppingCart类本身已经继承自Meta类，考虑到Dart并不支持多继承，我们怎样才能实现PrintHelper类的复用呢？</p><p>这就用到了我在上一篇文章中提到的“混入”（Mixin），相信你还记得只要在使用时加上with关键字即可。</p><p>我们来试着增加PrintHelper类，并调整ShoppingCart的声明：</p><pre><code>abstract class PrintHelper {
+  printInfo() =&gt; print(getInfo());
+  getInfo();
+}
+
+class ShoppingCart extends Meta with PrintHelper{
+...
+}
+</code></pre><p>经过Mixin的改造，我们终于把所有购物车的行为都封装到ShoppingCart内部了。而对于调用方而言，还可以使用级联运算符“..”，在同一个对象上连续调用多个函数以及访问成员变量。使用级联操作符可以避免创建临时变量，让代码看起来更流畅：</p><pre><code>void main() {
+  ShoppingCart.withCode(name:'张三', code:'123456')
+  ..bookings = [Item('苹果',10.0), Item('鸭梨',20.0)]
+  ..printInfo();
+
+  ShoppingCart(name:'李四')
+  ..bookings = [Item('香蕉',15.0), Item('西瓜',40.0)]
+  ..printInfo();
+}
+</code></pre><p>很好！通过Dart独有的语法特性，我们终于把这段购物车代码改造成了简洁、直接而又强大的Dart风格程序。</p><h2>总结</h2><p>这就是今天分享的全部内容了。在今天，我们以一个与Java、C++甚至JavaScript没有明显语法差异的购物车雏形为起步，逐步将它改造成了一个符合Dart设计思想的程序。</p><p>首先，我们使用构造函数语法糖及初始化列表，简化了成员变量的赋值过程。然后，我们重载了“+”运算符，并采用归纳合并的方式实现了价格计算，并且使用多行字符串和内嵌表达式的方式，省去了无谓的字符串拼接。最后，我们重新梳理了类之间的继承关系，通过mixin、多构造函数，可选命名参数等手段，优化了对象初始化调用方式。</p><p>下面是今天购物车综合案例的完整代码，希望你在IDE中多多练习，体会这次的改造过程，从而对Dart那些使代码变得更简洁、直接而强大的关键语法特性产生更深刻的印象。同时，改造前后的代码，你也可以在GitHub的<a href="https://github.com/cyndibaby905/08_Dart_Sample">Dart_Sample</a>中找到：</p><pre><code>class Meta {
+  double price;
+  String name;
+  //成员变量初始化语法糖
+  Meta(this.name, this.price);
+}
+
+class Item extends Meta{
+  Item(name, price) : super(name, price);
+  //重载+运算符，将商品对象合并为套餐商品
+  Item operator+(Item item) =&gt; Item(name + item.name, price + item.price); 
+}
+
+abstract class PrintHelper {
+  printInfo() =&gt; print(getInfo());
+  getInfo();
+}
+
+//with表示以非继承的方式复用了另一个类的成员变量及函数
+class ShoppingCart extends Meta with PrintHelper{
+  DateTime date;
+  String code;
+  List&lt;Item&gt; bookings;
+  //以归纳合并方式求和
+  double get price =&gt; bookings.reduce((value, element) =&gt; value + element).price;
+  //默认初始化函数，转发至withCode函数
+  ShoppingCart({name}) : this.withCode(name:name, code:null);
+  //withCode初始化方法，使用语法糖和初始化列表进行赋值，并调用父类初始化方法
+  ShoppingCart.withCode({name, this.code}) : date = DateTime.now(), super(name,0);
+
+  //??运算符表示为code不为null，则用原值，否则使用默认值&quot;没有&quot;
+  @override
+  getInfo() =&gt; '''
+购物车信息:
+-----------------------------
+  用户名: $name
+  优惠码: ${code??&quot;没有&quot;}
+  总价: $price
+  Date: $date
+-----------------------------
+''';
+}
+
+void main() {
+  ShoppingCart.withCode(name:'张三', code:'123456')
+  ..bookings = [Item('苹果',10.0), Item('鸭梨',20.0)]
+  ..printInfo();
+
+  ShoppingCart(name:'李四')
+  ..bookings = [Item('香蕉',15.0), Item('西瓜',40.0)]
+  ..printInfo();
+}
+</code></pre><h2>思考题</h2><p>请你扩展购物车程序的实现，使得我们的购物车可以支持：</p><ol>
+<li>商品数量属性；</li>
+<li>购物车信息增加商品列表信息（包括商品名称，数量及单价）输出，实现小票的基本功能。</li>
+</ol><p>欢迎你在评论区给我留言分享你的观点，我会在下一篇文章中等待你！感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/08/fd/3f3dca30.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>relax</span>
+  </div>
+  <div class="_2_QraFYR_0">能不能所有的示例代码放到一个git下面</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 代码还是要分开放的，因为每节分享都是独立的一个可运行工程，不只是代码，还有CI和单测一堆工程相关的东西，集中放就没法管理了。<br>我单起了一个仓库，用submodule的方式把这些demo都收进去了，可以自取<br>https:&#47;&#47;github.com&#47;cyndibaby905&#47;flutter_core_demo</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-14 08:51:31</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/77/ff/4ce0aa51.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Ω</span>
+  </div>
+  <div class="_2_QraFYR_0">Item operator+(Item item) =&gt; I...<br>double get price =&gt; bookings...<br><br>这个改造+号的代码还是无法看懂<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: operator+：把两个Item对象合并为一个。新Item对象的name为这两个对象的name拼接而成，price为他们的price相加而成。<br><br>get price：对列表数据采用累加的方式进行求和。这里用到了reduce方法。reduce是函数迭代方法，需要传递一个二元函数进行列表的合并工作。list[0...n].reduce(f)等于：<br>a0 = list[0]<br>a1 = f(a0,list[1])<br>a2 = f(a1,list[2])<br>an = f(an-1,list[n])<br>在这里我们的f是求和函数f(x,y)=x+y，可以理解成an=list[0]+list[1]+list[n-1]+list[n]</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-16 14:09:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/24/07/380666e3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>bytecode</span>
+  </div>
+  <div class="_2_QraFYR_0">double get price() {<br>  double sum = 0.0;<br>  for(var i in bookings) {<br>    sum += i.price;<br>  }<br>  return sum;<br>} <br><br>文中这里的price()是多了括号()，要去掉()</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 感谢提醒</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-16 08:33:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/a9/09/fd67d691.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jia58960</span>
+  </div>
+  <div class="_2_QraFYR_0">大概能看懂并实现代码，但构造函数中的属性什么时候用this.属性，什么时候不用this，希望老师能回答下。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 类的实例变量：1.是声明时定义的，可以用this语法糖赋值；2.是继承来的，不能用this，需要把这个值交给super让父类赋值</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-24 16:36:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/3a/58/494a6aca.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Paradise</span>
+  </div>
+  <div class="_2_QraFYR_0">这种结合代码的方式很友好，可以一边听一边上手，更容易理解...😀</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-16 11:25:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/93/80/ccf2f428.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>灰灰</span>
+  </div>
+  <div class="_2_QraFYR_0">abstract class PrintHelper {<br>  printInfo() =&gt; print(getInfo());<br>  getInfo();<br>}<br><br>class Meta {<br>  double price;<br>  String name;<br>  Meta(this.name, this.price);<br>}<br><br>&#47;&#47; 定义商品Item类<br>class Item extends Meta {<br>  int count;<br>  Item(name, price, this.count): super(name, price);<br>  Item operator+(Item item) =&gt; Item(name + item.name, price * count + (item.price * item.count), 1);<br>}<br><br>&#47;&#47;定义购物车类<br>class ShoppingCart extends Meta with PrintHelper {<br>  DateTime date;<br>  String code;<br>  List&lt;Item&gt; bookings;<br><br>  double get price =&gt; bookings.reduce((value, element) =&gt; (value + element)).price;<br>&#47;&#47;  ShoppingCart(name, this.code): date = DateTime.now(), super(name,0);<br>  ShoppingCart({name}): this.withCode(name: name, code: null);<br>  ShoppingCart.withCode({name, this.code}): date = DateTime.now(), super(name, 0);<br>  getInfo () =&gt; &#39;&#39;&#39;<br>     购物车信息:<br>     <br>     ----------------<br>     商品名    单价    数量    总价<br>     ----------------<br>     ${bookings.map((item) =&gt; &#39;${item.name}  ${item.price}  ${item.count}  ${item.price * item.count}&#39;).join(&#39;\n     &#39;)}<br>     <br>     ================<br>     用户名： $name<br>     优惠码： ${code ?? &quot;没有&quot;}<br>     总价： $price<br>     日期： $date<br>  &#39;&#39;&#39;;<br>}<br><br>void main() {<br>  ShoppingCart.withCode(name: &#39;张三&#39;, code: &#39;123456&#39;)<br>  ..bookings = [Item(&#39;苹果&#39;, 10.0, 3), Item(&#39;鸭梨&#39;, 20.0, 1)]<br>  ..printInfo();<br><br>  ShoppingCart(name: &#39;李四&#39;)<br>  ..bookings = [Item(&#39;香蕉&#39;, 2.4, 2), Item(&#39;芒果&#39;, 6.8, 4)]<br>  ..printInfo();<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-27 20:43:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/3b/3b/b8c00291.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Uncle.Wang</span>
+  </div>
+  <div class="_2_QraFYR_0">class Meta {<br>  double price;<br>  String name;<br>  &#47;&#47; 成员变量初始化语法糖<br>  Meta(this.name, this.price);<br>}<br><br>abstract class PrintHelper {<br>  printInfo() =&gt; print(getInfo());<br>  getInfo();<br>}<br><br>class Item extends Meta with PrintHelper {<br>  int count;<br>  Item(name, price, {int count = 1}): super(name, price) {<br>    this.count = count;<br>  }<br>  &#47;&#47; 重载 + 运算符，将商品对象合并为套餐商品<br>  Item operator+(Item item) =&gt; Item(name + item.name, price + item.price); <br>    @override<br>  getInfo() =&gt; &#39;&#39;&#39;<br>    商品名: $name<br>    单价: $price<br>    数量: $count<br>    ---------------<br>&#39;&#39;&#39;;<br>}<br><br>&#47;&#47;with 表示以非继承的方式复用了另一个类的成员变量及函数<br>class ShoppingCart extends Meta with PrintHelper{<br>  DateTime date;<br>  String code;<br>  List&lt;Item&gt; bookings;<br>  &#47;&#47; 以归纳合并方式求和<br>  double get price =&gt; bookings.reduce((value, element) =&gt; value + element).price;<br>  &#47;&#47; 默认初始化函数，转发至 withCode 函数<br>  ShoppingCart({name}) : this.withCode(name:name, code:null);<br>  &#47;&#47;withCode 初始化方法，使用语法糖和初始化列表进行赋值，并调用父类初始化方法<br>  ShoppingCart.withCode({name, this.code}) : date = DateTime.now(), super(name,0);<br><br>  getBookingInfo() {<br>    String str = &quot;&quot;;<br>    for (Item item in bookings) {<br>      str += item.getInfo();<br>    }<br>    return str;<br>  }<br><br>  &#47;&#47;?? 运算符表示为 code 不为 null，则用原值，否则使用默认值 &quot; 没有 &quot;<br>  @override<br>  getInfo() =&gt; &#39;&#39;&#39;<br>购物车信息:<br>-----------------------------<br>  用户名: $name<br>  优惠码: ${code??&quot; 没有 &quot;}<br>  总价: $price<br>  Date: $date<br>  商品列表：<br>    ---------------<br>${ getBookingInfo() }<br>-----------------------------<br>&#39;&#39;&#39;;<br>}<br><br>void main() {<br>  ShoppingCart.withCode(name:&#39;张三&#39;, code:&#39;123456&#39;)<br>  ..bookings = [Item(&#39;苹果&#39;,10.0, count: 10), Item(&#39;鸭梨&#39;,20.0, count: 5)]<br>  ..printInfo();<br><br>  ShoppingCart(name:&#39;李四&#39;)<br>  ..bookings = [Item(&#39;香蕉&#39;,15.0), Item(&#39;西瓜&#39;,40.0)]<br>  ..printInfo();<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 非常棒！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-20 00:31:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epxMjZcn8LFy6PIT7uGzUOHTCZosTwh39jBKlyW3Ffzyscm14PQGh3QZ1GrEGF4UWxwKZrAib8AXCA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>江宁彭于晏</span>
+  </div>
+  <div class="_2_QraFYR_0">class Meta {<br>  double price;<br>  String name;<br>  &#47;&#47; 成员变量初始化语法糖<br>  Meta(this.name, this.price);<br>}<br><br>class Item extends Meta{<br>  Item(name, price) : super(name, price);<br>  &#47;&#47; 重载 + 运算符，将商品对象合并为套餐商品<br>  Item operator+(Item item) =&gt; Item(name + item.name, price + item.price); <br>}<br><br>class Items {<br>  Item item;<br>  double num;<br>  Items(this.item, this.num);<br>  double get totalPrice =&gt; item.price * num; <br>}<br><br>abstract class PrintHelper {<br>  printInfo() =&gt; print(getInfo());<br>  getInfo();<br>}<br><br>&#47;&#47;with 表示以非继承的方式复用了另一个类的成员变量及函数<br>class ShoppingCart extends Meta with PrintHelper{<br>  DateTime date;<br>  String code;<br>  List&lt;Items&gt; bookings;<br>  &#47;&#47; 以归纳合并方式求和<br>  double get shopPrice {<br>     double result = 0.0;<br>     bookings.forEach((element) =&gt; result+=element.totalPrice);<br>     return result;<br>  }<br><br>  &#47;&#47; 默认初始化函数，转发至 withCode 函数<br>  ShoppingCart({name}) : this.withCode(name:name, code:null);<br>  &#47;&#47;withCode 初始化方法，使用语法糖和初始化列表进行赋值，并调用父类初始化方法<br>  ShoppingCart.withCode({name, this.code}) : date = DateTime.now(), super(name,0);<br><br>  &#47;&#47;?? 运算符表示为 code 不为 null，则用原值，否则使用默认值 &quot; 没有 &quot;<br>  @override<br>  String getInfo() {<br>  String bookingsResult = &#39;商品明细: \n&#39;;<br>  bookings.forEach((item) =&gt; bookingsResult += &#39;  商品名称：${item.item.name}  单价：${item.item.price} 数量 ：${item.num}  总价：${item.totalPrice}\n&#39;);<br><br>  return &#39;&#39;&#39;<br>购物车信息:<br>-----------------------------<br>  用户名: $name<br>  优惠码: ${code??&quot; 没有 &quot;}<br>  $bookingsResult<br>  总价: $shopPrice<br>  Date: $date<br>-----------------------------<br>&#39;&#39;&#39;;<br>  }<br>}<br><br>void main() {<br>  ShoppingCart.withCode(name:&#39;张三&#39;, code:&#39;123456&#39;)<br>  ..bookings = [Items(Item(&#39;苹果&#39;,10.0),5.0), Items(Item(&#39;鸭梨&#39;,20.0),10.0)]<br>  ..printInfo();<br><br>  ShoppingCart(name:&#39;李四&#39;)<br>  ..bookings = [Items(Item(&#39;香蕉&#39;,15.0),10.0), Items(Item(&#39;西瓜&#39;,40.0),1.0)]<br>  ..printInfo();<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞👍<br><br>不过数量作为Item的属性会更好一点。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-07-19 17:30:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/77/d4/fc5d50cf.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>于小鱼</span>
+  </div>
+  <div class="_2_QraFYR_0">Dart 2.12 之后 Enabling null safety ， 文中的例子就有了问题。 <br>booking 也需要 Initialize<br>String code 需改为 String? code</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-09-25 21:58:46</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/1a/82/f039ae08.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>gk</span>
+  </div>
+  <div class="_2_QraFYR_0">19年的课，才看，忍不住回复下，主要是太妙了，作者的课程安排很好，另外这堂课的例子，从重载运算符，reduce妙用，级联运算符，一个比一个精彩，给个赞。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-10 16:44:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/48/55/48de9a24.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Carlo</span>
+  </div>
+  <div class="_2_QraFYR_0">看到一段代码：<br>firebaseService.login().then(<br>                        (value) {<br>                          print(value.toJson());<br>                        },<br>                        onError: (err) {<br>                          print(err);<br>                        },<br>                      );<br><br>请问这个onError是怎么回事啊。为什么会被执行呢？  这是dart特有的语法么？<br>我所知道的一般sync function的语法是<br><br>thisFunction()<br>    .catch(console.error)<br>    .then(() =&gt; console.log(&#39;We do cleanup here&#39;));</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 给你展开一下你就明白了：<br>funcThatThrows()<br>  .then(successCallback, onError: (e) {<br>    handleError(e);          &#47;&#47; Original error.<br>    anotherFuncThatThrows(); &#47;&#47; new error.<br>  })<br>  .catchError(handleError);  &#47;&#47; Error from within then() handled.</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-15 03:29:02</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/04/37/aa04f997.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>和小胖</span>
+  </div>
+  <div class="_2_QraFYR_0">老师您的第二个题目，我理解是要做每一种商品的分类，但是我还是用了以前语言的思路来做了。麻烦老师，看看是否正确。<br><br>关键代码如下：<br>&#47;&#47;定义购物车类<br>class ShoppingCar extends Meta with PrintHelper {<br>  DateTime date; &#47;&#47;购物日期<br>  String code; &#47;&#47;优惠券<br>  List&lt;Item&gt; _bookings; &#47;&#47;定义私有属性<br>  num count; &#47;&#47;商品数量<br><br>  &#47;&#47;求出总价<br>  double get price =&gt;<br>      books.reduce((value, element) =&gt; value + element).price;<br><br>  List&lt;Item&gt; get books =&gt; _bookings;<br><br>  &#47;&#47;给bookings定义set方法<br>  set book(List&lt;Item&gt; bookings) {<br>    this._bookings = bookings;<br>    this.count = bookings.length;<br>  }<br><br>  &#47;&#47;获取分类产品信息<br>  String getGoodsInfo() {<br>    StringBuffer temp = new StringBuffer();<br>    Map map = new Map&lt;String, List&lt;Item&gt;&gt;();<br>    books.forEach((item) {<br>      if (!map.containsKey(item.name)) {<br>        List list = new List&lt;Item&gt;();<br>        list.add(item);<br>        map[item.name] = list;<br>      } else {<br>        (map[item.name] as List&lt;Item&gt;).add(item);<br>      }<br>    });<br>    map.forEach((k, v) {<br>      temp.write(&quot;商品名称：$k,该种商品数量：${(v as List).length},该种商品单价：${(v as List&lt;Item&gt;)[0].price}元\n&quot;);<br>      print(&quot;$k,$v&quot;);<br>    });<br>    return temp.toString();<br>  }<br><br>  &#47;&#47;这种表达式赋值还是挺方便的<br>  ShoppingCar.withCode({name, this.code}): this.date = DateTime.now(),super(name, 0.0);<br><br>  ShoppingCar({name}) : this.withCode(name: name, code: null);<br><br>  @override<br>  getInfo() {<br>    return &#39;&#39;&#39;<br>      购物车信息：<br>      ----------------------<br>      用户名：$name<br>      优惠码：${code ?? &quot;没有优惠券啊&quot;}<br>      商品总量：$count<br>      总价：$price  <br>      日期：$date<br>      ${getGoodsInfo()}<br>      ----------------------<br>  &#39;&#39;&#39;;<br>  }<br>}<br><br>运行后信息如下：购物车信息：<br>      ----------------------<br>      用户名：小李<br>      优惠码：没有优惠券啊<br>      商品总量：3<br>      总价：29.0  <br>      日期：2019-08-14 22:01:24.437085<br>      商品名称：苹果,该种商品数量：2,该种商品单价：10.0元<br>      商品名称：梨,该种商品数量：1,该种商品单价：9.0元<br>      ----------------------</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 结果倒是对，但是这个购物车与我们理解的购物车还是有差异：<br>1.count属性应该是Item对象的：一个Item对象有count个，而不是一直往购物车内加同样的对象count次；<br>2.由于你的count属性无法拆分到Item类，导致getGoodsInfo的计算异常繁琐了。如果count属性在Item类，getGoodsInfo计算可以收敛到Item对象类内部。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-14 22:09:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c9/36/8e7aec6c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>刘荣清</span>
+  </div>
+  <div class="_2_QraFYR_0">在vs code已经安装dart、code runner插件，本地也安装完dart SDK，然后通过vs code运行dart 提示：dart : 无法将“dart”项识别为 cmdlet、函数...<br>但在cmd 控制板中就可以正常运行，这是为咋啊，vs code需要额外配置咋吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 把dart命令所在的目录设置成环境变量PATH</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-03 11:06:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/4f/86/ba472895.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>黄金分割</span>
+  </div>
+  <div class="_2_QraFYR_0">老师的dart 比较旧了. 如果大家使用了2.12以上的dart, 引入了新特性null safety, 会报错 argument_type_not_assignable. ShoppingCart里的code需要这样声明才行. String? code;</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-12-03 22:12:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1e/c7/a9/19aad8d6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>利姆露·坦派斯特</span>
+  </div>
+  <div class="_2_QraFYR_0">因为dart的null安全，现在要正常执行上面的代码的话。需要在ShoppingCart中对code属性以及bookings的那个属性做一些声明上的更改。使其空值安全才能通过编译。建议各位尝试 ? 跟 late 这两种方式使其空值安全。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-09-11 11:41:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/22/f5/fc/90c92bcc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>土豆土豆泥</span>
+  </div>
+  <div class="_2_QraFYR_0">干货满满</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-05-08 07:38:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/31/c8/a64e4aef.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>兔斯基</span>
+  </div>
+  <div class="_2_QraFYR_0">新版本可控字段需要标识（Dart 2.10.5）<br>String? code;<br>否则会编译不通过</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-05-01 14:20:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/89/56/6c1a6f22.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杰瑞</span>
+  </div>
+  <div class="_2_QraFYR_0">class Meta{<br>  String name;<br>  double price;<br>  Meta(this.name,this.price);<br>}<br><br>abstract class PrintHelper{<br>  printInfo() =&gt; print(getPrintInfo());<br><br>  String getPrintInfo();<br>}<br><br>&#47;&#47;定义商品Item类<br>class Item extends Meta with PrintHelper{<br>  int count;<br><br>  Item({name, price}) : this.withCount(name:name,price:price,count:1);<br><br>  Item.withCount({name, price, this.count}):super(name,price);<br><br>  Item operator+(Item item) =&gt; Item(name:name+item.name, price:price*count+item.price*item.count);<br><br>  @override<br>  String getPrintInfo(){<br>    return &#39;\t  $name \t\t $price \t  $count \t ${price*count}&#39;;<br>  }<br>}<br><br>&#47;&#47;定义购物车类<br>class ShoppingCart extends Meta with PrintHelper{<br>  DateTime date;<br>  String code;<br>  List&lt;Item&gt; bookings;<br><br>  ShoppingCart({String name}):this.withCode(name:name, code:null);<br><br>  ShoppingCart.withCode({String name, this.code}):date = DateTime.now(),super(name,0);<br><br>  double get price =&gt; bookings.reduce((value,element) =&gt; value + element).price;<br><br>  @override<br>  String getPrintInfo(){<br>    String itemDetailPrintInfo = &#39;&#39;;<br>    bookings.forEach((item)=&gt;{<br>    itemDetailPrintInfo = itemDetailPrintInfo+item.getPrintInfo() + &#39;\n&#39;<br>    });<br>    return &#39;&#39;&#39;<br>  购物车信息：<br>  -----------------------------<br>      用户名：$name<br>      优惠码：${code??&quot;无&quot;}<br>      总价：  $price<br>      日期：  $date<br>  -----------------------------<br><br>  商品详情：<br>  -----------------------------<br>      商品名 \t 单价 \t 数量 \t 总价<br>  $itemDetailPrintInfo<br>  -----------------------------<br>  &#39;&#39;&#39;;<br>  }<br>}<br><br>void main(){<br>  ShoppingCart(name:&#39;张三&#39;)<br>  ..bookings = [Item(name:&#39;苹果&#39;,price:10.0), Item.withCount(name:&#39;鸭梨&#39;,price:50.0,count:3)]<br>  ..printInfo();<br><br>  ShoppingCart.withCode(name:&#39;李四&#39;,code:&#39;123456&#39;) <br>  ..bookings = [Item.withCount(name:&#39;香蕉&#39;,price:15.0,count:2), Item(name:&#39;西瓜&#39;,price:40.0)] <br>  ..printInfo();<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-13 10:27:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/d0/9e/eda4bcef.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>董鹏宇</span>
+  </div>
+  <div class="_2_QraFYR_0">PrintHelper 与 ShoppingCart的关系为什么是“混入“ 而不是组合呢？感觉 是has-a的关系而不是 is-a</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-29 16:38:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f5/ea/5f046856.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Dale</span>
+  </div>
+  <div class="_2_QraFYR_0">a. 静态方法没有办法使用 this 关键字；<br>b. 构造函数或普通的实例方法里面，this 指向当前操作的实例;<br>c. 构造函数的 “:” 后面初始化那一部分，this 指向当前类。<br>--------------------------<br>不知道这个理解对不对？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-03 17:06:00</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

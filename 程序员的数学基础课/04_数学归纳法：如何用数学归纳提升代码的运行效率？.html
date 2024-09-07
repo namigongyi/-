@@ -1,0 +1,526 @@
+<audio title="04_数学归纳法：如何用数学归纳提升代码的运行效率？" src="https://static001.geekbang.org/resource/audio/00/c6/00d02389a5e9fe1f498ad5cbe68888c6.mp3" controls="controls"></audio> 
+<p>你好，我是黄申。</p><p>上次我们聊了迭代法及其应用，并用编程实现了几个小例子。不过你知道吗，对于某些迭代问题，我们其实可以避免一步步的计算，直接<strong>从理论上证明某个结论</strong>，节约大量的计算资源和时间，这就是我们今天要说的<strong>数学归纳法</strong>。</p><p>平时我们谈的“归纳”，是一种从经验事实中找出普遍特征的认知方法。比如，人们在观察了各种各样动物之后，通过它们的外观、行为特征、生活习性等得出某种结论，来区分哪些是鸟、哪些是猫等等。比如我这里列出的几个动物的例子。</p><p><img src="https://static001.geekbang.org/resource/image/f6/37/f606627d96040653c5eeca1541788a37.jpg?wh=1142*699" alt=""></p><p>通过上面的表格，我们可以进行归纳，并得出这样的结论：</p><ul>
+<li>
+<p>如果一个动物，身上长羽毛并且会飞，那么就是属于鸟；</p>
+</li>
+<li>
+<p>如果一个动物，身上长绒毛、不会飞、而且吃小鱼和老鼠，那么就属于猫。</p>
+</li>
+</ul><p>通过观察$5$个动物样本的$3$个特征，从而得到某种动物应该具有何种特征，这种方法就是我们平时所提到的归纳法。</p><p>我们日常生活中所说的这种归纳法和数学归纳法是不一样的，它们究竟有什么区别呢？具体数学归纳法可以做什么呢？我们接着上一节舍罕王赏麦的故事继续说。</p><h2>什么是数学归纳法？</h2><p>上节我们提到，在棋盘上放麦粒的规则是，第一格放一粒，第二格放两粒，以此类推，每一小格内都比前一小格多一倍的麦子，直至放满$64$个格子。</p><!-- [[[read_end]]] --><p>我们假想一下自己穿越到了古印度，正站在国王的身边，看着这个棋盘，你发现第$1$格到第$8$格的麦子数分别是：$1、2、4、8、16、32、64、128$。这个时候，国王想知道总共需要多少粒麦子。我们小时候都玩过“找规律”，于是，我发现了这么一个规律，你看看是不是这样？</p><p><img src="https://static001.geekbang.org/resource/image/8e/8c/8eba65a8d57d5cc84cb6ea4dd20ba68c.jpg?wh=1142*830" alt=""></p><p>根据这个观察，我们是不是可以大胆假设，前$n$个格子的麦粒总数就是$2^{n}-1$ 呢？如果这个假设成立，那么填满64格需要的麦粒总数，就是$1+2+2^{2}+2^{3}+2^{4}+……＋ 2^{63}$<br>
+$＝2^{64}-1＝18446744073709551615$。</p><p>这个假设是否成立，我们还有待验证。但是对于类似这种无穷数列的问题，我们通常可以采用<strong>数学归纳法</strong>（Mathematical Induction）来证明。</p><p>在数论中，数学归纳法用来证明任意一个给定的情形都是正确的，也就是说，第一个、第二个、第三个，一直到所有情形，概不例外。</p><p>数学归纳法的一般步骤是这样的：</p><ul>
+<li>
+<p><strong>证明基本情况（通常是$n=1$的时候）是否成立</strong><strong>；</strong></p>
+</li>
+<li>
+<p><strong>假设$n=k-1$成立，再证明$n=k$也是成立的</strong><strong>（$k$为任意大于$1$的自然数）</strong>。</p>
+</li>
+</ul><p>只要学过数学，我想你对这个步骤都不陌生。但是，现在你需要牢记这个步骤，然后我们用这个步骤来证明下开头的例子。</p><p>为了让你更好地理解，我将原有的命题分为两个子命题来证明。第一个子命题是，第$n$个棋格放的麦粒数为$2^{n-1}$。第二个子命题是，前$n$个棋格放的麦粒数总和为$2^{n}-1$。</p><p>首先，我们来证明第一个子命题。</p><ul>
+<li>
+<p>基本情况：我们已经验证了$n=1$的时候，第一格内的麦粒数为$1$，和$2^{1-1}$相等。因此，命题在$k=1$的时候成立。</p>
+</li>
+<li>
+<p>假设第$k-1$格的麦粒数为$2^{k-2}$。那么第$k$格的麦粒数为第$k-1$格的$2$倍，也就是$2^{k - 2}*2=2^{k-1}$。因此，如果命题在$k=n-1$的时候成立，那么在$k=n$的时候也成立。</p>
+</li>
+</ul><p>所以，第一个子命题成立。在这个基础之上，我再来证明第二个子命题。</p><ul>
+<li>
+<p>基本情况：我们已经验证了$n=1$的时候，所有格子的麦粒总数为$1$。因此命题在$k=1$的时候成立。</p>
+</li>
+<li>
+<p>假设前$k-1$格的麦粒总数为$2^{k-1}-1$，基于前一个命题的结论，第k格的麦粒数为$2^{k-1}$。那么前$k$格的麦粒总数为$(2^{k-1}-1)+(2^{k-1})=2*2^{k-1}-1=2^{k}-1$。因此，如果命题在$k=n-1$的时候成立，那么在$k=n$的时候也成立。</p>
+</li>
+</ul><p>说到这里，我已经证明了这两个命题都是成立的。<strong>和使用迭代法的计算相比，数学归纳法最大的特点就在于“归纳”二字。它已经总结出了规律。只要我们能够证明这个规律是正确的，就没有必要进行逐步的推算，可以节省很多时间和资源。</strong></p><p>说到这里，我们也可以看出，数学归纳法中的“归纳”是指的从第一步正确，第二步正确，第三步正确，一直推导到最后一步是正确的。这就像多米诺骨牌，只要确保第一张牌倒下，而每张牌的倒下又能导致下一张牌的倒下，那么所有的骨牌都会倒下。从这里，你也能看出来，这和开篇提到的广义归纳法是不同的。数学归纳法并不是通过经验或样本的观察，总结出事物的普遍特征和规律。</p><p>好了，对数学归纳法的概念，我想你现在已经理解了。这里，我对上一节中有关麦粒的代码稍作修改，增加了一点代码来使用数学归纳法的结论，并和迭代法的实现进行了比较，你可以看看哪种方法耗时更长。</p><pre><code>public static void main(String[] args) {
+  
+  int grid = 63;
+  long start, end = 0;
+  start = System.currentTimeMillis();
+  System.out.println(String.format(&quot;舍罕王给了这么多粒：%d&quot;, Lesson3_1.getNumberOfWheat(grid)));
+  end = System.currentTimeMillis();
+  System.out.println(String.format(&quot;耗时%d毫秒&quot;, (end - start)));
+  
+  start = System.currentTimeMillis();
+  System.out.println(String.format(&quot;舍罕王给了这么多粒：%d&quot;, (long)(Math.pow(2, grid)) - 1));
+  end = System.currentTimeMillis();
+  System.out.println(String.format(&quot;耗时%d毫秒&quot;, (end - start)));
+  
+ }
+</code></pre><p>在我的电脑上，这段代码运行的结果是：舍罕王给了$9223372036854775807$粒，耗时$4$毫秒。舍罕王给了这么多粒：$9223372036854775806$，耗时$0$毫秒。</p><p>你可能已经发现，当grid=$63$时，结果差了$1$个。这个是由于Math.pow()函数计算精度导致的误差。正确的结果应该是$9223372036854775807$。不过，基于数学归纳结论的计算明显在耗时上占有优势。虽然在我的笔记本电脑上只有4毫秒的差距，但是在生产项目的实践中，这种点点滴滴的性能差距都有可能累积成明显的问题。</p><h2>递归调用和数学归纳的逻辑是一样的？</h2><p>我们不仅可以使用数学归纳法从理论上指导编程，还可以使用编程来模拟数学归纳法的证明。如果你仔细观察一下数学归纳法的证明过程，会不会觉得和函数的<strong>递归调用</strong>很像呢？</p><p>这里我通过总麦粒数的命题来示范一下。首先，我们要把这个命题的数学归纳证明，转换成一段伪代码，这个过程需要经过这样两步：</p><p>第一步，如果$n$为$1$，那么我们就判断麦粒总数是否为$2^{1-1}=1$。同时，返回当前棋格的麦粒数，以及从第$1$格到当前棋格的麦粒总数。</p><p>第二步，如果$n$为$k-1$的时候成立，那么判断$n$为$k$的时候是否也成立。此时的判断依赖于前一格$k-1$的麦粒数、第$1$格到$k-1$格的麦粒总数。这也是上一步我们所返回的两个值。</p><p>你应该看出来了，这两步分别对应了数学归纳法的两种情况。在数学归纳法的第二种情况下，我们只能假设$n=k-1$的时候命题成立。但是，在代码的实现中，我们可以将伪代码的第二步转为函数的递归（嵌套）调用，直到被调用的函数回退到$n=1$的情况。然后，被调用的函数逐步返回$k-1$时命题是否成立。</p><p>如果要写成具体的函数，就类似下面这样：</p><pre><code>class Result {
+ public long wheatNum = 0;  // 当前格的麦粒数
+ public long wheatTotalNum = 0;  // 目前为止麦粒的总数
+}
+
+public class Lesson4_2 {
+ 
+ /**
+    * @Description: 使用函数的递归（嵌套）调用，进行数学归纳法证明
+    * @param k-放到第几格，result-保存当前格子的麦粒数和麦粒总数
+    * @return boolean-放到第k格时是否成立
+    */
+ 
+    public static boolean prove(int k, Result result) {
+     
+     // 证明n = 1时，命题是否成立
+     if (k == 1) {
+      if ((Math.pow(2, 1) - 1) == 1) {
+       result.wheatNum = 1;
+       result.wheatTotalNum = 1;
+       return true;
+      } else return false;
+     }
+     // 如果n = (k-1)时命题成立，证明n = k时命题是否成立
+     else {
+      
+      boolean proveOfPreviousOne = prove(k - 1, result);
+      result.wheatNum *= 2;
+      result.wheatTotalNum += result.wheatNum;
+      boolean proveOfCurrentOne = false;
+      if (result.wheatTotalNum == (Math.pow(2, k) - 1)) proveOfCurrentOne = true; 
+      
+      if (proveOfPreviousOne &amp;&amp; proveOfCurrentOne) return true;
+      else return false;
+      
+     }
+     
+    }
+
+}
+
+</code></pre><p>其中，类Result用于保留每一格的麦粒数，以及目前为止的麦粒总数。这个代码递归调用了函数prove(int, Result)。</p><p>从这个例子中，我们可以看出来，<strong>递归调用的代码和数学归纳法的逻辑是一致的</strong>。一旦你理解了数学归纳法，就很容易理解递归调用了。只要数学归纳证明的逻辑是对的，递归调用的逻辑就是对的，我们没有必要纠结递归函数是如何嵌套调用和返回的。</p><p>不过，和数学归纳证明稍有不同的是，递归编程的代码需要返回若干的变量，来传递$k-1$的状态到$k$。这里，我使用类Result来实现这一点。</p><p>这里是一段测试的代码。</p><pre><code>public static void main(String[] args) {
+  
+  int grid = 63;
+  
+  Result result = new Result();
+  System.out.println(Lesson4_2.prove(grid, result));
+  
+ }
+
+</code></pre><p>我们最多测试到$63$。因为如果测试到第$64$格，麦粒总数就会溢出Java的long型数据。</p><p>你可以自己分析一下函数的调用和返回。我这里列出了一开始嵌套调用和到递归结束并开始返回值得的几个状态：</p><p><img src="https://static001.geekbang.org/resource/image/02/2d/02dfa54d6968676b90ac757a0711342d.png?wh=2040*1864" alt=""></p><p>从这个图可以看出，函数从$k=63$开始调用，然后调用$k-1$，也就是$62$，一直到$k=1$的时候，嵌套调用结束，$k=1$的函数体开始返回值给$k=2$的函数体，一直到$k=63$的函数体。从$k=63, 62, …, 2, 1$的嵌套调用过程，其实就是体现了数学归纳法的核心思想，我把它称为<strong>逆向递推</strong>。而从$k=1, 2, …, 62, 63$的值返回过程，和上一篇中基于循环的迭代是一致的，我把它称为<strong>正向递推</strong>。</p><h2>小结</h2><p>今天，我介绍了一个编程中非常重要的数学概念：数学归纳法。</p><p>上一节我讲了迭代法是如何通过重复的步骤进行计算或者查询的。与此不同的是，数学归纳法在理论上证明了命题是否成立，而无需迭代那样反复计算，因此可以帮助我们节约大量的资源，并大幅地提升系统的性能。</p><p>数学归纳法实现的运行时间几乎为$0$。不过，数学归纳法需要我们能做出合理的命题假设，然后才能进行证明。虽然很多时候要做这点比较难，确实也没什么捷径。你就是要多做题，多去看别人是怎么解题的，自己去积累经验。</p><p>最后，我通过函数的递归调用，模拟了数学归纳法的证明过程。如果你细心的话，会发现递归的函数值返回实现了从$k=1$开始到$k=n$的迭代。说到这里，你可能会好奇：既然递归最后返回值的过程和基于循环的迭代是一致，那为什么还需要使用递归的方法呢？下一节，我们继续聊这个问题。</p><p><img src="https://static001.geekbang.org/resource/image/0d/81/0dc6eaf8597eccad3ee4411e14acf081.jpg?wh=1242*1646" alt=""></p><h2>思考题</h2><p>在你日常工作的项目中，什么地方用到了数学归纳法来提升代码的运行效率？如果没有遇到过，你可以尝试做做实验，看看是否有提升？</p><p><span class="orange">欢迎在留言区交作业，并写下你今天的学习笔记。你可以点击“请朋友读”，把今天的内容分享给你的好友，和他一起精进。</span></p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/d4/c2/910d231e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>oddrock</span>
+  </div>
+  <div class="_2_QraFYR_0">递归把计算交给计算机，归纳把计算交给人，前者是拿计算机的计算成本换人的时间，后者是拿人的时间换计算机的计算成本</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 精辟的总结👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-18 08:18:33</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epQyvB3NqlCWF0TG3BUYC0IicqRiaiaandYWtQuCb7JMv5z32jUOkWtgg2EVXsibOkibt2ckqG9MHsqQbA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>cafu_chino</span>
+  </div>
+  <div class="_2_QraFYR_0">老师下次可以提供Python的代码示例吗？对Java的使用不是很熟练<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以，后期会整理出来</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 15:01:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6d/7f/e1c189c7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>陈诚</span>
+  </div>
+  <div class="_2_QraFYR_0">个人觉得有时候虽然用迭代和递归都能解决问题，但是使用递归时，由于有数学归纳法保证递归关系的正确性，所以只要专注于解决2个相邻层的关系就可以了，然后使用数学归纳法的基本情况作为递归出口。当然，在实际编程中，递归会增加函数调用栈的开销，也是要考虑的一方面</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 07:55:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/f0/89/25899406.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Neo_Zhang</span>
+  </div>
+  <div class="_2_QraFYR_0">项目中还没碰到，但在以前做编程题时经常碰到找规律的问题，这时候只需抽象出一个公式即可。<br>另外可否给老师提个建议，就是在github上建一个仓库，这样我们可以fork下来，用自己熟悉的编程语言把老师讲的思路写进代码里push上去，方便大家相互学习 ^_^</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这是个好建议，我先问下是否版权问题</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 19:48:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6d/7f/e1c189c7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>陈诚</span>
+  </div>
+  <div class="_2_QraFYR_0">我觉得加深学习数学效果的方式，就是自己实现一遍，我这里用C语言实现了一下递归求麦粒总数的问题以求抛砖引玉<br>#include &lt;stdio.h&gt;<br>#include &lt;stdlib.h&gt;<br><br>struct result {<br>	long cur_grid_wheat;<br>	long sum_of_wheat;<br>};<br><br>struct result wheat(int grid)<br>{<br>	struct result rst;<br><br>	if (grid == 1) {<br>		rst.cur_grid_wheat = 1;<br>		rst.sum_of_wheat = 1;<br>	} else {<br>		struct result last_rst;<br>		last_rst = wheat(grid - 1);<br>		rst.cur_grid_wheat = last_rst.cur_grid_wheat * 2;<br>		rst.sum_of_wheat = last_rst.sum_of_wheat + rst.cur_grid_wheat;<br>	}<br><br>	return rst;<br>}<br><br>int main(int argc, char *argv[])<br>{<br>	struct result rst;<br>	int grid_index = 0;<br><br>	if (argc != 2) {<br>		printf(&quot;Usage: %s grid_index\n&quot;, argv[0]);<br>		return -1;<br>	}<br>	grid_index = atoi(argv[1]);<br><br>	rst = wheat(grid_index);<br><br>	printf(&quot;grid_index: %d\ncur_grid_wheat: %ld\nsum_of_wheat: %ld\n&quot;,<br>		grid_index, rst.cur_grid_wheat, rst.sum_of_wheat);<br><br>	return 0;<br>}<br><br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-19 08:26:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/04/48/ef6082a5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>mikukuma</span>
+  </div>
+  <div class="_2_QraFYR_0">数据归纳法通俗易懂的说法就是一个个经典的数学公式的证明。我们要去证明这个公式是否正确，需要根据两个步骤，1：n=1时，公式是否正确；2: 假设n = k-1成立，那么去证明n=k公式是成立的。就跟数学做证明题一样的思路。然后我们去做这些算法题的时候，就可以直接根据已经证明的公式，很快就能得到我们需要的答案。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 11:29:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/21/a3/06291d0c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>lkj</span>
+  </div>
+  <div class="_2_QraFYR_0">递归还有一个就是搜索目录文件，编程递归第一个练习就是这个<br>递归过程判断事目录还是文件，目录就继续递归，文件就根据缩进打印，最终打印出目录结构</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的👌</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-05-25 10:53:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/7d/6b/648c30bc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>予悠悠</span>
+  </div>
+  <div class="_2_QraFYR_0">可以给老师提个建议吗？课程里提到的关键概念可不可以加上英文名呢？例如这篇里提到的迭代，递归，正向递推，逆向递推</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 好，后面会加注，感谢建议</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-19 12:07:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/3d/e1/5279ea2f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>鱼鱼鱼培填</span>
+  </div>
+  <div class="_2_QraFYR_0">用Python实现数学归纳法，一开始使用math.pow()函数发现不对，Python中该函数会使用科学技术法导致结果出错<br>#-*- coding:UTF-8 -*-<br>class result(object):<br>	wheatNum = 0<br>	wheatTotalNum = 0<br><br>class getWheatTotalNum(object):<br>	&#39;&#39;&#39;<br>	函数说明：使用递归嵌套， 进行数学归纳法证明<br>	Param： k - 表示放到第几格   result - 表示当前格子的麦粒数<br>	Return: boolean - 放到第K格时是否成立<br>	&#39;&#39;&#39;<br>	def prove(self, k, result):<br>		if k == 1:<br>			if (2 ** 1 - 1) == 1:<br>				result.wheatNum = 1<br>				result.wheatTotalNum = 1<br>				return True<br>			else:<br>				return False <br><br>		else:<br>			proveOfPreviousOne = self.prove(k - 1, result)<br>			result.wheatNum *= 2<br>			result.wheatTotalNum += result.wheatNum<br>			proveOfCurrentOne = False<br>			if result.wheatTotalNum == (2 ** k - 1):<br>				proveOfCurrentOne = True<br>			if (proveOfPreviousOne &amp; proveOfCurrentOne):<br>				return True<br>			else:<br>				return False<br><br><br>if __name__ == &#39;__main__&#39;:<br>	grid = 64<br>	result = result()<br>	g = getWheatTotalNum()<br>	print(g.prove(grid, result))</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 研究了细节，很赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-19 23:35:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/91/78/ccd75c94.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>田野</span>
+  </div>
+  <div class="_2_QraFYR_0">关于这节课讲的内容在编程中具体的应用能这样理解不？  迭代法在实际应用中，如果迭代层次过深 ，会导致各种问题(耗时\内存占用等) ，遇到这种情况可以总结规律， 使用数学归纳法将其简化。(代码中不再使用迭代 使用数学归纳总结出来的结果)</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的，特别是递归的实现比较耗资源</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 15:25:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f2/aa/32fc0d54.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>失火的夏天</span>
+  </div>
+  <div class="_2_QraFYR_0">个人觉得动态规划就是归纳法思想的处理，一个问题分解为多个字问题的最优解</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 07:27:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/05/aa/cc1dd8de.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>zh</span>
+  </div>
+  <div class="_2_QraFYR_0">想起罗斯的故事，1-100 的所有数求和，罗斯的方法就是数学归纳法的简单应用。平时还没有需要用到归纳法，递归方法也很少用。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你是说高斯的故事吧😀</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-24 18:13:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/e9/0b/1171ac71.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>WL</span>
+  </div>
+  <div class="_2_QraFYR_0">老师我感觉递归和归纳法还是有些区别的, 递归是自顶向下的拆解问题, 直到终止条件后再一层层返回结果, 但是归纳法好像没有自顶向下拆解问题的这个环节.</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 07:41:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>大鱼</span>
+  </div>
+  <div class="_2_QraFYR_0">def get_result(n):<br>    &quot;&quot;&quot;<br>    :param n: n 为实际的格子数  <br>    &quot;&quot;&quot;<br>    return 1 if n == 1 else get_result(n - 1) * 2 + 1<br><br>差不多一行代码可以解决这个问题</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 代码非常简洁👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-20 12:56:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/42/df/a034455d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>罗耀龙@坐忘</span>
+  </div>
+  <div class="_2_QraFYR_0">茶艺师学编程<br><br>大家都知道，好的普洱茶都特点是“苦能回甘，涩能生津。”，这由多少位茶人实践，再经过口口相传，归纳出来的一点经验。<br><br>而数学归纳法，基于数学的形状，它把基于人的经验的归纳的靠谱程度提升了好几个数量级。<br><br>再结合计算机的递归实现数学归纳法，实现了有效分工（人提供灵感，计算机负责验证），极大的提升了效率（优秀的程序员必备素养）。<br><br>纵观整个归纳法的“升级过程”，也呈现了人类善于使用工具解决问题的特点（眼睛——&gt;数学——&gt;计算）。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 总结的非常形象和生动，赞一个</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-26 19:02:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/89/e5/2219d26f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>艾格北峰</span>
+  </div>
+  <div class="_2_QraFYR_0">有没有C的代码演示，没学过java,之前报名也没说是用java演示</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这门课主要是讲数学的思想，代码仅供参考，后面我会补上其他语言的实现</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-05 12:49:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/1c/a4/3a7a0213.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>microsnow</span>
+  </div>
+  <div class="_2_QraFYR_0">&lt;?php<br><br>class Result <br>{<br>    public $wheatNum = 0;<br>    public $wheatTotalNum = 0;<br>}<br><br>class Lession4_2 <br>{<br><br>    public $result = NULL;<br><br>    public function __construct()<br>    {<br>        $this-&gt;result = new Result();<br>    }<br><br>    public function getResult()<br>    {<br>        return $this-&gt;result;<br>    }<br><br>    public function prove($n)<br>    {<br>        if ($n == 1) {<br>            if ((pow(2, 1) - 1) == 1) {<br>                $this-&gt;result-&gt;wheatNum  = 1;<br>                $this-&gt;result-&gt;wheatTotalNum = 1;<br>                return true;<br>            } else {<br>                return false;<br>            }<br>        } else {<br>            $proveOfPreviousOne = $this-&gt;prove($n - 1);<br>            $this-&gt;result-&gt;wheatNum *= 2;<br>            $this-&gt;result-&gt;wheatTotalNum += $this-&gt;result-&gt;wheatNum;<br>            $proveOfCurrentOne = false;<br>            if ($this-&gt;result-&gt;wheatTotalNum == (pow(2, $n) - 1)) $proveOfCurrentOne = true;<br>            if ($proveOfCurrentOne &amp;&amp; $proveOfPreviousOne) {<br>                return true;<br>            } else {<br>                return false;<br>            }<br>        }<br>    }<br>}<br><br>$a = new Lession4_2();<br>$result = $a-&gt;prove(13);<br>$result = $a-&gt;getResult();</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我对php语言不熟悉，你能否贴一下运行的结果？</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-29 11:20:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/82/d8/1df27da4.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>瘦马</span>
+  </div>
+  <div class="_2_QraFYR_0">数学归纳法：一、证明n=1时，成立；二、假设n=k-1时成立，证明n=k时，成立。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-18 08:24:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6b/13/683b4c5e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>未明。</span>
+  </div>
+  <div class="_2_QraFYR_0">数字全变成了math_progress_error了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-17 08:37:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/fe/83/df562574.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>慎独明强</span>
+  </div>
+  <div class="_2_QraFYR_0">看了留言，对于递归和归纳法是有区别的，递归是一层层调用去计算，归纳法是已知规律可以直接去用公式套用，已经证明了这个公式是成立的。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-31 12:45:34</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

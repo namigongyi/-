@@ -1,0 +1,552 @@
+<audio title="07_排列：如何让计算机学会“田忌赛马”？" src="https://static001.geekbang.org/resource/audio/19/89/1944dea9b5c7d551f284024f65fa6a89.mp3" controls="controls"></audio> 
+<p>你好，我是黄申。</p><p>“田忌赛马”的故事我想你肯定听过吧？田忌是齐国有名的将领，他常常和齐王赛马，可是总是败下阵来，心中非常不悦。孙膑想帮田忌一把。他把这些马分为上、中、下三等。他让田忌用自己的下等马来应战齐王的上等马，用上等马应战齐王的中等马，用中等马应战齐王的下等马。三场比赛结束后，田忌只输了第一场，赢了后面两场，最终赢得与齐王的整场比赛。</p><p>孙膑每次都从田忌的马匹中挑选出一匹，一共进行三次，排列出战的顺序。是不是感觉这个过程很熟悉？这其实就是数学中的<strong>排列</strong>过程。</p><p>我们初高中的时候，都学过排列，它的概念是这么说的：从n个不同的元素中取出m（1≤m≤n）个不同的元素，按照一定的顺序排成一列，这个过程就叫<strong>排列</strong>（Permutation）。当m=n这种特殊情况出现的时候，比如说，在田忌赛马的故事中，田忌的三匹马必须全部出战，这就是<strong>全排列</strong>（All Permutation）。</p><p>如果选择出的这m个元素可以有重复的，这样的排列就是为<strong>重复排列</strong>（Permutation with Repetition），否则就是<strong>不重复排列</strong>（Permutation without Repetition）。</p><p><img src="https://static001.geekbang.org/resource/image/98/15/98df21876ad52195217709e298707515.jpg?wh=1142*792" alt=""></p><p>看出来没有？这其实是一个树状结构。从树的根结点到叶子结点，每种路径都是一种排列。有多少个叶子结点就有多少种全排列。从图中我们可以看出，最终叶子结点的数量是3x2x1=6，所以最终排列的数量为6。</p><!-- [[[read_end]]] --><pre><code>{上等，中等，下等}
+{上等，下等，中等}
+{中等，上等，下等}
+{中等，下等，上等}
+{下等，上等，中等}
+{下等，中等，上等}
+</code></pre><p>我用t1，t2和t3分别表示田忌的上、中、下等马跑完全程所需的时间，用q1，q2和q3分别表示齐王的上、中、下等马跑全程所需的时间，因此，q1&lt;t1&lt;q2&lt;t2&lt;q3&lt;t3。</p><p>如果你将这些可能的排列，仔细地和齐王的上等、中等和下等马进行对比，只有{下等，上等，中等}这一种可能战胜齐王，也就是t3&gt;q1，t1&lt;q2，t2&lt;q3。</p><p>对于最终排列的数量，这里我再推广一下：</p><ul>
+<li>
+<p>对于n个元素的全排列，所有可能的排列数量就是nx(n-1)x(n-2)x…x2x1，也就是n!；</p>
+</li>
+<li>
+<p>对于n个元素里取出m(0&lt;m≤n)个元素的不重复排列数量是nx(n-1)x(n-2)x…x(n - m + 1)，也就是n!/(n-m)!。</p>
+</li>
+</ul><p>这两点都是可以用数学归纳法证明的，有兴趣的话你可以自己尝试一下。</p><h2>如何让计算机为田忌安排赛马？</h2><p>我们刚才讨论了3匹马的情况，这倒还好。可是，如果有30匹马、300匹马，怎么办？30的阶乘已经是天文数字了。更糟糕的是，如果两组马之间的速度关系也是非常随机的，例如q1&lt;q2&lt;t1&lt;t2&lt;q3&lt;t3， 那就不能再使用“最差的马和对方最好的马比赛”这种战术了。这个时候，人手动肯定是算不过来了，计算机又要帮我们大忙啦！我们使用代码来展示如何生成所有的排列。</p><p>如果你细心的话，就会发现在新版舍罕王赏麦的案例中，其实已经涉及了排列的思想，不过那个案例不是以“选取多少个元素”为终止条件，而是以“选取元素的总和”为终止条件。尽管这样，我们仍然可以使用递归的方式来快速地实现排列。</p><p>不过，要把田忌赛马的案例，转成计算机所能理解的内容，还需要额外下点功夫。</p><p>首先，在不同的选马阶段，我们都要保存已经有几匹马出战、它们的排列顺序、以及还剩几匹马没有选择。我使用变量result来存储到当前函数操作之前，已经出战的马匹及其排列顺序。而变量horses存储了到当前函数操作之前，还剩几匹马还没出战。变量new_result和rest_horses是分别从result和horses克隆而来，保证不会影响上一次的结果。</p><p>其次，孙膑的方法之所以奏效，是因为他看到每一等马中，田忌的马只比齐王的差一点点。如果相差太多，可能就会有不同的胜负结局。所以，在设置马匹跑完全程的时间上，我特意设置为q1&lt;t1&lt;q2&lt;t2&lt;q3&lt;t3，只有这样才能保证计算机得出和孙膑相同的结论。</p><pre><code>import java.util.ArrayList;
+import java.util.Arrays; 
+import java.util.HashMap;
+
+public class Lesson7_1 {
+	
+	// 设置齐王的马跑完所需时间
+	public static HashMap&lt;String, Double&gt; q_horses_time = new HashMap&lt;String, Double&gt;(){
+		{
+		 	  put(&quot;q1&quot;, 1.0);
+		 	  put(&quot;q2&quot;, 2.0);
+		    put(&quot;q3&quot;, 3.0);
+		}
+	};
+	
+	// 设置田忌的马跑完所需时间
+	public static HashMap&lt;String, Double&gt; t_horses_time = new HashMap&lt;String, Double&gt;(){
+		{
+		 	  put(&quot;t1&quot;, 1.5);
+		 	  put(&quot;t2&quot;, 2.5);
+		    put(&quot;t3&quot;, 3.5);
+		}
+	};
+	
+	public	static ArrayList&lt;String&gt; q_horses = new ArrayList&lt;String&gt;(Arrays.asList(&quot;q1&quot;, &quot;q2&quot;, &quot;q3&quot;));
+	
+	/**
+    * @Description:	使用函数的递归（嵌套）调用，找出所有可能的马匹出战顺序
+    * @param horses-目前还剩多少马没有出战，result-保存当前已经出战的马匹及顺序
+    * @return void
+    */
+	
+    public static void permutate(ArrayList&lt;String&gt; horses, ArrayList&lt;String&gt; result) {
+    	
+    	// 所有马匹都已经出战，判断哪方获胜，输出结果
+    	if (horses.size() == 0) {
+    		System.out.println(result);
+    		compare(result, q_horses);
+    		
+    		System.out.println();
+    		
+ 	 			return;
+   		}
+    	
+   		for (int i = 0; i &lt; horses.size(); i++) {
+    		// 从剩下的未出战马匹中，选择一匹，加入结果
+ 	 			ArrayList&lt;String&gt; new_result = (ArrayList&lt;String&gt;)(result.clone());
+   			new_result.add(horses.get(i));
+  	 		
+    		// 将已选择的马匹从未出战的列表中移出
+ 	 			ArrayList&lt;String&gt; rest_horses = ((ArrayList&lt;String&gt;)horses.clone());
+ 	 			rest_horses.remove(i);
+    		
+    		// 递归调用，对于剩余的马匹继续生成排列
+   			permutate(rest_horses, new_result);
+   		}
+    	
+    }
+
+
+}
+ 
+</code></pre><p>另外，我还使用了compare的函数来比较田忌和齐王的马匹，看哪方获胜。</p><pre><code>    public static void compare(ArrayList&lt;String&gt; t, ArrayList&lt;String&gt; q) {
+    	int t_won_cnt = 0;
+    	for (int i = 0; i &lt; t.size(); i++) {
+			System.out.println(t_horses_time.get(t.get(i)) + &quot; &quot; +  q_horses_time.get(q.get(i)));
+			if (t_horses_time.get(t.get(i)) &lt; q_horses_time.get(q.get(i))) t_won_cnt ++;
+		}
+		
+		if (t_won_cnt &gt; (t.size() / 2)) System.out.println(&quot;田忌获胜！&quot;);
+		else System.out.println(&quot;齐王获胜！&quot;);
+		
+		System.out.println();
+    }
+ 
+</code></pre><p>下面是测试代码。当然你可以设置更多的马匹，并增加相应的马匹跑完全程的时间。</p><pre><code>  public static void main(String[] args) {
+		
+		ArrayList&lt;String&gt; horses = new	ArrayList&lt;String&gt;(Arrays.asList(&quot;t1&quot;, &quot;t2&quot;, &quot;t3&quot;));
+		Lesson7_1.permutate(horses,	new ArrayList&lt;String&gt;());
+		
+	}
+
+</code></pre><p>在最终的输出结果中，6种排列中只有一种情况是田忌获胜的。</p><pre><code>[t3, t1, t2]
+3.5 1.0
+1.5 2.0
+2.5 3.0
+田忌获胜！
+</code></pre><p>如果田忌不听从孙膑的建议，而是随机的安排马匹出战，那么他只有1/6的获胜概率。</p><p>说到这里，我突然产生了一个想法，如果齐王也是随机安排他的马匹出战顺序，又会是怎样的结果？如果动手来实现的话，大体思路是我们为田忌和齐王两方都生成他们马匹的全排序，然后再做交叉对比，看哪方获胜。这个交叉对比的过程也是个排列的问题，田忌这边有6种顺序，而齐王也是6种顺序，所以一共的可能性是6x6=36种。</p><p>我用代码模拟了一下，你可以看看。</p><pre><code>public static void main(String[] args) {
+		
+		ArrayList&lt;String&gt; t_horses = new ArrayList&lt;String&gt;(Arrays.asList(&quot;t1&quot;, &quot;t2&quot;, &quot;t3&quot;));
+		Lesson7_2.permutate(t_horses, new ArrayList&lt;String&gt;(), t_results);
+		
+		ArrayList&lt;String&gt; q_horses = new ArrayList&lt;String&gt;(Arrays.asList(&quot;q1&quot;, &quot;q2&quot;, &quot;q3&quot;));
+		Lesson7_2.permutate(q_horses, new ArrayList&lt;String&gt;(), q_results);
+		
+		System.out.println(t_results);
+		System.out.println(q_results);
+		System.out.println();
+		
+		for (int i = 0; i &lt; t_results.size(); i++) {
+			for (int j = 0; j &lt; q_results.size(); j++) {
+				Lesson7_2.compare(t_results.get(i), q_results.get(j));
+			}
+		}
+		
+	}
+ 
+</code></pre><p>由于交叉对比时只需要选择2个元素，分别是田忌的出战顺序和齐王的出战顺序，所以这里使用2层循环的嵌套来实现。从最后的结果可以看出，田忌获胜的概率仍然是1/6。</p><h2>暴力破解密码如何使用排列思想？</h2><p>聊了这么多，相信你对排列有了更多了解。在概率中，排列有很大的作用，因为排列会帮助我们列举出随机变量取值的所有可能性，用于生成这个变量的概率分布，之后在概率统计篇我还会具体介绍。此外，排列在计算机领域中有着很多应用场景。我这里讲讲最常见的密码的暴力破解。</p><p>我们先来看去年网络安全界的两件大事。第一件发生在2017年5月，新型“蠕虫”式勒索病毒WannaCry爆发。当时这个病毒蔓延得非常迅速，电脑被感染后，其中的文件会被加密锁住，黑客以此会向用户勒索比特币。第二件和美国的信用评级公司Equifax有关。仅在2017年内，这个公司就被黑客盗取了大约1.46亿用户的数据。</p><p>看样子，黑客攻击的方式多种多样，手段也高明了很多，但是窃取系统密码仍然是最常用的攻击方式。有时候，黑客们并不需要真的拿到你的密码，而是通过“猜”，也就是列举各种可能的密码，然后逐个地去尝试密码的正确性。如果某个尝试的密码正好和原先管理员设置的一样，那么系统就被破解了。这就是我们常说的<strong>暴力破解法</strong>。</p><p>我们可以假设一个密码是由英文字母组成的，那么每位密码有52种选择，也就是大小写字母加在一起的数量。那么，生成m位密码的可能性就是52^m种。也就是说，从n（这里n为52）个元素取出m（0&lt;m≤n）个元素的可重复全排列，总数量为n^m。如果你遍历并尝试所有的可能性，就能破解密码了。</p><p>不过，即使存在这种暴力法，你也不用担心自己的密码很容易被人破解。我们平时需要使用密码登录的网站或者移动端App程序，基本上都限定了一定时间内尝试密码的次数，例如1天之内只能尝试5次等等。这些次数一定远远小于密码排列的可能性。</p><p>这也是为什么有些网站或App需要你一定使用多种类型的字符来创建密码，比如字母加数字加特殊符号。因为类型越多，n^m中的n越大，可能性就越多。如果使用英文字母的4位密码，就有52^4=7311616种，超过了700万种。如果我们在密码中再加入0～9这10个阿拉伯数字，那么可能性就是62^4=14776336种，超过了1400万。</p><p>同理，我们也可以增加密码长度，也就是用n^m中的m来实现这一点。如果在英文和阿拉伯数字的基础上，我们把密码的长度增加到6位，那么就是62^6=56800235584种，已经超过了568亿了！这还没有考虑键盘上的各种特殊符号。有人估算了一下，如果用上全部256个ASCII码字符，设置长度为8的密码，那么一般的黑客需要10年左右的时间才能暴力破解这种密码。</p><h2>小结</h2><p>排列可以帮助我们生成很多可能性。由于这种特性，排列最多的用途就是穷举法，也就是，列出所有可能的情况，一个一个验证，然后看每种情况是否符合条件的解。</p><p>古代的孙膑利用排列的思想，穷举了田忌马匹的各种出战顺序，然后获得了战胜齐王的策略。现代的黑客，通过排列的方法，穷举了各种可能的密码，试图破坏系统的安全性。如果你所面临的问题，它的答案也是各种元素所组成的排列，那么你就可以考虑，有没有可能排列出所有的可能性，然后通过穷举的方式来获得最终的解。</p><p><img src="https://static001.geekbang.org/resource/image/84/45/84f9e15c857ca0dbc49837ff0e107945.jpg?wh=1242*1547" alt=""></p><h2>思考题</h2><p>假设有一个4位字母密码，每位密码是a～e之间的小写字母。你能否编写一段代码，来暴力破解该密码？（提示：根据可重复排列的规律，生成所有可能的4位密码。）</p><p><span class="orange">欢迎在留言区交作业，并写下你今天的学习笔记。你可以点击“请朋友读”，把今天的内容分享给你的好友，和他一起精进。</span></p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/ec/0d/43d46889.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>alic</span>
+  </div>
+  <div class="_2_QraFYR_0">password = &#39;bacdce&#39;<br>classes = [&#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39;]<br><br>def get_password(n, result = &#39;&#39;):<br>    if n == 0:<br>        if result == password:<br>            print(password)<br>    else:<br>        for i in classes:<br>            new_result = copy.copy(result)<br>            new_result = new_result + i<br>            get_password(n - 1, new_result)<br><br>get_password(6)</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以的👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 16:02:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>菩提</span>
+  </div>
+  <div class="_2_QraFYR_0">交作业：<br>public class L7_2 {<br><br>	public static void calLetterList(ArrayList&lt;String&gt; l, ArrayList&lt;String&gt; result) {<br>		if (result.size() == l.size()) {<br>			System.out.println(result);<br>			return;<br>		}<br><br>		for (String letter : l) {<br>			ArrayList&lt;String&gt; newResult = (ArrayList&lt;String&gt;) result.clone();<br>			newResult.add(letter);<br>			calLetterList(l, newResult);<br>		}<br>	}<br><br>	public static void main(String[] args) {<br>		ArrayList&lt;String&gt; l = new ArrayList&lt;&gt;(Arrays.asList(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;, &quot;e&quot;));<br>		calLetterList(l, new ArrayList&lt;&gt;());<br>	}<br><br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很赞</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-30 21:36:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6a/8e/7b6ea886.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Joe</span>
+  </div>
+  <div class="_2_QraFYR_0">C++形式交作业，好像用list数据结果会方便一点。<br>&#47;** permutaion: 排列。<br> * 从n个数中选出m个数的方式，若不考虑顺序Cn(m)，若考虑顺序An(m)<br> *&#47;<br><br>&#47;* 问题：密码排列<br> * 假设有一个 4 位字母密码，每位密码是 a～e 之间的小写字。<br> * 编写密码可能排列方式。<br> *&#47;<br>#include &lt;iostream&gt;<br>#include &lt;vector&gt;<br>using namespace std;<br><br>class Permutation {<br>  private:<br>  int resultCount_ = 0;<br><br>  public:<br>  &#47;** Details: 根据输入字母列表，获得所有的排列方式。<br>   *  params: result- 当前排列形式， candidate- 未排列字母表。<br>   *  return: null<br>   *&#47;<br>  void breakPassword(vector&lt;string&gt; result, vector&lt;string&gt; candidate) {<br>    int len = candidate.size();<br>    if (0 == len) {<br>      &#47;&#47; 无字母剩余，输出排列结果<br>      outputResult(result);<br>      resultCount_++;<br>      return;<br>    }<br>    for (int i = 0; i &lt; len; i++) {<br>      vector&lt;string&gt; resultNew;<br>      vector&lt;string&gt; candidateLeft;<br>      &#47;&#47; 读取排列字母<br>      resultNew = result;<br>      resultNew.push_back(candidate[i]);<br>      &#47;&#47; 获得剩余字母表<br>      candidateLeft = candidate;<br>      vector&lt;string&gt;::iterator it = candidateLeft.begin();<br>      candidateLeft.erase(it + i);<br>      &#47;&#47; 递归<br>      breakPassword(resultNew, candidateLeft);<br>    }<br>  }<br>  &#47;&#47; 输出结果<br>  void outputResult(vector&lt;string&gt; result) {<br>    for (unsigned int i = 0; i &lt; result.size(); i++) {<br>      cout &lt;&lt; result[i];<br>    }<br>    cout &lt;&lt; endl;<br>  }<br>  &#47;&#47; 获得所有可能密码总数<br>  int getResultCount() {<br>    return resultCount_;<br>  }<br>};<br><br>int main(void) {<br>  vector&lt;string&gt; fourAlphabetString = {&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;, &quot;e&quot;};<br>  vector&lt;string&gt; res;<br>  Permutation test;<br>  test.breakPassword(res, fourAlphabetString);<br>  cout &lt;&lt; &quot;可能的密码形式：&quot;;<br>  cout &lt;&lt; test.getResultCount() &lt;&lt; &quot;种&quot; &lt;&lt; endl;<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: c语言确实更简洁👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-09 20:56:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/18/d0/49b06424.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>qinggeouye</span>
+  </div>
+  <div class="_2_QraFYR_0">python<br>一、田忌和齐王双方都随机选择马匹出战顺序<br>import copy<br># 设置齐王的马跑完所需时间<br>q_horses_time = {&quot;q1&quot;: 1.0, &quot;q2&quot;: 2.0, &quot;q3&quot;: 3.0}<br># 设置田忌的马跑完所需时间<br>t_horses_time = {&quot;t1&quot;: 1.5, &quot;t2&quot;: 2.5, &quot;t3&quot;: 3.5}<br># 双方均随机选择出战的马匹<br><br>q_horses = [&quot;q1&quot;, &quot;q2&quot;, &quot;q3&quot;]<br>t_horses = [&quot;t1&quot;, &quot;t2&quot;, &quot;t3&quot;]<br><br>def permutation(horses, result=None, all_results=None):<br>    &quot;&quot;&quot;<br>    使用函数的递归（嵌套）调用，找出所有可能的马匹出战顺序<br>    :param all_results: 马匹出战顺序的所有排列（全排列）<br>    :param horses: 目前还剩多少马没有出战<br>    :param result: 保存当前已经出战的马匹及顺序（其中一种排列）<br>    :return:<br>    &quot;&quot;&quot;<br>    if result is None:<br>        result = []<br>    if all_results is None:<br>        all_results = []<br><br>    # 所有马匹都已经出战，返回出战顺序<br>    if len(horses) == 0:<br>        all_results.append(result)<br>        return<br><br>    for k in range(len(horses)):<br>        # 从剩下的未出战马匹中 选择一匹 加入结果<br>        new_result = copy.copy(result)<br>        new_result.append(horses[k])<br>        # 将已选择的马匹从未出战的列表中移除<br>        rest_horses = copy.copy(horses)<br>        rest_horses.pop(k)<br>        # 递归调用 对于剩余的马匹继续生成排列<br>        permutation(rest_horses, new_result, all_results)<br>    return all_results<br><br><br>def compare(t, q):<br>    t_won_cnt = 0<br>    for m in range(len(t)):<br>        print(str(t_horses_time.get(t[m])) + &#39;,&#39; + str(q_horses_time.get(q[m])))<br>        if t_horses_time.get(t[m]) &lt; q_horses_time.get(q[m]):<br>            t_won_cnt = t_won_cnt + 1<br>    if t_won_cnt &gt; len(t)&#47;&#47;2:<br>        print(&quot;田忌获胜！&quot;)<br>    else:<br>        print(&quot;齐王获胜！&quot;)<br><br>if __name__ == &#39;__main__&#39;:<br>    # 双方均随机安排马匹出战，田忌获胜的概率仍为 1&#47;6<br>    t_results = permutation(t_horses)<br>    q_results = permutation(q_horses)<br>    print(t_results)<br>    print(q_results)<br>    for i in range(len(t_results)):<br>        for j in range(len(q_results)):<br>            compare(t_results[i], q_results[j])<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-08 02:10:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/42/df/a034455d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>罗耀龙@坐忘</span>
+  </div>
+  <div class="_2_QraFYR_0">茶艺师学编程<br><br>1、学完这节课要记住的<br><br>●不重复排列 n!&#47;(n-m)!   （1≤m≤n）<br>●不重复全排列 n！<br>●重复排列 n＾m<br><br>2、田忌赛马也好，穷举破解法也好，背后的数学原理都是一样的，就是排列。由此我获得两点体会<br><br>●这就是所谓“等价问题”。正因为存在“等价”，才能实现“融会贯通”。<br>●正如黄老师所说，在确定好数学的解决办法后，程序的解法也自然出来了。<br>把这项本领练到极致的话，也许就能像那位高德纳（《计算机程序设计艺术》的作者），总是能用最慢的电脑获得编程大赛的第一名。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 确实，懂了很多数学原理，算法设计就很简单了，而且效率和质量都会得到提升</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-30 21:41:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/7f/bb/794dd610.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jing</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;&#47;思考题 c#版本<br>private static char[] _letters = { &#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39; };<br>public static void GetPassword()<br>{<br>string password = &quot;abded&quot;;<br>CrackPassword(password.Length, new StringBuilder(), password);<br>}<br><br>private static void CrackPassword(int length, StringBuilder result, string realPsd)<br>{<br>if (length == 0)<br>{<br>if (realPsd.Equals(result.ToString()))<br>{<br>Console.WriteLine(&quot;Your password is:&quot; + result.ToString());<br>}<br>result.Length = 0;<br>return;<br>}<br>else if (length &lt; 0)<br>{<br>return;<br>}<br>for (int i = 0; i &lt; _letters.Length; i++)<br>{<br>StringBuilder temp = new StringBuilder();<br>temp.Append(result.ToString());<br>temp.Append(_letters[i]);<br>CrackPassword(length - 1, temp, realPsd);<br>}<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-05 00:01:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/34/54/e9e0f8d6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>瓶子dian</span>
+  </div>
+  <div class="_2_QraFYR_0">var chars = [&#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39;]<br>var result = []<br><br>function getPassword(passwordChars, num, password) {<br>    if (num == 0) {<br>        return result.push(password)<br>    } else {<br>        for (var i = 0; i &lt; passwordChars.length; i++) {<br>            getPassword(passwordChars, num - 1, password + passwordChars[i])<br>        }<br>    }<br>}<br>getPassword(chars, 4, &#39;&#39;)<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 代码很简洁</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-09 10:24:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/92/fd/6b0e58fe.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>文刂 氵共 超</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题 - 递归思想-C++<br>#include &lt;iostream&gt;<br>#include&lt;string&gt;<br><br>using std::string;<br>using namespace std;<br><br>void BreakPassword( string Words, int PasswordLen, string result)<br>{<br>	if (result.length() == PasswordLen)<br>	{<br>		&#47;&#47;C++中string类型不能直接输出，需加头问题#include&lt;string&gt;，不能用#include&lt;string.h&gt;<br>		cout &lt;&lt; result &lt;&lt; &quot;    &quot;;<br>		return;<br>	}<br><br>	for (int i = 0; i &lt; Words.length(); ++i)<br>	{<br>		string newResult = result;<br>		newResult.insert( newResult.end(), Words[i] );<br>		BreakPassword(Words, PasswordLen, newResult);<br>	}<br>}<br><br>int _tmain(int argc, _TCHAR* argv[])<br>{<br>	int passwordLen = 4;<br>	string words(&quot;abcde&quot;);<br>	string result = &quot;&quot;;<br>	<br>	BreakPassword(words, passwordLen, result);<br><br>	return 0;<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 12:21:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/ec/0d/43d46889.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>alic</span>
+  </div>
+  <div class="_2_QraFYR_0">怎么用递归来求？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 具体是指哪道题目？</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 11:56:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/11/a2/33be69a6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>毛毛</span>
+  </div>
+  <div class="_2_QraFYR_0">最笨的方法，一个数组A容纳a~e，四个for循环遍历数组A，拼成一个新一维数组B，多个数组B再拼成二维数组，就是最后结果。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 密码短的话，循环嵌套就可以了。如果密码很长，或者长度是满足某种条件的，就需要递归</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 09:36:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/d9/0a/ce61e397.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>石佳佳_Gemtra</span>
+  </div>
+  <div class="_2_QraFYR_0">对于 n 个元素里取出 m(0&lt;m≤n) 个元素的重复排列数量是 nxnxnx…xn，也就是 n^m。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 00:33:51</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/66/c8/4ef9a5b1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>上善若水</span>
+  </div>
+  <div class="_2_QraFYR_0">python3  一行解决<br>answer, = [f&quot;{a}{b}{c}{d}&quot; for a in &quot;abcde&quot; for b in &quot;abcde&quot; for c in &quot;abcde&quot; for d in &quot;abcde&quot; if f&quot;{a}{b}{c}{d}&quot; in password]</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Python确实很简洁👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-07-06 10:58:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/21/17/dc/8edbd93e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>zhaoey</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题：<br>&#47;** 记录总结果数 *&#47;<br>    private static int total = 0;<br>    <br>    &#47;**<br>     * 暴力密码破解<br>     * @param codes<br>     * @param result<br>     *&#47;<br>    public static void permutation(ArrayList&lt;String&gt; codes, ArrayList&lt;String&gt; result){<br>        &#47;&#47; n = 0<br>        if (result.size() == 4){<br>            total ++;<br>            System.out.println(result);<br>            return;<br>        }<br><br>        for (int i = 0; i &lt; codes.size(); i++) {<br>            &#47;&#47; 取出一个字母添加到排列中<br>            ArrayList&lt;String&gt; newResult = (ArrayList)result.clone();<br>            newResult.add(codes.get(i));<br>            &#47;&#47; 递归调用，继续生成排列<br>            permutation(codes,newResult);<br>        }<br>    }<br><br>    public static void main(String[] args) {<br>        ArrayList&lt;String&gt; codes = new ArrayList&lt;&gt;(Arrays.asList(&quot;a&quot;,&quot;b&quot;,&quot;c&quot;,&quot;d&quot;,&quot;e&quot;));<br>        permutation(codes,new ArrayList&lt;&gt;());<br>        System.out.println(&quot;总结果数：&quot;+total);<br>    }<br># 输出结果<br>[a, a, a, a]<br>[a, a, a, b]<br>....<br>[e, e, e, d]<br>[e, e, e, e]<br>总结果数：625</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-10-08 17:09:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Mr.L</span>
+  </div>
+  <div class="_2_QraFYR_0">class decode:<br>    def __init__(self, secret):<br>        self.secret = secret<br>    def decode_s(self, result):<br>        if result == self.secret:<br>            print(&#39;The secret is:&#39;+result)<br>            return True<br>        elif len(result) &gt;= 4:<br>            return False<br>        code = [&#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39;]<br>        for c in code:<br>            result2 = result + c<br>            if self.decode_s(result2):<br>                return True<br>        return False<br>#test<br>secret = &#39;abde&#39;<br>result = &#39;&#39;<br>decode(secret).decode_s(result)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-07 17:47:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTKIRSxInCiclMszZ21FptlHSHBB2icQSdIbRX2BYdiaEfdicsWxLzqB7h01jhibpLOAu9Hd8SfbZxHBaQg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>渣渣辉</span>
+  </div>
+  <div class="_2_QraFYR_0">static int sum = 0;<br>    public static void compare(char[] t, ArrayList&lt;String&gt; q) {<br>        if(q.size()==4)<br>        {<br>            System.out.println(q);<br>            sum+=1;<br>            return;<br>        }<br><br>        for (int i = 0; i &lt;t.length ; i++) {<br>            q.add(String.valueOf(t[i]));<br>            compare(t,q);<br>            q.remove(q.size()-1);<br>        }<br>    }<br><br><br><br>    public static void main(String[] args) {<br>        char[] t = {&#39;a&#39;,&#39;b&#39;,&#39;c&#39;,&#39;d&#39;,&#39;e&#39;};<br>        compare(t,new ArrayList&lt;String&gt;());<br>        System.out.println(sum);<br>    }</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-18 21:59:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/34/b2/1e593de7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>QFann</span>
+  </div>
+  <div class="_2_QraFYR_0">交作业<br>&#47;**<br>     *<br>     * @param password 密码组成元素<br>     * @param result 密码可能组合<br>     * @param number 密码个数<br>     *&#47;<br>    public static void getPassword(ArrayList&lt;String&gt; password,ArrayList&lt;String&gt; result,int number){<br><br>        if(result.size() &gt;= number ){<br>            System.out.println(result);<br>            return;<br>        }<br><br>        for (int i = 0;i &lt; password.size() ; i++){<br>            ArrayList&lt;String&gt; new_result = (ArrayList&lt;String&gt;) result.clone();<br>            new_result.add(password.get(i));<br>            getPassword(password,new_result,number);<br><br>        }<br><br>    }</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-29 16:35:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/qC39IKuxA4tY32fcGlH3px3gcEO7qPictF6ptVwkJkYn8t49tuibS1aSN982KpG0WUxtZJNcbDWojOMsj6O2wgNA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>suiyueranzly</span>
+  </div>
+  <div class="_2_QraFYR_0">来补作业了，老师<br>-------------------------代码-----------------------------------<br> &#47;**<br>     * 排列<br>     *<br>     * @param passwords 待排列的字符<br>     * @param results   排列的结果<br>     ***&#47;<br>    public void range(ArrayList&lt;String&gt; passwords, ArrayList&lt;String&gt; results) {<br>        &#47;&#47;如果为空则不需要排列<br>        if (passwords.isEmpty()) {<br><br>            String collect = String.join(&quot;&quot;, results);<br><br>            System.out.print(collect + &quot;\t&quot;);<br><br>        }<br><br>        for (int i = 0; i &lt; passwords.size(); i++) {<br><br>            String password = passwords.get(i);<br><br>            ArrayList&lt;String&gt; newResult = (ArrayList&lt;String&gt;) results.clone();<br><br>            ArrayList&lt;String&gt; newPassword = (ArrayList&lt;String&gt;) passwords.clone();<br><br>            newResult.add(password);<br><br>            newPassword.remove(i);<br><br>            range(newPassword,newResult);<br><br>        }<br>    }</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 逻辑清晰</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-07 11:56:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/18/34/c082419c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>风轨</span>
+  </div>
+  <div class="_2_QraFYR_0">public class Crack {<br>    static char[] pwdcs = new char[] { &#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39; };<br>    static String[] crack(int len) {<br>        String[] ps = new String[] { &quot;&quot; };<br>        while (len-- &gt; 0) {<br>            String[] nps = new String[ps.length * pwdcs.length];<br>            int nsbsi = 0;<br>            for (String pwd : ps) {<br>                for (char c : pwdcs) {<br>                    nps[nsbsi++] = pwd + c;<br>                }<br>            }<br>            ps = nps;<br>        }<br>        return ps;<br>    }<br>    <br>    <br>    public static void main(String[] args) {<br>        String[] pwds = crack(4);<br>        for (String pwd : pwds) {<br>            System.out.println(pwd);<br>        }<br>        &#47;**<br>         * 输出结果<br>         * aaaa<br>         * aaab<br>         * aaac<br>         * aaad<br>         * aaae<br>         * aaba<br>         * ....<br>         * 省略517行<br>         * ....<br>         * eeed<br>         * eeee<br>         * <br>         *&#47;<br>    }<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-28 10:10:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/8c/36/6fcd3414.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>der果</span>
+  </div>
+  <div class="_2_QraFYR_0">const crack = (dict, word = &#39;&#39;, num = 4, password = &#39;dcde&#39;) =&gt; {<br>  if (word.length &gt;= num) {<br>    return password === word ? word : undefined<br>  }<br><br>  for (const w of dict) {<br>    const r = crack(dict, word + w)<br>    if (r) {<br>      return r<br>    }<br>  }<br>}<br>const dict = [&#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39;]<br>const p = crack(dict)<br>console.log(p)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2023-03-01 10:37:06</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/24/f4/a1/51e99a88.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>高伸</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;&#47;递归生成，变量是剩余长度及当前序列，当达到密码长度时记录结果<br>void generator(int len,const string&amp; passItems,string prePass,vector&lt;string&gt;&amp; passSet){<br>    if(len==0){<br>        passSet.push_back(prePass);<br>        return;<br>    }<br>    for(int i=0;i&lt;passItems.size();++i){<br>        generator(len-1,passItems,prePass+passItems[i],passSet);<br>    }<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-08-08 21:29:11</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

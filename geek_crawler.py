@@ -83,7 +83,9 @@ def check_filename(file_name):
                     .replace('\b', '') \
                     .replace('\f', '') \
                     .replace('\t', '') \
-                    .replace('\r', '')
+                    .replace('\r', '') \
+                    .replace(' ', '')\
+                    .replace('(0,eval)("x=100")', '')\
 
 
 class Cookie:
@@ -254,7 +256,7 @@ class GeekCrawler:
             "last_learn": 0,
             "learn_status": 0,
             "prev": 0,
-            "size": 20,
+            "size": 200,
             "sort": 1,
             "type": "",
             "with_learn_count": 1
@@ -399,7 +401,7 @@ class GeekCrawler:
         headers["Cookie"] = self.cookie.cookie_string
         params = {
             "cid": cid,
-            "size": 100,
+            "size": 200,
             "prev": 0,
             "order": "earliest",
             "sample": "false"
@@ -537,14 +539,14 @@ if __name__ == "__main__":
     exclude = []
 
     # 需要保存文件的后缀名，尽量选 .md 或者 .html
-    file_type = '.md'
+    file_type = '.html'
 
     # 是否获取评论信息，目前暂时设置为不获取，因为 md 文档中评论显示不太好看，如果需要获取评论的话请设置保存文本为 HTML（样式好看些）
-    get_comments = False  # True
+    get_comments = True  # True
 
     try:
         FINISH_ARTICLES = _load_finish_article()
-        run(cellphone, pwd, exclude=exclude, get_comments=get_comments)
+        run(cellphone, pwd, exclude=exclude,file_type=file_type,get_comments=get_comments)
     except Exception:
         import traceback
         log.error(f"请求过程中出错了，出错信息为：{traceback.format_exc()}")

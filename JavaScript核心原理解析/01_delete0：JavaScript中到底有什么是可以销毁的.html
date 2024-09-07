@@ -1,0 +1,462 @@
+<audio title="01_delete0：JavaScript中到底有什么是可以销毁的" src="https://static001.geekbang.org/resource/audio/86/f5/866ed6d1256f70b5727bea4313c145f5.mp3" controls="controls"></audio> 
+<p>你好，我是周爱民，感谢你来听我的专栏。</p><p>今天是这个系列的第一讲，我将从JavaScript中最不起眼的、使用率最低的一个运算——delete讲起。</p><p>你知道，JavaScript是一门面向对象的语言。它很早就支持了delete运算，这是一个元老级的语言特性。但细追究起来，delete其实是从JavaScript 1.2中才开始有的，与它一同出现的，是对象和数组的字面量语法。</p><p>有趣的是，JavaScript中最具恶名的typeof运算其实是在1.1版本中提供的，比delete运算其实还要早。这里提及typeof这个声名狼藉的运算符，主要是因为delete的操作与类型的识别其实是相关的。</p><h2>习惯中的“引用”</h2><p>早期的JavaScript在推广时，仍然采用传统的数据类型的分类方法，也就是说，它宣称自己同时支持值类型和引用类型的数据，并且，所谓值类型中的字符串是按照引用来赋值和传递引用（而不是传递值）的。这些都是当时“开发人员的概念集”中已经有的、容易理解的知识，不需要特别解释。</p><p>但是<span class="orange">什么是引用类型呢？</span></p><p>在这件事上，JavaScript偷了个懒，它强行定义了“Object和Function就是引用类型”。这样一来，引用类型和值类型就给开发人员讲清楚了，对象和函数呢，也就可以理解了：它们按引用来传递和使用。</p><!-- [[[read_end]]] --><p>绝大多数情况下，这样解释起来是行得通的。但是到了delete运算这里，就不行。</p><p>因为这样一来，<code>delete 0</code>就是删除一个值，而<code>delete x</code>就既可能是删除一个值，也可能是删除一个引用。然而，当时JavaScript又同时约定：那些在global对象上声明的属性，就“等同于”全局变量。于是，这就带来了第三个问题：<code>delete x</code>还可能是删除一个global对象上的属性。而它在执行这个操作的时候，看起来却像是一个全局变量（的名字）。</p><p>这中间有哪些细节的区别呢？</p><p>delete这个运算的表面意思，是该运算试图销毁某种东西。然而，<code>delete 0</code>中的0是一个具体的、字面量表示的“值”。一个字面量值“0”如何在现实世界中销毁呢？假定它销毁了，那是不是说，在这个语言当前的运行环境中，就不能使用0这个值了呢？显然，这不合理。</p><p>所以，JavaScript认为“<strong>所有删除值的delete就直接返回true</strong>”，表明该行为过程中没有异常。很不幸，JavaScript 1.2的时代并没有结构化异常处理（即try…catch语句）。所以，通过函数调用中返回true来表明“没有异常”，其实是很常规的做法。</p><p>然而，返回值只表明执行过程中没有异常，但实际的执行行为是“什么也没发生”。你显然不可能真的将“0”从执行系统中清理出去。</p><p>那么接下来，就还剩下删除变量和删除属性。由于全局变量实际上是通过全局对象的属性来实现的，因此删除变量也就存在识别这两种行为的必要性。例如：</p><pre><code>delete x
+</code></pre><p>这行代码究竟是在删除什么呢？出于JavaScript是动态语言这项特性，从根本上来说，我们是没有办法在语法分析期来判断<code>x</code>的性质的。所以现在，需要有一种方法在运行期来标识<code>x</code>的性质，以便进一步地处理它。</p><p>这就导致了一种新的“引用”类型呼之欲出。</p><h2>到底在删除什么？</h2><p>探索工作往往如此，是所谓“进五退一”，甚至是“进五退四”。在今后的专栏文章中，你往往会看到，我在碰触到一种新东西的时候会竭力向前，但随后又后退好几步，再来讨论一些更基础层面的东西。这是因为如果不把这些基础概念说得清楚明白，那么往前冲的那几步常常就被带偏了方向。</p><p>一如现在这个问题：<span class="orange"><code>delete 0</code>到底是在删除什么？</span></p><p>对于一门编译型语言来说，所谓“0”，就是上面所述的一个值，它可以是基础值（Primitive values），也可以是数值类型。但如果将这个问题上升到编译之前的、所谓语法分析的阶段，那么“0”就会被称为一个记号（Tokens）。一个记号是没有语义的，记号既可以是语言能识别的，也可以是语言不能识别的。唯有把这二者同时纳入语言范畴，那么这个语言才能识别所谓的“语法错误”。</p><p>delete不仅仅是要操作0或x这样的单个记号或标识符（例如变量）。因为这个语法实际起作用的是一个对象的属性，也就是“删除对象的成员”。那么它真正需要的语法其实是：</p><pre><code>delete obj.x
+</code></pre><p>只不过因为全局对象的成员可以用全局变量的形式来存取，所以它才有了</p><pre><code>delete x
+</code></pre><p>这样的语法语义而已。所以，这正好将你之前所认识的倒转过来，是删除x这个成员，而不是删除x这个值。不过终归有一点是没错的：既然没办法表达异常，而delete 0又不产生异常，那么它自然就该返回true。</p><p>然而，如果你理解了<code>delete obj.x</code>，那么就一定会想到：<code>obj.x</code>既不是之前说过的引用类型，也不是之前说过的值类型，它与<code>typeof(x)</code>识别的所有类型都无关。因为，它是一个表达式。</p><p>所以，delete这个操作的正式语法设计并不是“删除某个东西”，而是“<span class="orange">删除一个表达式的结果</span>”：</p><pre><code>delete UnaryExpression
+</code></pre><h2>表达式的结果是什么？</h2><p>在JavaScript中表达式是一个很独特的东西，所有一切表达式运算的终极目的都是为了得到一个值，例如字符串。然后再用另外一些操作将这个值输出出来，例如变成网页中的一个元素（element）。这是JavaScript语言创生的原力，也是它的基础设计。也只是因为有了这种设计，它才变得既像面向对象的，又像函数式语言的样子。</p><p>表达式的执行特性，以及表达式与语句的关系等等细节，回头我放在第二阶段的内容中讲给你听。现在我们只需要关注一个要点，表达式计算的结果到底是什么？因为就像上面所说的，这个结果，才是<code>delete</code>这个操作要删除的东西。</p><p>在JavaScript中，有两个东西可以被执行并存在执行结果（Result），包括语句和表达式。比如你用<code>eval()</code>来执行一个字符串，那么实际上，你执行的是一个语句，并返回了语句的值；而如果你使用一对括号来强制一个表达式执行，那么这个括号运算得到的，就是这个表达式的值。</p><p>表达式的值，在ECMAScript的规范中，称为“引用”。</p><p>这是一种称为“规范类型”的东西。</p><h2>规范中的“引用”</h2><p>实际上这个概念出现得也很早。从JavaScript 1.3开始，ECMAScript规范就在语言定义的层面，正式地将上述的天坑补起来，推出了上面说到的这个“（真正的）引用类型”。</p><p>但是，由于这个时候规范的影响力在开发人员中并不那么大，所以开发人员还是习惯性地将对象和函数称为引用，而其它类型就称为值，并且继续按照传统的理解来解释JavaScript中对数据的处理。</p><p>这种情况下，一个引用只是在语法层面上表达“它是对某种语法元素的引用”，而与在执行层面的值处理或引用处理没关系。所以，下面这行简短的语句：</p><pre><code>delete 0
+</code></pre><p>实际上是在说：JavaScript将0视为一个表达式，并尝试删除它的求值结果。</p><p>所以，现在这里的0，其实不是值（Value）类型的数据，而是一个表达式运算的结果（Result）。而在进一步的删除操作之前，JavaScript需要检测这个Result的类型：</p><ul>
+<li>如果它是值，则按照传统的JavaScript的约定返回true；</li>
+<li>如果它是一个引用，那么对该引用进行分析，以决定如何操作。</li>
+</ul><p>这个检测过程说明，ECMAScript约定：任何表达式计算的结果（Result）要么是一个值，要么是一个引用。并且需要留意的是，在这个描述中，所谓对象，其实也是值。准确地说，是“非引用类型”。例如：</p><pre><code>delete {}
+</code></pre><p>那么显然，这里要删除的一对大括号是表示一个字面量的对象，当它被作为表达式执行的时候，结果也是一个值。这也是我常常将所有这类表达式称为“单值表达式”的原因，这里并没有所谓的“引用”。</p><p>你可以像下面这样，非常细致而准确地解释这一行代码：<span class="orange">单值表达式的运算结果返回那个“对象字面量”的单值</span>。然后，<code>delete</code>运算发现它的操作数是“值/非引用类型”，就直接返回了true。</p><p>所以，什么也没有发生。</p><h2>还会发生什么</h2><p>那么到底还会发生什么呢？</p><p>在JavaScript的内部，所谓“引用”是可以转换为“值”，以便参与值运算的。因为表达式的本质是求值运算，所以引用是不能直接作为最终求值的操作数的。这依赖于一个非常核心的、称为“GetValue()”的内部操作。所谓内部操作，也称为内部抽象操作（internal abstract operations），是ECMAScript描述一个符合规范的引擎在具体实现时应当处理的那些行为。</p><p><code>GetValue()</code>是从一个引用中取出值来的行为。这有什么用呢？比如说下面这行代码：</p><pre><code>x = x
+</code></pre><p>我们上面说过，所谓x其实是一个引用。上面的表达式其实是一个赋值表达式，那么“引用x赋值给引用x”有什么意义呢？其实这在语法层面来解释是非常直接的：</p><blockquote>
+<p>所有赋值操作的含义，是将右边的“值”，赋给左边用于包含该值的“引用”。</p>
+</blockquote><p>那么上面的<code>x=x</code>，其实就是被翻译成：</p><pre><code>x = GetValue(x)
+</code></pre><p>来执行的。而JavaScript识别两个x的不同的方法，就称为“手性”，即是所谓“左手端(<em>lhs, left hand side</em>)”和“右手端(<em>rhs</em>)”。它本来是用来描述自然语言的语法中，一个修饰词应该是放在它的主体的前面或是后面的。而在程序设计语言中，它用来说明一个记号（Token）是放在了赋值符号（例如“=”号）的左边或是右边。作为一个简单的结论，区别上例中的两个x的方法就是：</p><blockquote>
+<p>如果x放在左边作为lhs，那么它是引用；如果放在右边作为rhs，那么就是值。</p>
+</blockquote><p>所以<code>x=x</code>的语义并不是“x赋给x”，而是“<strong>把值x赋给引用x</strong>”。</p><p>所以，“delete x”归根到底，是在<strong>删除一个表达式的、引用类型的结果（Result）</strong>，而不是在<strong>删除x表达式</strong>，或者这个<strong>删除表达式的值（Value）</strong>。</p><p>是的，在JavaScript中的<code>delete</code>是一个很罕见的、能直接操作“引用”的语法元素。由于这里的“引用”是在ECMAScript规范层面的概念，因此在JavaScript语言中能操作它的语法元素其实非常少。</p><p>然而很不幸，delete就是其中之一。</p><h2>告诉我这些有什么用</h2><p>等等，我想你一定会问了：神啊，让我知道这些究竟有什么用呢？我永远也不会去执行<code>delete 0</code>这样的操作啊！</p><p>是的。但是我接下来要告诉你的事实是：<code>obj.x</code>也是一个引用。对象属性存取是JavaScript的面向对象的基本操作之一，所以本质上我们早就在使用“引用”这个东西了，只不过它太习以为常，所以大家都视而不见。</p><p>“属性存取（"."运算符）”返回一个关于“x”的引用，然后它可以作为下一个操作符（例如函数调用运算“()”）的左手端来使用，这才有了著名的<span class="orange">“对象方法调用”运算</span>：</p><pre><code>obj.x()
+</code></pre><p>因为在对象方法调用的时候，函数_x()_是来自于<code>obj.x</code>这个引用的，所以这个引用将<code>obj</code>这个对象传递给x()，这才会让函数_x()_内部通过this来访问到obj。</p><p>根本上来说，如果<code>obj.x</code>只是值，或者它作为右手端，那么它就不能“携带”obj这个对象，也就完成不了后续的方法调用操作。</p><blockquote>
+<p>对象存取 + 函数调用 = 方法调用</p>
+</blockquote><p>这是JavaScript通过连续表达式运算来实现新的语义/语法的经典示例。</p><p>而所谓“连续运算”其实是函数式运算范式的基本原则。也就是说，<code>obj.x()</code>是在JavaScript中集合了“引用规范类型操作”“函数式”“面向对象”和“动态语言”等多种特性于一体的一个简单语法。</p><p>而它对语言的基础特性的依赖，就在于：</p><ul>
+<li><code>delete 0</code>中的这个<code>0</code>是一个表达式求值；</li>
+<li><code>delete x</code>中的<code>x</code>是一个引用；</li>
+<li><code>delete obj.x</code>中<code>obj.x</code>是一组表达式连续运算的结果（Result/引用）；</li>
+</ul><p>于是，我们现在可以解释，当x是全局对象global的属性时，所谓<code>delete x</code>其实只需要返回<code>global.x</code>这个引用就可以了。而当它不是全局对象global的属性时，那么就需要从当前环境中找到一个名为<code>x</code>的引用。找到这两种不同的引用的过程，称为ResolveBinding；而这两种不同的<code>x</code>，称为不同环境下绑定的标识符/名字。</p><h2>知识回顾</h2><p>下一讲我将给你讲述的，就是这个名字从声明到发现的全过程。至于现在，这一讲就要告一段落了。今天的内容中，有一些知识点我来带你回顾一下。</p><ul>
+<li>delete 运算符尝试删除值数据时，会返回true，用于表示没有错误（Error）。</li>
+<li>delete 0的本质是删除一个表达式的值（Result）。</li>
+<li>delete x与上述的区别只在于Result是一个引用（Reference）。</li>
+<li>delete其实只能删除一种引用，即对象的成员（Property）。</li>
+</ul><p>所以，只有在<code>delete x</code>等值于<code>delete obj.x</code>时delete才会有执行意义。例如<code>with (obj) ...</code>语句中的delete x，以及全局属性global.x。</p><h2>思考题</h2><ul>
+<li>delete x中，如果x根本不存在，会发生什么？</li>
+<li>delete object.x中，如果x是只读的，会发生什么？</li>
+</ul><p>希望你喜欢我的分享。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/6f/10/bfbf81dc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>海绵薇薇</span>
+  </div>
+  <div class="_2_QraFYR_0">老师好，我又来了:-)<br><br>1.<br><br>delete 0<br><br>这里的0是一个值（就当前情况），而不是引用是吗？<br><br>2.<br><br>delete x (x不存在)<br><br>返回true<br><br>x 表达式返回的应该是一个引用，并且环境中并没有表示这个引用不能被删除，这个理解对吗？<br><br>但是文章中有提到delete只能删除属性这一种引用，糊涂了，估计这里的理解还是有问题。<br><br>3.<br><br>delete null 返回true<br><br>delete undefined 返回false 为啥啊？不都是值吗？<br><br>4. 还想知道昨天提问的1和2两条是不是漏洞百出啊，就想知道个结果😁。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Oh~ 哈哈，你是说昨天有一个问题我只回复了3，没有回复1和2两条吗？那两条，是全对的，所以……嗯嗯，我只是没有回复确认而已。你对ECMAScript中的“引用规范类型”的使用场景和过程推演都是正确的。<br><br>关于今天的前3个问题，1是正确的。<br><br>2你也是对的。但是有一点，这个x的确会得到一个引用，称为（UnresolvableReference）。而这一段逻辑在ECMAScript里面写的是“if IsUnresolvableReference, then return true”。也就是说，ECMAScript约定对于这种情况就是这么返回的，这属于规范约定（并且如果在这时发现是严格模式，就抛异常了）。关于这里，你可以看一看：<br>https:&#47;&#47;tc39.es&#47;ecma262&#47;#sec-delete-operator-runtime-semantics-evaluation<br><br>不过问题3，你倒是提到了一个“少有人知”问题，哈哈，这个问题我是漏讲了，而且其实还挺有趣、挺关键的。<br><br>是这样，早期的JavaScript中，undefined是一个特殊值，是在运行期中通过void运算，或者不返回值的函数，又或者一个声明了但未赋值的变量，等等类似这样的情况来“计算得到”的。所以在JavaScript的早期版本中，你没有办法直接判断“undefined是undefined”，例如无法写出“x === undefined”这样的代码，而你只能写类似“typeof(x) ===&#39;undefined&#39;”这样的代码。<br><br>后来（其实也没有太久），规范就约定把undefined作为可以缺省访问的名字，类似于null。但是这个时候就带来了一个矛盾，因为这个undefined很重要，早期的绝大多数框架或引擎都把它作为一个“全局名字”给声明了。也就是说，ECMAScript现在既没有办法将它规范成一个keyword，也没有办法处理成保留字等等，它看起来像null，但又没有办法在规范层面强制它。所以……ECMAScript就搞了一个“奇招”：<br><br>&gt; 我们把undefined声明成全局的属性，怎么样？！<br><br>嗯嗯，很好。所以你看，现在的引擎上面undefined看起来长得跟null值差不多，而且在ECMAScript规范中它们都还是平级的（是原始值），而且它们的作用也很接近，最后他们都还是从最初的JavaScript 1.x中就存在的概念，但是undefined&#47;null两者却在实现上完全不同：undefined是一个全局属性，而null是一个关键字。<br><br>由于undefined是全局属性，所以`delete undefined`其实就是`delete global.undefined`，是删除引用，而不是删除值。而这个属性是只读的，所以就返回false了。<br><br>例如你可以试试下面的代码：<br><br>&gt; Object.getOwnPropertyDescriptor(global, &#39;undefined&#39;)<br>{ value: undefined,<br>  writable: false,<br>  enumerable: false,<br>  configurable: false }</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-19 23:30:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/6f/10/bfbf81dc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>海绵薇薇</span>
+  </div>
+  <div class="_2_QraFYR_0">hello 老师好，感谢老师之前的回答：）<br>突然想到，访问不存在的变量x报ReferenceError错误，其实是对x表达式的的Result引用做getValue的时候报的错误，然后为啥typeof x和delete x不报错，因为这两个操作没有求值。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 强烈点赞！你这个就属于一通百通的例子。弄明白了Result用来做引用和值的方法&#47;原理，一些具体现象就迎刃而解了！<br><br>^^.</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-22 08:50:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/18/65/35361f02.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>潇潇雨歇</span>
+  </div>
+  <div class="_2_QraFYR_0">1、如果x根本不存在，delete x什么也不做，返回true<br>2、如果x只读，delete object.x不能删除掉x属性，返回false；如果在严格模式下，会报错：TypeError: Cannot delete property &#39;c&#39;</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞的！+1<br><br>其实第1个问题的潜在问题是：这种情况下，x是什么呢？它显然是语法可以识别的东西，但如果这样，在语法上它是什么，且在执行环境中它又是什么？<br><br>而第二个问题的答案，其实也会回到第一个问题上。如果是在严格模式上，第一个问题的答案是什么？并且，为什么它们不同？<br><br>所以，呵呵，其实细一点的看，这两个问题还可以挖更多的呢。^^.</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-11 19:44:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/18/65/35361f02.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>潇潇雨歇</span>
+  </div>
+  <div class="_2_QraFYR_0">关于delete的知识，大家可以看下MDN的讲解：https:&#47;&#47;developer.mozilla.org&#47;zh-CN&#47;docs&#47;Web&#47;JavaScript&#47;Reference&#47;Operators&#47;delete<br>以及这篇深入delete博客：http:&#47;&#47;perfectionkills.com&#47;understanding-delete&#47;</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 谢谢 @潇潇雨歇</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-11 21:11:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83ep7yaY0ibpBicMhk0gr01lZrn2Sj9SJU0OdFMWWZbicx1JFVEycKkw3xMoFFs5STPoXhTp823nPtkJjw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>SOneDiGo</span>
+  </div>
+  <div class="_2_QraFYR_0">想问下老师如何理解用delete处理array element实际上在底层是如何操作的?<br>例如：array = [1,2,&#39;1&#39;]<br>为什么 delete array[2] 后数组就成了[1,2,undefined&#47;empty]?</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 对于array来说，你理解为一个普通对象就可以了，只是一些array原型上的方法能帮助你处理array.length这个属性而已。<br>有多少个有效的element，那么就有多少个同名的（数字下标的）属性；而array.length记录着这个最大值。除了这一点，没有任何与其它对象不同。<br>所以你用array.pop()或array.push()等操作，甚至直接使用array[i]都可以影响到array.length这个属性——因为这些操作内部都会处理它。但是，你用delete去根本不会处理这个属性——因为delete是把array[i]当一个一般属性处理的，根本不知道array.length的存在。<br><br>例如：<br>```<br>&gt; x = new Array(8)<br>&gt; x.length<br>8<br>&gt; x[x.length] = 8 &#47;&#47; add to last<br>&gt; x.length<br>9<br>&gt; x.push(10)  &#47;&#47; push<br>10<br><br>&gt; x.pop() &#47;&#47; pop<br>&gt; x.length<br>9<br><br>&gt; delete x[8]<br>true<br>&gt; x.length<br>9<br>```<br><br>至于删除delete array[2]，则array[2]位置上是undefined，这个与delete操作无关。而是因为你“读取一个不存在的属性，它的值就是undefined”。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-22 06:16:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/6f/10/bfbf81dc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>海绵薇薇</span>
+  </div>
+  <div class="_2_QraFYR_0">感谢老师指点😁<br><br>ref：语法上的引用<br><br>我又看了几遍文章并根据提供的连接，得出如下结论：<br><br>1.<br><br>var x<br><br>x = 0<br>console.log(x)<br><br>x 表达式返回的是一个ref（{referencedName: &#39;x&#39;, base: Environment Record}），然后计算值getValue(ref)得到具体的值，具体的值会分为传统意义上的基本类型和引用类型<br><br>2. 衍生出下面的猜想<br><br>var obj<br><br>obj = {a: 1}<br><br>console.log(obj.a)<br><br>obj.a 也是一个ref（{referencedName: &#39;a&#39;, base: obj}），然后计算值的时候getValue(ref)得到具体的值1<br><br>3. 关于表达式的结果Result的疑问。<br><br>文中说：表达式的值，在 ECMAScript 的规范中，称为“引用”。（表达式的结果（Result）是引用。）<br><br>但是后文说Result可能是引用&#47;值。<br><br>这里的值我不能很好的理解。值指的是另一种引用的格式吗？例如链接文档中提到的base其实有很多种值 undefined, Object, a Boolean, a String, a Symbol, a Number。值指的是{base: 0}这种引用吗？如果不是这样的话base的Boolean等基本值类型有啥用啊？<br><br>还是说 0 这个表达式的Result就是0这个值？<br><br>期待老师的指点😁</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 关于3，我一般是用Result来表达它是表达式执行结果的“未决状态”。就是执行出结果来了，但没确定是作为lrs还是rhs，所以这种情况下，它就是未决的。<br><br>当你确定了一个Result用作lrs，那么它就是引用；如果确定它用作rhs，那么它就是值（将由引擎隐式地调用`GetValue()`）。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-18 22:04:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/18/65/35361f02.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>潇潇雨歇</span>
+  </div>
+  <div class="_2_QraFYR_0">看的第三遍。还是要去看看规范加深理解。<br>如果x根本不存在，delete x操作时，x首先是一个表达式，语义上是一个引用，然后去寻找该引用的result，但是x根本不存在，是找不到的。也就做不了什么，返回ture。<br>如果obj.x是只读的或者不可配置的，表示他是不能删除的，但是他是实实在在的引用，是可以求值得到Result的，所以返回false。表示不能删除。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: ：）<br>+1</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-16 10:17:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/b9/5e/a8f6f7db.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Ming</span>
+  </div>
+  <div class="_2_QraFYR_0">乍一读，云里雾里。翻了文档并做测试，总结如下：<br><br>delete 操作符用于删除对象的属性，它接收一个表达式，该表达式应返回对象属性的引用。<br><br>1. 如果表达式返回的结果是引用：<br>当该引用是 let 或 const 定义的，delete 执行结果总是 false；<br>当引用作为对象的属性不存在时，delete 对象的属性，执行结果为 true，表示未处理；<br>当该引用为 window 对象的属性且是 var 定义的，delete window 对象的属性，执行结果为 false，表示处理失败（获取属性描述符时为不可配置）；<br>如果在全局环境下显示定义一个属性描述符为可配置的全局属性，执行 delete，结果是 true，表示操作成功；<br>当该引用为非 window 对象的属性且是 var 定义的，delete 非 window 对象的属性，执行结果为 true，表示处理成功（获取属性描述符时为可配置）。<br><br>2. 如果表达式返回的结果是值，如数字、字符串等，delete 执行结果为 true，表示未处理。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 其实这一讲的核心是关于“引用&#47;值”在ECMAScript规范类型中的使用与理解，而不是（不仅仅是）delete的使用。所以呢，解释delete这个操作的种种现象，最好是在ECMAScript规范所讨论的语言模型中来叙述，这样更容易讲得清楚。<br><br>比如说，`x`如果是一个属性（包括是global的属性），那么`delete x`的是否成功就取决于属性描述符，以及属性存取的过程（是否在严格模式中等等）。这样就Ok了，而不需要细致地列举每一种情况。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-11 21:31:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/cf/14/384258ba.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Wiggle Wiggle</span>
+  </div>
+  <div class="_2_QraFYR_0">即便 obj.x 是一个 function，当 obj.x 作为右手端时，也会被 GetValue 方法抽取出值来，而这个“值”并不是直觉上的数字或字符串。这里是有恍然大悟的感觉的，“值”和“引用”应当从严格的规范定义层面理解，而不能从直觉上来理解，只要满足定义，那就是“值”&#47;“引用”。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞的！就是这样！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-12 17:57:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/22/d6/9378f4d5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>隔夜果酱</span>
+  </div>
+  <div class="_2_QraFYR_0">既然delete这么鸡肋,只能删除对象的成员.<br>那么后来的版本中为什么不进行改进呢?<br>比如限定其只能用delete obj.x这种语法格式.<br>或者加入trycatch,对删除value的操作直接报错呢?</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这个问题就牵扯得大了。<br><br>最早javascript中是没有明确、显式的global这个对象的，在宿主环境（例如浏览器中）你可以用window.x去访问它，这算是宿主在实现引擎的时候的约定。但是，仅只从引擎的角度上来说，既没有window，也没有global，更没有Global。所以，全局的变量虽然是作为全局属性名存在着，却没有办法写成global.x这样的引用。<br><br>而global这个全局名字，直到现在在ECMAScript中都还是个没被规范的东西。TC39有一个提案（https:&#47;&#47;github.com&#47;tc39&#47;proposal-global）专门来定义它，现在到了stage3，应该不会被否决了。但即使如此，这个东东也不叫global，而改名成了globalThis。——原本提案阶段是叫global的，但应用中有问题，所以就改了。<br><br>关于globalThis这个说法，又得是一段历史了。因为早期的JavaScript约定普通函数在“不作为对象方法调用”的时候，this值默认指向这个全局的global。所以，这也就是著名的代码“global = (new Function(&#39;return this&#39;)()”，或“global = Function(&#39;return this&#39;)()”的由来。<br><br>^^.</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-11 21:05:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/2f/1f/f95bd8c9.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>余文郁</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，JS是基于对象的语言，不是面象对象的语言吧，感觉第二段这有点不妥，虽然ES6增加了class语法，但只是原型的语法糖而已<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 在后面我会再着重地讲到JavaScript对面向对象的理解。<br><br>如今我们对OOP的理解其实添加了太多应用的色彩。事实上，JavaScript对OOP的理解是很精彩、很学术，以及很完整的。不过这些内容大概要到第11讲之后了。<br><br>至于“面向对象”还是“基于对象”，其实JavaScript 1.0是有类而无继承的，而JavaScript 1.1才开始使用原型来实现继承，这个时候它又抛弃了（严格意义上的）类。<br><br>当然，上面看起来有点儿绕着你的问题在讲。所以，如果再确切地、准确无误地回复你的问题，那么应该是说：所谓面向对象的三个原则（封装、继承与多态），在严格意义上，后两者是多余的。所以不必过度去强调这些性质之于面向对象的重要性。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-11 21:50:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/ff/1f/4f927519.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>渭河</span>
+  </div>
+  <div class="_2_QraFYR_0">这句话要怎么理解呀 <br>所谓值类型中的字符串是按照引用来赋值和传递引用（而不是传递值）的</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这就是“传统中的‘引用’”用来解释这类现象的时候出现的麻烦。很典型的一个例子，话表达的是正确的，内容是正确的，说法也正确，就是特别特别难于理解。<br><br>首先，“值类型中的字符串”是指什么呢？是指typeof(x) === &#39;string&#39;中的那个`x`。在传统的javaScript概念中，这样的x是值类型，而不是引用类型。<br><br>那么值“该怎么赋值和传递”呢？如果x的值是1，那么y = x的话，就是把1这个值“抄写”到y里面去。这是“正常的值”的处理方法，但是如果“字符串值”也这么处理，就完蛋了，因为字符串可能无数多个字符，那么当`y = x`按照“正常的值处理方法”来实现的话，这个“值的复制”的开销就受不了。<br><br>所以：<br>1. “值类型中的字符串”，是指照<br>2. “引用来赋值和传递引用”的；且，<br>3. 它是只传递引用（而不是传递值）的。<br><br>如上。只是说起来特别麻烦而已。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-21 16:04:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/ee/44/26ac883e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>桃翁</span>
+  </div>
+  <div class="_2_QraFYR_0">我突然 明白了 (obj.func=obj.func)()这种方式会丢掉obj里面的this，因为等号右边的obj.func是值，所以得到的仅仅是个函数这个值，而不是引用。 老师我理解得是对的吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Yes！+5</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-19 01:21:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/57/2c/b0793828.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ssala</span>
+  </div>
+  <div class="_2_QraFYR_0">关于delete，搜集了一些资料，结合代码测试，我目前是这样理解的：delete为一元操作符，其操作数为一个表达式，如果表达式的求值结果是一个值，那么`delete 值`直接返回true，表示该操作没有异常。如果表达式求值结果是一个引用，那么`delete 引用`则会有如下表现，如果引用是可删除的，则直接删除该引用，返回true，否则返回false。<br><br>关于属性&#47;property的可删除特性，参照这篇文章：http:&#47;&#47;perfectionkills.com&#47;understanding-delete&#47;<br><br>关于引用和值的理解，我用段代码说明，如下：<br>```<br>var x = {a: 20}<br>```<br>代码中，x是引用，它&quot;指向&quot;执行系统中{a: 20}的一个对象，而{2: 20}则是值，它对应执行系统中内存上的一块区域。x.a是引用，它&quot;指向&quot;执行系统中内存20这个值，而20是值，它也对应执行系统中内存上的一块区域。因此：<br>```<br>delete x &#47;&#47; `false` ，x为表达式，求值结果为global.x，且该属性是用var来声明的，其特性是不可删除<br><br>delete 20 &#47;&#47; `true`，当执行系统遇到20字面量时，认为其为表达式，对其求值以后得到20这个值，delete 值返回true<br><br>delete x.a &#47;&#47; `true` x.a 为引用，且可以删除<br>```<br><br>另外关于delete x，若x不存在，我的解释是：x为表达式，由于未定义，表达式求值结果是未定义的，但是虽然未定义，但求值结果仍然是值，而delete 值就返回true。不知这种解释是否正确？<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Yes. 对的。<br><br>其实只要理解到`delete {}`中的对象字面量其实是“值”，那么就一通百通了。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-14 11:12:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1b/b8/79/a4dbe9ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>blueBean</span>
+  </div>
+  <div class="_2_QraFYR_0">表达式的值，在 ECMAScript 的规范中称为“引用”。<br>ECMAScript 约定：任何表达式计算的结果（Result）要么是一个值，要么是一个引用。<br>上面这两句话矛盾了吧<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 并不是矛盾，只是这里解释起来比较别扭。因为“Value”和“Result”，以及“值和引用”在上下文中都存在多种含义。<br><br><br>【第一句】<br>```<br>表达式的值，在 ECMAScript 的规范中称为“引用”。<br>```<br>这一句讲的时候，上下文中是将表达式与语句放在一起讨论的。原文是“（你）执行的是一个语句，那么……；而如果你使用……表达式执行，那么……”。前者是语句的值，后者表达式的值。——它们都分别是“一个称为结果（Result）的东西”。<br><br>这样对比来讲的时候，我向来会解释成：<br><br>&gt; 语句和表达式都是有值的，语句的值是“完成（规范类型）”，而表达式的值是“引用（规范类型）”。<br><br>这个区别在后面的章节里面还会有，而且也还会这么讲。主要是这样讲起来清晰、简单，分别起来也很容易。——但是，这样讲并不“准确”。因为事实上表达式的“结果（Result）”也可以是完成类型，而语句的结果还包括一个所谓的“Empty”值。<br><br>在第一章中，要把所有关系到的概念讲清楚是很难的，真要那样讲概念，大概也让人读不下去。所以这里说的是一个简单的区分，也就是如何区别“表达式的值 vs 语句的值”。<br><br><br>【第二句】<br>```<br>ECMAScript 约定：任何表达式计算的结果（Result）要么是一个值，要么是一个引用。<br>```<br>这一句是完整而正确的。但是如同上面的讨论中所说的，它其实也并不“绝对完整”，因为有一部分表达式事实上是在返回“完成（规范类型）”。只不过当这种情况发生时，后续的计算过程会从“完成（规范类型）”中直接取值，因此在计算过程中感觉不到“非值”的结果（Result），这是一种中间状态。<br><br>总之，这些内容在后续的章节中还会介绍。会逐渐更新和补全。第一章，以及前几章的内容，要通贯起来看，有很多地方的写法或者讲法，是不得以而（暂且）为之的。关于这一点，我在“加餐（选学的章节）”里面说过，也就可以先略过去，看不明白，或者看起来矛盾的地方，后面再读到的时候，就了解了。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-21 20:06:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/0b/9f/788b964e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>仰望星空</span>
+  </div>
+  <div class="_2_QraFYR_0">老师的英语发音delete偏差的有点多</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这个这个，惭愧呀惭愧~ <br><br>我的口语不是一点半点的糟糕（当然，其实不仅仅只是口语糟糕）。我尽量……注意……后面的课程~ 多谢多谢~<br><br>惭愧呀~<br><br>:(~</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-11 19:54:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/60/12/268826e6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Marvin</span>
+  </div>
+  <div class="_2_QraFYR_0">关于文中delete x的解释，我有一点疑问。<br>文中是这样说的：<br>于是，我们现在可以解释，当 x 是全局对象 global 的属性时，所谓delete x其实只需要返回global.x这个引用就可以了。而当它不是全局对象 global 的属性时，那么就需要从当前环境中找到一个名为x的引用。找到这两种不同的引用的过程，称为 ResolveBinding；而这两种不同的x，称为不同环境下绑定的标识符 &#47; 名字。<br>如果把x解释为引用，而且先寻找global.x，当不是全局属性再寻找当前环境的话：<br>```<br>window.apple = 10;<br>let apple = 10;<br>delete apple; &#47;&#47; false<br>```<br>上面的代码应该先去全局寻找apple引用，那么删除就成功了，应该返回true才对，而不是false。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 哦。确实是这样的。<br><br>但是这个问题与delete运算符无关，这个取决于`delete`将`apple`作为一个名字被&quot;发现(resolving)&quot;的过程。<br><br>由于全局环境的作用域是由global对象和一个词法环境（共同）构成的，所以它查找上面这个名字的顺序是先词法声明，然后才是global对象上的属性的。这个部分请参见ECMAScript：<br>https:&#47;&#47;tc39.es&#47;ecma262&#47;#sec-global-environment-records-getbindingvalue-n-s<br><br>&gt; If DclRec.HasBinding then return DclRec.GetBindingValue();<br>&gt; else return ObjRec.GetBindingValue()</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 15:51:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/76/c7/74d54fb5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Mr_Liu</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题1：delete x  x不存在返回的是true<br>2:  删除会返回false,严格模式会报错<br>第一遍听感觉有些云里雾里的感觉，又听了一遍加实践。但是有一点不理解或者不知道理解的对不对，希望老师解答一下<br>问题一：<br>例如var a = &#39;123&#39;  delete a 返回的是false , <br>再次输入a 得到结果依然是 ‘123’，<br>这是说明delete  没有起作用，其没有起作用的原因是因为 var a = &#39;123&#39; 中的a 是基本数据类型，不是引用类型，所以删除a 元素失败，借此印证了所讲的delete 删除的是表达式或者引用类型的结果。印证这句话的另一个例子是:<br>var obj = {<br>   a: &#39;123&#39;<br>},<br>var b = obj.a<br>delete b  返回false , 因为b = obj.a  属于一个赋值语句，b 也是个基本数据类型，所以也不起作用<br>那么修改成<br>var obj = {<br>a: &#39;123&#39;,<br>b: {<br>	name: &#39;123&#39;<br>}<br>}<br>var val = obj.b<br>deletet val 返回的依然是false 后来会读了一下，有这样一句话：delete 其实只能删除一种引用，即对象的成员（Property）<br>那么 delete x 还有什么存在的意义么。<br><br>问题二：<br>接着我使用delete obj.a   返回的是true ,再次输入 obj.a   返回的就是undefined<br>但如果我使用<br>var val = obj.b<br>delete obj.b  返回的是true<br>然后打印 obj.b  为undefined;   val 为 {name: &#39;123&#39;}<br>，那老师的那句delete实际上是删除一个表达式的、引用类型的结果（Result），而不是在删除 x 表达式，或者这个删除表达式的值（Value）。是否可以理解为实际是是删除一直引用呢。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 问题1中，你的思考方向错了。`delete a`不起作用的原因是`var`声明导致的，而不是因为`a 是基本数据类型`。举例来说，<br><br>`with (x = {a: 100}) delete a;` <br><br>这个例子的结果中x.a是不存在的，但`a 也是基本数据类型`呀。所以是无关的。<br><br>“delete x 还有什么存在的意义么”这个问题我之前回复过另一个留言，你找找。<br><br>关于问题二，关键在于你所理解的“引用与值”，跟JavaScript内部所理解的“引用与值”是不一样的。也正是因此，我在这一讲的一开始用大量文字讨论了二者的区别。简单地来说，如果有表达式`x = x`，那么同一个变量`x`，在上述表达式中，左侧的这个是它的引用，左侧的是它的值。如果放在代码中看：<br><br>x = 5; &#47;&#47; 在JavaScript语言中，&#39;5&#39;是“值类型”<br>x = x; &#47;&#47; 在ECMAScript规范中，左侧是“引用x”，右侧是“值x”。<br><br>我一直用“结果（Result）”来强调表达式“表达式计算的结果”，就是因为对于`x = x`来说，左侧和右侧都是表达式，左侧的结果是“lhs&#47;引用（reference）”，而右侧的结果是“rhs&#47;值（value）”。<br><br>所以所谓“结果（Result）”，在不明确它的手性或用处之前，是二个意思都包含的。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-12 14:50:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/18/11/f1f37801.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>James</span>
+  </div>
+  <div class="_2_QraFYR_0">老师问你一个问题。<br>var a = 1<br>delete(a) &#47;&#47; false<br>这个为什么返回false啊，我查看不是只读的。<br>Obect.getOwnPropertyDescriptor(window, &#39;a&#39;)<br>{<br>value: 1<br>writable: true<br>enumerable: true<br>configurable: false<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 没说它是只读的呀。<br><br>configurable: false，说明它是不可变更配置的，亦即是不能删除该属性，也不能修改属性描述符。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-17 09:18:46</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/f5/82/af81ab59.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>老姚</span>
+  </div>
+  <div class="_2_QraFYR_0">下面从5.1语言规范上找到的，希望能辅助大家理解。内容copy于某个版本的翻译。<br><br>一、类型分类<br><br>类型分为 ECMAScript 语言类型 与 规范类型 。<br><br> ECMAScript 语言类型 是 ECMAScript 程序员使用 ECMAScript 语言直接操作的值对应的类型。ECMAScript 语言类型包括 未定义 （Undefined）、 空值 （Null）、 布尔值（Boolean）、 字符串 （String）、 数值 （Number）、 对象 （Object）。<br><br> 规范类型 是描述 ECMAScript 语言构造与 ECMAScript 语言类型语意的算法所用的元值对应的类型。规范类型包括 引用 、 列表 、 完结 、 属性描述式 、 属性标示 、 词法环境（Lexical Environment）、 环境纪录（Environment Record）。规范类型的值是不一定对应 ECMAScript 实现里任何实体的虚拟对象。规范类型可用来描述 ECMAScript 表式运算的中途结果，但是这些值不能存成对象的变量或是 ECMAScript 语言变量的值。<br><br> 在本规范中，我们将「x 的类型」简写为 Type(x) ，而类型指的就是上述的 ECMAScript 语言类型 与 规范类型 。<br><br>二、规范类型中的引用类型定义<br> 引用类型用来说明 delete，typeof，赋值运算符这些运算符的行为。例如，在赋值运算中左边的操作数期望产生一个引用。通过赋值运算符左侧运算子的语法案例分析可以但不能完全解释赋值行为，还有个难点：函数调用允许返回引用。承认这种可能性纯粹是为了宿主对象。本规范没有定义返回引用的内置 ECMAScript 函数，并且也不提供返回引用的用户定义函数。（另一个不使用语法案列分析的原因是，那样将会影响规范的很多地方，冗长并且别扭。）<br><br> 一个 引用 (Reference) 是个已解决的命名绑定。一个引用由三部分组成， 基 (base) 值， 引用名称（referenced name） 和布尔值 严格引用 (strict reference) 标志。基值是 undefined, 一个 Object, 一个 Boolean, 一个 String, 一个 Number, 一个 environment record 中的任意一个。基值是 undefined 表示此引用可以不解决一个绑定。引用名称是一个字符串。<br><br> 本规范中使用以下抽象操作接近引用的组件：<br><br>GetBase(V)。 返回引用值 V 的基值组件。<br>GetReferencedName(V)。 返回引用值 V 的引用名称组件。<br>IsStrictReference(V)。 返回引用值 V 的严格引用组件。<br>HasPrimitiveBase(V)。 如果基值是 Boolean, String, Number，那么返回 true。<br>IsPropertyReference(V)。 如果基值是个对象或 HasPrimitiveBase(V) 是 true，那么返回 true；否则返回 false。<br>IsUnresolvableReference(V)。 如果基值是 undefined 那么返回 true，否则返回 false。<br><br>三、delete运算符<br>产生式 UnaryExpression : delete UnaryExpression 按照下面的过程执行 :<br><br>1.令 ref 为解释执行 UnaryExpression 的结果。<br>2.如果 Type(ref) 不是 Reference，返回 true。<br>3.若 IsUnresolvableReference(ref) 则 , 如果 IsStrictReference(ref) 为 true ，抛出一个 SyntaxError 异常。 否则，返回 true。<br>4.如果 IsPropertyReference(ref) 为 true 则： 返回以 GetReferencedName(ref) 和 IsStrictReference(ref) 做为参数调用 ToObject(GetBase(ref)) 的 [[Delete]] 内置方法的结果。<br>5.否则 , ref 是到环境记录项绑定的 Reference，所以： 如果 IsStrictReference(ref) 为 true ，抛出一个 SyntaxError 异常 . 令 bindings 为 GetBase(ref). 返回以 GetReferencedName(ref) 为参数调用绑定的 DeleteBinding 具体方法的结果。<br><br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 谢谢。赞的！<br><br>关于ES6之前的ECMAScript翻译，大概最精良的算是w3c的那一份，这在加餐的下节（https:&#47;&#47;time.geekbang.org&#47;column&#47;article&#47;175261）里专门说了一下。这门课程有意地避开了ECMAScript的一些讲述方法（当然也有一些地方是特意去讲ECMAScript的），主要是考虑到课程自己的整体体系和讲述的逻辑，还是与ECMAScript有些差异的。而且，讲ECMAScript的话……讲不完啊。哈哈哈~<br><br>多谢。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-04 18:35:34</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

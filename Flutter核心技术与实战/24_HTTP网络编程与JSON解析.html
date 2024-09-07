@@ -1,0 +1,654 @@
+<audio title="24_HTTP网络编程与JSON解析" src="https://static001.geekbang.org/resource/audio/b8/a1/b840f321655f1d0c3eb1b6ef06e7eca1.mp3" controls="controls"></audio> 
+<p>你好，我是陈航。</p><p>在上一篇文章中，我带你一起学习了Dart中异步与并发的机制及实现原理。与其他语言类似，Dart的异步是通过事件循环与队列实现的，我们可以使用Future来封装异步任务。而另一方面，尽管Dart是基于单线程模型的，但也提供了Isolate这样的“多线程”能力，这使得我们可以充分利用系统资源，在并发Isolate中搞定CPU密集型的任务，并通过消息机制通知主Isolate运行结果。</p><p>异步与并发的一个典型应用场景，就是网络编程。一个好的移动应用，不仅需要有良好的界面和易用的交互体验，也需要具备和外界进行信息交互的能力。而通过网络，信息隔离的客户端与服务端间可以建立一个双向的通信通道，从而实现资源访问、接口数据请求和提交、上传下载文件等操作。</p><p>为了便于我们快速实现基于网络通道的信息交换实时更新App数据，Flutter也提供了一系列的网络编程类库和工具。因此在今天的分享中，我会通过一些小例子与你讲述在Flutter应用中，如何实现与服务端的数据交互，以及如何将交互响应的数据格式化。</p><h2>Http网络编程</h2><p>我们在通过网络与服务端数据交互时，不可避免地需要用到三个概念：定位、传输与应用。</p><p>其中，<strong>定位</strong>，定义了如何准确地找到网络上的一台或者多台主机（即IP地址）；<strong>传输</strong>，则主要负责在找到主机后如何高效且可靠地进行数据通信（即TCP、UDP协议）；而<strong>应用</strong>，则负责识别双方通信的内容（即HTTP协议）。</p><!-- [[[read_end]]] --><p>我们在进行数据通信时，可以只使用传输层协议。但传输层传递的数据是二进制流，如果没有应用层，我们无法识别数据内容。如果想要使传输的数据有意义，则必须要用到应用层协议。移动应用通常使用HTTP协议作应用层协议，来封装HTTP信息。</p><p>在编程框架中，一次HTTP网络调用通常可以拆解为以下步骤：</p><ol>
+<li>创建网络调用实例client，设置通用请求行为（如超时时间）；</li>
+<li>构造URI，设置请求header、body；</li>
+<li>发起请求, 等待响应；</li>
+<li>解码响应的内容。</li>
+</ol><p>当然，Flutter也不例外。在Flutter中，Http网络编程的实现方式主要分为三种：dart:io里的HttpClient实现、Dart原生http请求库实现、第三方库dio实现。接下来，我依次为你讲解这三种方式。</p><h3>HttpClient</h3><p>HttpClient是dart:io库中提供的网络请求类，实现了基本的网络编程功能。</p><p>接下来，我将和你分享一个实例，对照着上面提到的网络调用步骤，来演示HttpClient如何使用。</p><p>在下面的代码中，我们创建了一个HttpClien网络调用实例，设置了其超时时间为5秒。随后构造了Flutter官网的URI，并设置了请求Header的user-agent为Custom-UA。然后发起请求，等待Flutter官网响应。最后在收到响应后，打印出返回结果：</p><pre><code>get() async {
+  //创建网络调用示例，设置通用请求行为(超时时间)
+  var httpClient = HttpClient();
+  httpClient.idleTimeout = Duration(seconds: 5);
+  
+  //构造URI，设置user-agent为&quot;Custom-UA&quot;
+  var uri = Uri.parse(&quot;https://flutter.dev&quot;);
+  var request = await httpClient.getUrl(uri);
+  request.headers.add(&quot;user-agent&quot;, &quot;Custom-UA&quot;);
+  
+  //发起请求，等待响应
+  var response = await request.close();
+  
+  //收到响应，打印结果
+  if (response.statusCode == HttpStatus.ok) {
+    print(await response.transform(utf8.decoder).join());
+  } else {
+    print('Error: \nHttp status ${response.statusCode}');
+  }
+}
+</code></pre><p>可以看到，使用HttpClient来发起网络调用还是相对比较简单的。</p><p>这里需要注意的是，由于网络请求是异步行为，因此<strong>在Flutter中，所有网络编程框架都是以Future作为异步请求的包装</strong>，所以我们需要使用await与async进行非阻塞的等待。当然，你也可以注册then，以回调的方式进行相应的事件处理。</p><h3>http</h3><p>HttpClient使用方式虽然简单，但其接口却暴露了不少内部实现细节。比如，异步调用拆分得过细，链接需要调用方主动关闭，请求结果是字符串但却需要手动解码等。</p><p>http是Dart官方提供的另一个网络请求类，相比于HttpClient，易用性提升了不少。同样，我们以一个例子来介绍http的使用方法。</p><p>首先，我们需要将http加入到pubspec中的依赖里：</p><pre><code>dependencies:
+  http: '&gt;=0.11.3+12'
+</code></pre><p>在下面的代码中，与HttpClient的例子类似的，我们也是先后构造了http网络调用实例和Flutter官网URI，在设置user-agent为Custom-UA后，发出请求，最后打印请求结果：</p><pre><code>httpGet() async {
+  //创建网络调用示例
+  var client = http.Client();
+
+  //构造URI
+  var uri = Uri.parse(&quot;https://flutter.dev&quot;);
+  
+  //设置user-agent为&quot;Custom-UA&quot;，随后立即发出请求
+  http.Response response = await client.get(uri, headers : {&quot;user-agent&quot; : &quot;Custom-UA&quot;});
+
+  //打印请求结果
+  if(response.statusCode == HttpStatus.ok) {
+    print(response.body);
+  } else {
+    print(&quot;Error: ${response.statusCode}&quot;);
+  }
+}
+</code></pre><p>可以看到，相比于HttpClient，http的使用方式更加简单，仅需一次异步调用就可以实现基本的网络通信。</p><h3>dio</h3><p>HttpClient和http使用方式虽然简单，但其暴露的定制化能力都相对较弱，很多常用的功能都不支持（或者实现异常繁琐），比如取消请求、定制拦截器、Cookie管理等。因此对于复杂的网络请求行为，我推荐使用目前在Dart社区人气较高的第三方dio来发起网络请求。</p><p>接下来，我通过几个例子来和你介绍dio的使用方法。与http类似的，我们首先需要把dio加到pubspec中的依赖里：</p><pre><code>dependencies:
+  dio: '&gt;2.1.3'
+</code></pre><p>在下面的代码中，与前面HttpClient与http例子类似的，我们也是先后创建了dio网络调用实例、创建URI、设置Header、发出请求，最后等待请求结果：</p><pre><code>void getRequest() async {
+  //创建网络调用示例
+  Dio dio = new Dio();
+  
+  //设置URI及请求user-agent后发起请求
+  var response = await dio.get(&quot;https://flutter.dev&quot;, options:Options(headers: {&quot;user-agent&quot; : &quot;Custom-UA&quot;}));
+  
+ //打印请求结果
+  if(response.statusCode == HttpStatus.ok) {
+    print(response.data.toString());
+  } else {
+    print(&quot;Error: ${response.statusCode}&quot;);
+  }
+}
+</code></pre><blockquote>
+<p>这里需要注意的是，创建URI、设置Header及发出请求的行为，都是通过dio.get方法实现的。这个方法的options参数提供了精细化控制网络请求的能力，可以支持设置Header、超时时间、Cookie、请求方法等。这部分内容不是今天分享的重点，如果你想深入理解的话，可以访问其<a href="https://github.com/flutterchina/dio#dio-apis">API文档</a>学习具体使用方法。</p>
+</blockquote><p>对于常见的上传及下载文件需求，dio也提供了良好的支持：文件上传可以通过构建表单FormData实现，而文件下载则可以使用download方法搞定。</p><p>在下面的代码中，我们通过FormData创建了两个待上传的文件，通过post方法发送至服务端。download的使用方法则更为简单，我们直接在请求参数中，把待下载的文件地址和本地文件名提供给dio即可。如果我们需要感知下载进度，可以增加onReceiveProgress回调函数：</p><pre><code>//使用FormData表单构建待上传文件
+FormData formData = FormData.from({
+  &quot;file1&quot;: UploadFileInfo(File(&quot;./file1.txt&quot;), &quot;file1.txt&quot;),
+  &quot;file2&quot;: UploadFileInfo(File(&quot;./file2.txt&quot;), &quot;file1.txt&quot;),
+
+});
+//通过post方法发送至服务端
+var responseY = await dio.post(&quot;https://xxx.com/upload&quot;, data: formData);
+print(responseY.toString());
+
+//使用download方法下载文件
+dio.download(&quot;https://xxx.com/file1&quot;, &quot;xx1.zip&quot;);
+
+//增加下载进度回调函数
+dio.download(&quot;https://xxx.com/file1&quot;, &quot;xx2.zip&quot;, onReceiveProgress: (count, total) {
+	//do something      
+});
+</code></pre><p>有时，我们的页面由多个并行的请求响应结果构成，这就需要等待这些请求都返回后才能刷新界面。在dio中，我们可以结合Future.wait方法轻松实现：</p><pre><code>//同时发起两个并行请求
+List&lt;Response&gt; responseX= await Future.wait([dio.get(&quot;https://flutter.dev&quot;),dio.get(&quot;https://pub.dev/packages/dio&quot;)]);
+
+//打印请求1响应结果
+print(&quot;Response1: ${responseX[0].toString()}&quot;);
+//打印请求2响应结果
+print(&quot;Response2: ${responseX[1].toString()}&quot;);
+</code></pre><p>此外，与Android的okHttp一样，dio还提供了请求拦截器，通过拦截器，我们可以在请求之前，或响应之后做一些特殊的操作。比如可以为请求option统一增加一个header，或是返回缓存数据，或是增加本地校验处理等等。</p><p>在下面的例子中，我们为dio增加了一个拦截器。在请求发送之前，不仅为每个请求头都加上了自定义的user-agent，还实现了基本的token认证信息检查功能。而对于本地已经缓存了请求uri资源的场景，我们可以直接返回缓存数据，避免再次下载：</p><pre><code>//增加拦截器
+dio.interceptors.add(InterceptorsWrapper(
+    onRequest: (RequestOptions options){
+      //为每个请求头都增加user-agent
+      options.headers[&quot;user-agent&quot;] = &quot;Custom-UA&quot;;
+      //检查是否有token，没有则直接报错
+      if(options.headers['token'] == null) {
+        return dio.reject(&quot;Error:请先登录&quot;);
+      } 
+      //检查缓存是否有数据
+      if(options.uri == Uri.parse('http://xxx.com/file1')) {
+        return dio.resolve(&quot;返回缓存数据&quot;);
+      }
+      //放行请求
+      return options;
+    }
+));
+
+//增加try catch，防止请求报错
+try {
+  var response = await dio.get(&quot;https://xxx.com/xxx.zip&quot;);
+  print(response.data.toString());
+}catch(e) {
+  print(e);
+}
+</code></pre><p>需要注意的是，由于网络通信期间有可能会出现异常（比如，域名无法解析、超时等），因此我们需要使用try-catch来捕获这些未知错误，防止程序出现异常。</p><p>除了这些基本的用法，dio还支持请求取消、设置代理，证书校验等功能。不过，这些高级特性不属于本次分享的重点，故不再赘述，详情可以参考dio的<a href="https://github.com/flutterchina/dio/blob/master/README-ZH.md">GitHub主页</a>了解具体用法。</p><h2>JSON解析</h2><p>移动应用与Web服务器建立好了连接之后，接下来的两个重要工作分别是：服务器如何结构化地去描述返回的通信信息，以及移动应用如何解析这些格式化的信息。</p><h3>如何结构化地描述返回的通信信息？</h3><p>在如何结构化地去表达信息上，我们需要用到JSON。JSON是一种轻量级的、用于表达由属性值和字面量组成对象的数据交换语言。</p><p>一个简单的表示学生成绩的JSON结构，如下所示：</p><pre><code>String jsonString = '''
+{
+  &quot;id&quot;:&quot;123&quot;,
+  &quot;name&quot;:&quot;张三&quot;,
+  &quot;score&quot; : 95
+}
+''';
+</code></pre><p>需要注意的是，由于Flutter不支持运行时反射，因此并没有提供像Gson、Mantle这样自动解析JSON的库来降低解析成本。在Flutter中，JSON解析完全是手动的，开发者要做的事情多了一些，但使用起来倒也相对灵活。</p><p>接下来，我们就看看Flutter应用是如何解析这些格式化的信息。</p><h3>如何解析格式化的信息？</h3><p>所谓手动解析，是指使用dart:convert库中内置的JSON解码器，将JSON字符串解析成自定义对象的过程。使用这种方式，我们需要先将JSON字符串传递给JSON.decode方法解析成一个Map，然后把这个Map传给自定义的类，进行相关属性的赋值。</p><p>以上面表示学生成绩的JSON结构为例，我来和你演示手动解析的使用方法。</p><p>首先，我们根据JSON结构定义Student类，并创建一个工厂类，来处理Student类属性成员与JSON字典对象的值之间的映射关系：</p><pre><code>class Student{
+  //属性id，名字与成绩
+  String id;
+  String name;
+  int score;
+  //构造方法  
+  Student({
+    this.id,
+    this.name,
+    this.score
+  });
+  //JSON解析工厂类，使用字典数据为对象初始化赋值
+  factory Student.fromJson(Map&lt;String, dynamic&gt; parsedJson){
+    return Student(
+        id: parsedJson['id'],
+        name : parsedJson['name'],
+        score : parsedJson ['score']
+    );
+  }
+}
+</code></pre><p>数据解析类创建好了，剩下的事情就相对简单了，我们只需要把JSON文本通过JSON.decode方法转换成Map，然后把它交给Student的工厂类fromJson方法，即可完成Student对象的解析：</p><pre><code>loadStudent() {
+  //jsonString为JSON文本
+  final jsonResponse = json.decode(jsonString);
+  Student student = Student.fromJson(jsonResponse);
+  print(student.name);
+}
+</code></pre><p>在上面的例子中，JSON文本所有的属性都是基本类型，因此我们直接从JSON字典取出相应的元素为对象赋值即可。而如果JSON下面还有嵌套对象属性，比如下面的例子中，Student还有一个teacher的属性，我们又该如何解析呢？</p><pre><code>String jsonString = '''
+{
+  &quot;id&quot;:&quot;123&quot;,
+  &quot;name&quot;:&quot;张三&quot;,
+  &quot;score&quot; : 95,
+  &quot;teacher&quot;: {
+    &quot;name&quot;: &quot;李四&quot;,
+    &quot;age&quot; : 40
+  }
+}
+''';
+</code></pre><p>这里，teacher不再是一个基本类型，而是一个对象。面对这种情况，我们需要为每一个非基本类型属性创建一个解析类。与Student类似，我们也需要为它的属性teacher创建一个解析类Teacher：</p><pre><code>class Teacher {
+  //Teacher的名字与年龄
+  String name;
+  int age;
+  //构造方法
+  Teacher({this.name,this.age});
+  //JSON解析工厂类，使用字典数据为对象初始化赋值
+  factory Teacher.fromJson(Map&lt;String, dynamic&gt; parsedJson){
+    return Teacher(
+        name : parsedJson['name'],
+        age : parsedJson ['age']
+    );
+  }
+}
+</code></pre><p>然后，我们只需要在Student类中，增加teacher属性及对应的JSON映射规则即可：</p><pre><code>class Student{
+  ...
+  //增加teacher属性
+  Teacher teacher;
+  //构造函数增加teacher
+  Student({
+    ...
+    this.teacher
+  });
+  factory Student.fromJson(Map&lt;String, dynamic&gt; parsedJson){
+    return Student(
+        ...
+        //增加映射规则
+        teacher: Teacher.fromJson(parsedJson ['teacher'])
+    );
+  }
+}
+</code></pre><p>完成了teacher属性的映射规则添加之后，我们就可以继续使用Student来解析上述的JSON文本了：</p><pre><code>final jsonResponse = json.decode(jsonString);//将字符串解码成Map对象
+Student student = Student.fromJson(jsonResponse);//手动解析
+print(student.teacher.name);
+</code></pre><p>可以看到，通过这种方法，无论对象有多复杂的非基本类型属性，我们都可以创建对应的解析类进行处理。</p><p>不过到现在为止，我们的JSON数据解析还是在主Isolate中完成。如果JSON的数据格式比较复杂，数据量又大，这种解析方式可能会造成短期UI无法响应。对于这类CPU密集型的操作，我们可以使用上一篇文章中提到的compute函数，将解析工作放到新的Isolate中完成：</p><pre><code>static Student parseStudent(String content) {
+  final jsonResponse = json.decode(content);
+  Student student = Student.fromJson(jsonResponse);
+  return student;
+}
+doSth() {
+ ...
+ //用compute函数将json解析放到新Isolate
+ compute(parseStudent,jsonString).then((student)=&gt;print(student.teacher.name));
+}
+</code></pre><p>通过compute的改造，我们就不用担心JSON解析时间过长阻塞UI响应了。</p><h2>总结</h2><p>好了，今天的分享就到这里了，我们简单回顾一下主要内容。</p><p>首先，我带你学习了实现Flutter应用与服务端通信的三种方式，即HttpClient、http与dio。其中dio提供的功能更为强大，可以支持请求拦截、文件上传下载、请求合并等高级能力。因此，我推荐你在实际项目中使用dio的方式。</p><p>然后，我和你分享了JSON解析的相关内容。JSON解析在Flutter中相对比较简单，但由于不支持反射，所以我们只能手动解析，即：先将JSON字符串转换成Map，然后再把这个Map给到自定义类，进行相关属性的赋值。</p><p>如果你有原生Android、iOS开发经验的话，可能会觉得Flutter提供的JSON手动解析方案并不好用。在Flutter中，没有像原生开发那样提供了Gson或Mantle等库，用于将JSON字符串直接转换为对应的实体类。而这些能力无一例外都需要用到运行时反射，这是Flutter从设计之初就不支持的，理由如下：</p><ol>
+<li>运行时反射破坏了类的封装性和安全性，会带来安全风险。就在前段时间，Fastjson框架就爆出了一个巨大的安全漏洞。这个漏洞使得精心构造的字符串文本，可以在反序列化时让服务器执行任意代码，直接导致业务机器被远程控制、内网渗透、窃取敏感信息等操作。</li>
+<li>运行时反射会增加二进制文件大小。因为搞不清楚哪些代码可能会在运行时用到，因此使用反射后，会默认使用所有代码构建应用程序，这就导致编译器无法优化编译期间未使用的代码，应用安装包体积无法进一步压缩，这对于自带Dart虚拟机的Flutter应用程序是难以接受的。</li>
+</ol><p>反射给开发者编程带来了方便，但也带来了很多难以解决的新问题，因此Flutter并不支持反射。而我们要做的就是，老老实实地手动解析JSON吧。</p><p>我把今天分享所涉及到的知识点打包到了<a href="https://github.com/cyndibaby905/24_network_demo">GitHub</a>中，你可以下载下来，反复运行几次，加深理解与记忆。</p><h2>思考题</h2><p>最后，我给你留两道思考题吧。</p><ol>
+<li>请使用dio实现一个自定义拦截器，拦截器内检查header中的token：如果没有token，需要暂停本次请求，同时访问"<a href="http://xxxx.com/token">http://xxxx.com/token</a>"，在获取新token后继续本次请求。</li>
+<li>为以下Student JSON写相应的解析类：</li>
+</ol><pre><code>String jsonString = '''
+  {
+    &quot;id&quot;:&quot;123&quot;,
+    &quot;name&quot;:&quot;张三&quot;,
+    &quot;score&quot; : 95,
+    &quot;teachers&quot;: [
+       {
+         &quot;name&quot;: &quot;李四&quot;,
+         &quot;age&quot; : 40
+       },
+       {
+         &quot;name&quot;: &quot;王五&quot;,
+         &quot;age&quot; : 45
+       }
+    ]
+  }
+  ''';
+</code></pre><p>欢迎你在评论区给我留言分享你的观点，我会在下一篇文章中等待你！感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/04/37/aa04f997.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>和小胖</span>
+  </div>
+  <div class="_2_QraFYR_0">第一个问题解决方法：<br>dio.interceptors.add(InterceptorsWrapper(<br>      onRequest: (Options options) async {<br>        if (options.headers[&#39;token&#39;] == null) {<br>          print(&quot;no token，request token firstly...&quot;);<br>          &#47;&#47;lock the dio.<br>          dio.lock();<br>          return new Dio().get(&quot;http:&#47;&#47;xxxx.com&#47;token&quot;).then((d) {<br>            options.headers[&quot;token&quot;] = d.data[&#39;token&#39;];<br>            print(&quot;request token succeed, value: &quot; + d.data[&#39;token&#39;]);<br>            print(<br>                &#39;continue to perform request：path:${options.path}，baseURL:${options.path}&#39;);<br>            return options;<br>          }).whenComplete(() =&gt; dio.unlock()); &#47;&#47; unlock the dio<br>        }<br>        return options;<br>      }<br>  ));</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 厉害👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-09 18:22:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epxMjZcn8LFy6PIT7uGzUOHTCZosTwh39jBKlyW3Ffzyscm14PQGh3QZ1GrEGF4UWxwKZrAib8AXCA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>江宁彭于晏</span>
+  </div>
+  <div class="_2_QraFYR_0">分享一个json转dart类的工具，理解了原理后，实际项目中可以省不少时间https:&#47;&#47;javiercbk.github.io&#47;json_to_dart&#47;</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-11 10:12:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/04/37/aa04f997.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>和小胖</span>
+  </div>
+  <div class="_2_QraFYR_0">第二道题解决方法：<br><br>class Student {<br>  String id;<br>  String name;<br>  int score;<br>  List&lt;Teacher&gt; teachers;<br><br>  Student({this.id, this.name, this.score, this.teachers});<br><br>  factory Student.fromJson(Map&lt;String, dynamic&gt; parsedJson) {<br>    return Student(<br>        id: parsedJson[&#39;id&#39;],<br>        name: parsedJson[&#39;name&#39;],<br>        score: parsedJson[&#39;score&#39;],<br>        teachers: getTeacher(parsedJson[&#39;teachers&#39;]));<br>  }<br><br>  static List&lt;Teacher&gt; getTeacher(dynamic list) {<br>    List&lt;Teacher&gt; teachers = new List();<br>    list.forEach((f) {<br>      teachers.add(Teacher.fromJson(f));<br>    });<br>    return teachers;<br>  }<br>}<br><br>class Teacher {<br>  String name;<br>  int age;<br><br>  Teacher({this.age, this.name});<br><br>  factory Teacher.fromJson(Map&lt;String, dynamic&gt; parsedJson) {<br>    return Teacher(name: parsedJson[&#39;name&#39;], age: parsedJson[&#39;age&#39;]);<br>  }<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 👍厉害</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-09 18:42:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/4f/c1/7f596aba.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>给我点阳光就灿烂</span>
+  </div>
+  <div class="_2_QraFYR_0">如何进行socket通信</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以参考cnDart社区的文章：http:&#47;&#47;www.cndartlang.com&#47;841.html</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-22 10:32:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_0793f1</span>
+  </div>
+  <div class="_2_QraFYR_0">使用这种方式，我们需要先将 JSON 字符串传递给 JSON.decode 方法解析成一个 Map，然后把这个 Map 传给自定义的类，进行相关属性的赋值。<br><br>前端一般把json字符串解析成map之后，就直接用这个map进行相关的属性赋值了，老师能解释一下，传给自定义类的做法的好处吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 以对象的方式承接服务端返回的JSON字典，不仅更直观，也避免了一些因为key写错出现的代码错误。js的类型系统比较混乱，object和字典是可以混用的，比如下面这段代码：<br>var x = {&#39;number&#39;:123,&#39;title&#39;:&#39;title&#39;};<br>x.number和x[&#39;number&#39;]是等价的，所以这也就是为什么前端同学直接拿字典就可以当对象用了。<br>而Dart是强类型语言，字典里的键值对和对象的属性是不能混用的，所以我们需要定义一层映射关系。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-02 17:21:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/5a/75/4e0d7419.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>飓风</span>
+  </div>
+  <div class="_2_QraFYR_0">https:&#47;&#47;github.com&#47;trevorwang&#47;retrofit.dart&#47;  <br>这个库配合dio，网络请求转换这一步我觉得更简单点？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-21 14:00:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/12/3c/2e7fd24f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_0d3a08</span>
+  </div>
+  <div class="_2_QraFYR_0">重定向监听有吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Dio默认会自动帮你重定向，你可以在options参数里面把followRedirects置为false，自己在拦截器中处理重定向</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-29 21:04:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/31/5e/d7cdc1d6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>江厚宏</span>
+  </div>
+  <div class="_2_QraFYR_0">老师能不能介绍一下反序列化工具，比如json_serializable和 built_value，建议用哪一个，如果遇到泛型，该如何处理</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 其实我觉得Dart提供的JSON自动序列化方案并不好用，所以我还是推荐手动解析，对于泛型，直接在运行是判断类型，走对应的解析方法就可以了。<br>看你的使用场景，一般而言，json_serializable易用性上比built_value会更好一些。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-22 10:27:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/d6/7d/4b09b0bf.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>李鑫鑫</span>
+  </div>
+  <div class="_2_QraFYR_0">带有泛型 的bean 这么转json????</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-02-26 17:48:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/26/2a/7e/6d2e703b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小何</span>
+  </div>
+  <div class="_2_QraFYR_0">老师好，问一个问题，flutter怎么做回调啊，我想封装一个工具类，网络请求的时候传入callback，然后成功就调用callback.onSuccess(t),失败就调用callback.onFailed(t)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-30 16:23:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/26/2a/7e/6d2e703b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小何</span>
+  </div>
+  <div class="_2_QraFYR_0">老师好，compute和Future区别是什么啊， 不是用Future也可以实现异步嘛</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-21 18:09:08</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTIFgmmBXRltzZDa6lvibrCouDvOQYkfT2tJibZ97tJvNhGdfibntJdwmQ4BSzqr4bRB4m2SFxyAHBPsQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>任逍遥</span>
+  </div>
+  <div class="_2_QraFYR_0">最近遇到一个问题，问一下老师服务器更新SSL证书时使用了pem格式，发现安卓端请求失败，iOS端正常，flutter应该如何兼容pem证书呢</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-07-12 12:01:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/65/e8/d1e52dbb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>IF-Processing</span>
+  </div>
+  <div class="_2_QraFYR_0">请问，flutter对于网络服务（比如Samba，NFS共享）的访问有支持吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-07 10:34:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/2c/2c/77f80dfc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>安南寸暖🤕</span>
+  </div>
+  <div class="_2_QraFYR_0">json_model 怎么生成纯数组的解析代码？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 参考官方文档吧https:&#47;&#47;github.com&#47;flutterchina&#47;json_model</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-07 14:14:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/3c/88/6bef27d6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>大神博士</span>
+  </div>
+  <div class="_2_QraFYR_0">想问下 Flutter 中 JSONP 的请求怎么处理</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 1.直接发url请求就可以了、把服务端返回的数据当作字符串简单处理下，把它转成json格式<br>2.flutter不需要处理跨域问题，不建议用jsonp这种奇怪的格式</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-21 21:34:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/f2/1e/679789f7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>米米呀👧</span>
+  </div>
+  <div class="_2_QraFYR_0">import &#39;dart:convert&#39;;<br><br>import &#39;package:flutter&#47;material.dart&#39;;<br>import &#39;package:http&#47;http.dart&#39; as http;<br>[...]<br>  loadData() async {<br>    String dataURL = &quot;https:&#47;&#47;jsonplaceholder.typicode.com&#47;posts&quot;;<br>    http.Response response = await http.get(dataURL);<br>    setState(() {<br>      widgets = JSON.decode(response.body);<br>    });<br>  }<br>}<br><br>官网Demo里面是用的这个，跟HttpClient有什么区别？我该用哪个？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这个就是今天分享说的http包啊</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-10 16:51:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTLFbNiaADSSo6SQhsoDRX95ey8zngVaj2fHqaVc6JAd1uXJFAle1sl4SaicicpSzcKwa4JjLvkpKItZQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_joestar</span>
+  </div>
+  <div class="_2_QraFYR_0">static List&lt;Teacher&gt; fromJsonList(List&lt;dynamic&gt; listJson){<br>    var list = List&lt;Teacher&gt;();<br>    for(Map&lt;String, dynamic&gt; parsedJson in listJson) {<br>      list.add(Teacher.fromJson(parsedJson));<br>    }<br>    return list;<br>  }</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-08 13:17:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/67/d1/1c69ad22.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>C</span>
+  </div>
+  <div class="_2_QraFYR_0">class Teacher {<br>  String name;<br>  int age;<br><br>  Teacher({this.name, this.age});<br><br>  factory Teacher.fromJson(Map&lt;String, dynamic&gt; parsedJson) {<br>    return Teacher(<br>      name: parsedJson[&#39;name&#39;],<br>      age: parsedJson[&#39;age&#39;],<br>    );<br>  }<br><br>  static List&lt;Teacher&gt; parseTeachers(List&lt;dynamic&gt; mapList) {<br>    List&lt;Teacher&gt; teachers = List&lt;Teacher&gt;();<br>    for(Map&lt;String, dynamic&gt; map in mapList) {<br>      teachers.add(Teacher.fromJson(map));<br>    }<br>    return teachers;<br>  }<br>}<br><br>class Student {<br>  String id;<br>  String name;<br>  int score;<br>  List&lt;Teacher&gt; teachers;<br><br>  Student({this.id, this.name, this.score, this.teachers});<br><br>  factory Student.fromJson(Map&lt;String, dynamic&gt; parsedJson) {<br>    return Student(<br>      id: parsedJson[&#39;id&#39;],<br>      name: parsedJson[&#39;name&#39;],<br>      score: parsedJson[&#39;score&#39;],<br>      teachers: Teacher.parseTeachers(parsedJson[&#39;teachers&#39;]),<br>    );<br>  }<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-06 14:52:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/8b/c3/bf56f46c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>大和</span>
+  </div>
+  <div class="_2_QraFYR_0">dio.interceptors.add(InterceptorsWrapper(<br>        onRequest: (RequestOptions options) async {<br>          if (options.headers[&quot;token&quot;] == null) {<br>            try {<br>              var token = await new Dio().get(&quot;https:&#47;&#47;xxx.com&#47;token&quot;);<br>              options.headers[&quot;token&quot;] = token;<br>            }catch(e) {<br>              return dio.reject(&quot;Error: 请先登录...&quot;);<br>            }<br>          }<br>          return options;<br>        }<br>    ));</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 思路是对的，有一个小点可以改进：如果此刻有多个request同时发出，token会请求多次。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-04 16:01:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/oawDPl6RMSNz5Br5hLUBZzdicRPshXVJyTe2runPeBiby76BqRa8ibs99xxZ7EcBnkLeRPvt4gSGfqEibz1bpzWuoA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>宁缺</span>
+  </div>
+  <div class="_2_QraFYR_0">请问老大，课后作业的答案啥时候给参考一下</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 会考虑专门出一节讲课后题的解决思路</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-03 11:40:07</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

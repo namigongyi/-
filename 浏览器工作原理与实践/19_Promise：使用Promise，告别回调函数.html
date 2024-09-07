@@ -1,0 +1,646 @@
+<audio title="19_Promise：使用Promise，告别回调函数" src="https://static001.geekbang.org/resource/audio/5d/d5/5d274a6224f1747def8b25849a8dded5.mp3" controls="controls"></audio> 
+<p>在<a href="https://time.geekbang.org/column/article/135624">上一篇文章</a>中我们聊到了微任务是如何工作的，并介绍了MutationObserver是如何利用微任务来权衡性能和效率的。今天我们就接着来聊聊微任务的另外一个应用<strong>Promise</strong>，DOM/BOM API中新加入的API大多数都是建立在Promise上的，而且新的前端框架也使用了大量的Promise。可以这么说，Promise已经成为现代前端的“水”和“电”，很是关键，所以深入学习Promise势在必行。</p><p>不过，Promise的知识点有那么多，而我们只有一篇文章来介绍，那应该怎么讲解呢？具体讲解思路是怎样的呢？</p><p>如果你想要学习一门新技术，最好的方式是先了解这门技术是如何诞生的，以及它所解决的问题是什么。了解了这些后，你才能抓住这门技术的本质。所以本文我们就来重点聊聊JavaScript引入Promise的动机，以及解决问题的几个核心关键点。</p><p>要谈动机，我们一般都是先从问题切入，那么Promise到底解决了什么问题呢？在正式开始介绍之前，我想有必要明确下，Promise解决的是异步编码风格的问题，而不是一些其他的问题，所以接下来我们聊的话题都是围绕编码风格展开的。</p><h2>异步编程的问题：代码逻辑不连续</h2><p>首先我们来回顾下JavaScript的异步编程模型，你应该已经非常熟悉页面的事件循环系统了，也知道页面中任务都是执行在主线程之上的，相对于页面来说，主线程就是它整个的世界，所以在执行一项耗时的任务时，比如下载网络文件任务、获取摄像头等设备信息任务，这些任务都会放到页面主线程之外的进程或者线程中去执行，这样就避免了耗时任务“霸占”页面主线程的情况。你可以结合下图来看看这个处理过程：</p><!-- [[[read_end]]] --><p><img src="https://static001.geekbang.org/resource/image/01/85/01e40e30db7e8a91eb70ce02fd8a6985.png?wh=1142*731" alt=""></p><center><span class="reference">Web应用的异步编程模型</span></center><p>上图展示的是一个标准的异步编程模型，页面主线程发起了一个耗时的任务，并将任务交给另外一个进程去处理，这时页面主线程会继续执行消息队列中的任务。等该进程处理完这个任务后，会将该任务添加到渲染进程的消息队列中，并排队等待循环系统的处理。排队结束之后，循环系统会取出消息队列中的任务进行处理，并触发相关的回调操作。</p><p>这就是页面编程的一大特点：<strong>异步回调</strong>。</p><p>Web页面的单线程架构决定了异步回调，而异步回调影响到了我们的编码方式，到底是如何影响的呢？</p><p>假设有一个下载的需求，使用XMLHttpRequest来实现，具体的实现方式你可以参考下面这段代码：</p><pre><code>//执行状态
+function onResolve(response){console.log(response) }
+function onReject(error){console.log(error) }
+
+let xhr = new XMLHttpRequest()
+xhr.ontimeout = function(e) { onReject(e)}
+xhr.onerror = function(e) { onReject(e) }
+xhr.onreadystatechange = function () { onResolve(xhr.response) }
+
+//设置请求类型，请求URL，是否同步信息
+let URL = 'https://time.geekbang.com'
+xhr.open('Get', URL, true);
+
+//设置参数
+xhr.timeout = 3000 //设置xhr请求的超时时间
+xhr.responseType = &quot;text&quot; //设置响应返回的数据格式
+xhr.setRequestHeader(&quot;X_TEST&quot;,&quot;time.geekbang&quot;)
+
+//发出请求
+xhr.send();
+</code></pre><p>我们执行上面这段代码，可以正常输出结果的。但是，这短短的一段代码里面竟然出现了五次回调，这么多的回调会导致代码的逻辑不连贯、不线性，非常不符合人的直觉，这就是异步回调影响到我们的编码方式。</p><p>那有什么方法可以解决这个问题吗？当然有，我们可以封装这堆凌乱的代码，降低处理异步回调的次数。</p><h2>封装异步代码，让处理流程变得线性</h2><p>由于我们重点关注的是<strong>输入内容（请求信息）<strong>和</strong>输出内容（回复信息）</strong>，至于中间的异步请求过程，我们不想在代码里面体现太多，因为这会干扰核心的代码逻辑。整体思路如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/83/5c/83dd5231c2e36c636c61af6a6dc80a5c.png?wh=1142*445" alt=""></p><center><span class="reference">封装请求过程</span></center><p>从图中你可以看到，我们将XMLHttpRequest请求过程的代码封装起来了，重点关注输入数据和输出结果。</p><p>那我们就按照这个思路来改造代码。首先，我们把输入的HTTP请求信息全部保存到一个request的结构中，包括请求地址、请求头、请求方式、引用地址、同步请求还是异步请求、安全设置等信息。request结构如下所示：</p><pre><code>//makeRequest用来构造request对象
+function makeRequest(request_url) {
+    let request = {
+        method: 'Get',
+        url: request_url,
+        headers: '',
+        body: '',
+        credentials: false,
+        sync: true,
+        responseType: 'text',
+        referrer: ''
+    }
+    return request
+}
+</code></pre><p>然后就可以封装请求过程了，这里我们将所有的请求细节封装进XFetch函数，XFetch代码如下所示：</p><pre><code>//[in] request，请求信息，请求头，延时值，返回类型等
+//[out] resolve, 执行成功，回调该函数
+//[out] reject  执行失败，回调该函数
+function XFetch(request, resolve, reject) {
+    let xhr = new XMLHttpRequest()
+    xhr.ontimeout = function (e) { reject(e) }
+    xhr.onerror = function (e) { reject(e) }
+    xhr.onreadystatechange = function () {
+        if (xhr.status = 200)
+            resolve(xhr.response)
+    }
+    xhr.open(request.method, URL, request.sync);
+    xhr.timeout = request.timeout;
+    xhr.responseType = request.responseType;
+    //补充其他请求信息
+    //...
+    xhr.send();
+}
+</code></pre><p>这个XFetch函数需要一个request作为输入，然后还需要两个回调函数resolve和reject，当请求成功时回调resolve函数，当请求出现问题时回调reject函数。</p><p>有了这些后，我们就可以来实现业务代码了，具体的实现方式如下所示：</p><pre><code>XFetch(makeRequest('https://time.geekbang.org'),
+    function resolve(data) {
+        console.log(data)
+    }, function reject(e) {
+        console.log(e)
+    })
+</code></pre><h2>新的问题：回调地狱</h2><p>上面的示例代码已经比较符合人的线性思维了，在一些简单的场景下运行效果也是非常好的，不过一旦接触到稍微复杂点的项目时，你就会发现，如果嵌套了太多的回调函数就很容易使得自己陷入了<strong>回调地狱</strong>，不能自拔。你可以参考下面这段让人凌乱的代码：</p><pre><code>XFetch(makeRequest('https://time.geekbang.org/?category'),
+      function resolve(response) {
+          console.log(response)
+          XFetch(makeRequest('https://time.geekbang.org/column'),
+              function resolve(response) {
+                  console.log(response)
+                  XFetch(makeRequest('https://time.geekbang.org')
+                      function resolve(response) {
+                          console.log(response)
+                      }, function reject(e) {
+                          console.log(e)
+                      })
+              }, function reject(e) {
+                  console.log(e)
+              })
+      }, function reject(e) {
+          console.log(e)
+      })
+</code></pre><p>这段代码是先请求<code>time.geekbang.org/?category</code>，如果请求成功的话，那么再请求<code>time.geekbang.org/column</code>，如果再次请求成功的话，就继续请求<code>time.geekbang.org</code>。也就是说这段代码用了三层嵌套请求，就已经让代码变得混乱不堪，所以，我们还需要解决这种嵌套调用后混乱的代码结构。</p><p>这段代码之所以看上去很乱，归结其原因有两点：</p><ul>
+<li><strong>第一是嵌套调用</strong>，下面的任务依赖上个任务的请求结果，并<strong>在上个任务的回调函数内部执行新的业务逻辑</strong>，这样当嵌套层次多了之后，代码的可读性就变得非常差了。</li>
+<li><strong>第二是任务的不确定性</strong>，执行每个任务都有两种可能的结果（成功或者失败），所以体现在代码中就需要对每个任务的执行结果做两次判断，这种对每个任务都要进行一次额外的错误处理的方式，明显增加了代码的混乱程度。</li>
+</ul><p>原因分析出来后，那么问题的解决思路就很清晰了：</p><ul>
+<li><strong>第一是消灭嵌套调用</strong>；</li>
+<li><strong>第二是合并多个任务的错误处理</strong>。</li>
+</ul><p>这么讲可能有点抽象，不过Promise已经帮助我们解决了这两个问题。那么接下来我们就来看看Promise是怎么消灭嵌套调用和合并多个任务的错误处理的。</p><h2>Promise：消灭嵌套调用和多次错误处理</h2><p>首先，我们使用Promise来重构XFetch的代码，示例代码如下所示：</p><pre><code>function XFetch(request) {
+  function executor(resolve, reject) {
+      let xhr = new XMLHttpRequest()
+      xhr.open('GET', request.url, true)
+      xhr.ontimeout = function (e) { reject(e) }
+      xhr.onerror = function (e) { reject(e) }
+      xhr.onreadystatechange = function () {
+          if (this.readyState === 4) {
+              if (this.status === 200) {
+                  resolve(this.responseText, this)
+              } else {
+                  let error = {
+                      code: this.status,
+                      response: this.response
+                  }
+                  reject(error, this)
+              }
+          }
+      }
+      xhr.send()
+  }
+  return new Promise(executor)
+}
+</code></pre><p>接下来，我们再利用XFetch来构造请求流程，代码如下：</p><pre><code>var x1 = XFetch(makeRequest('https://time.geekbang.org/?category'))
+var x2 = x1.then(value =&gt; {
+    console.log(value)
+    return XFetch(makeRequest('https://www.geekbang.org/column'))
+})
+var x3 = x2.then(value =&gt; {
+    console.log(value)
+    return XFetch(makeRequest('https://time.geekbang.org'))
+})
+x3.catch(error =&gt; {
+    console.log(error)
+})
+</code></pre><p>你可以观察上面这两段代码，重点关注下Promise的使用方式。</p><ul>
+<li>首先我们引入了Promise，在调用XFetch时，会返回一个Promise对象。</li>
+<li>构建Promise对象时，需要传入一个<strong>executor函数</strong>，XFetch的主要业务流程都在executor函数中执行。</li>
+<li>如果运行在excutor函数中的业务执行成功了，会调用resolve函数；如果执行失败了，则调用reject函数。</li>
+<li>在excutor函数中调用resolve函数时，会触发promise.then设置的回调函数；而调用reject函数时，会触发promise.catch设置的回调函数。</li>
+</ul><p>以上简单介绍了Promise一些主要的使用方法，通过引入Promise，上面这段代码看起来就非常线性了，也非常符合人的直觉，是不是很酷？基于这段代码，我们就可以来分析Promise是如何消灭嵌套回调和合并多个错误处理了。</p><p>我们先来看看Promise是怎么消灭嵌套回调的。产生嵌套函数的一个主要原因是在发起任务请求时会带上回调函数，这样当任务处理结束之后，下个任务就只能在回调函数中来处理了。</p><p>Promise主要通过下面两步解决嵌套回调问题的。</p><p><strong>首先，Promise实现了回调函数的延时绑定</strong>。回调函数的延时绑定在代码上体现就是先创建Promise对象x1，通过Promise的构造函数executor来执行业务逻辑；创建好Promise对象x1之后，再使用x1.then来设置回调函数。示范代码如下：</p><pre><code>//创建Promise对象x1，并在executor函数中执行业务逻辑
+function executor(resolve, reject){
+    resolve(100)
+}
+let x1 = new Promise(executor)
+
+
+//x1延迟绑定回调函数onResolve
+function onResolve(value){
+    console.log(value)
+}
+x1.then(onResolve)
+</code></pre><p><strong>其次，需要将回调函数onResolve的返回值穿透到最外层</strong>。因为我们会根据onResolve函数的传入值来决定创建什么类型的Promise任务，创建好的Promise对象需要返回到最外层，这样就可以摆脱嵌套循环了。你可以先看下面的代码：</p><p><img src="https://static001.geekbang.org/resource/image/ef/7f/efcc4fcbebe75b4f6e92c89b968b4a7f.png?wh=1142*922" alt=""></p><center><span class="reference">回调函数返回值穿透到最外层</span></center><p>现在我们知道了Promise通过回调函数延迟绑定和回调函数返回值穿透的技术，解决了循环嵌套。</p><p>那接下来我们再来看看Promise是怎么处理异常的，你可以回顾<a href="https://time.geekbang.org/column/article/135624">上篇文章</a>思考题留的那段代码，我把这段代码也贴在文中了，如下所示：</p><pre><code>function executor(resolve, reject) {
+    let rand = Math.random();
+    console.log(1)
+    console.log(rand)
+    if (rand &gt; 0.5)
+        resolve()
+    else
+        reject()
+}
+var p0 = new Promise(executor);
+
+var p1 = p0.then((value) =&gt; {
+    console.log(&quot;succeed-1&quot;)
+    return new Promise(executor)
+})
+
+var p3 = p1.then((value) =&gt; {
+    console.log(&quot;succeed-2&quot;)
+    return new Promise(executor)
+})
+
+var p4 = p3.then((value) =&gt; {
+    console.log(&quot;succeed-3&quot;)
+    return new Promise(executor)
+})
+
+p4.catch((error) =&gt; {
+    console.log(&quot;error&quot;)
+})
+console.log(2)
+</code></pre><p>这段代码有四个Promise对象：p0～p4。无论哪个对象里面抛出异常，都可以通过最后一个对象p4.catch来捕获异常，通过这种方式可以将所有Promise对象的错误合并到一个函数来处理，这样就解决了每个任务都需要单独处理异常的问题。</p><p>之所以可以使用最后一个对象来捕获所有异常，是因为Promise对象的错误具有“冒泡”性质，会一直向后传递，直到被onReject函数处理或catch语句捕获为止。具备了这样“冒泡”的特性后，就不需要在每个Promise对象中单独捕获异常了。至于Promise错误的“冒泡”性质是怎么实现的，就留给你课后思考了。</p><p>通过这种方式，我们就消灭了嵌套调用和频繁的错误处理，这样使得我们写出来的代码更加优雅，更加符合人的线性思维。</p><h2>Promise与微任务</h2><p>讲了这么多，我们似乎还没有将微任务和Promise关联起来，那么Promise和微任务的关系到底体现哪里呢？</p><p>我们可以结合下面这个简单的Promise代码来回答这个问题：</p><pre><code>function executor(resolve, reject) {
+    resolve(100)
+}
+let demo = new Promise(executor)
+
+function onResolve(value){
+    console.log(value)
+}
+demo.then(onResolve)
+</code></pre><p>对于上面这段代码，我们需要重点关注下它的执行顺序。</p><p>首先执行new Promise时，Promise的构造函数会被执行，不过由于Promise是V8引擎提供的，所以暂时看不到Promise构造函数的细节。</p><p>接下来，Promise的构造函数会调用Promise的参数executor函数。然后在executor中执行了resolve，resolve函数也是在V8内部实现的，那么resolve函数到底做了什么呢？我们知道，执行resolve函数，会触发demo.then设置的回调函数onResolve，所以可以推测，resolve函数内部调用了通过demo.then设置的onResolve函数。</p><p>不过这里需要注意一下，由于Promise采用了回调函数延迟绑定技术，所以在执行resolve函数的时候，回调函数还没有绑定，那么只能推迟回调函数的执行。</p><p>这样按顺序陈述可能把你绕晕了，下面来模拟实现一个Promise，我们会实现它的构造函数、resolve方法以及then方法，以方便你能看清楚Promise的背后都发生了什么。这里我们就把这个对象称为Bromise，下面就是Bromise的实现代码：</p><pre><code>function Bromise(executor) {
+    var onResolve_ = null
+    var onReject_ = null
+     //模拟实现resolve和then，暂不支持rejcet
+    this.then = function (onResolve, onReject) {
+        onResolve_ = onResolve
+    };
+    function resolve(value) {
+          //setTimeout(()=&gt;{
+            onResolve_(value)
+           // },0)
+    }
+    executor(resolve, null);
+}
+</code></pre><p>观察上面这段代码，我们实现了自己的构造函数、resolve、then方法。接下来我们使用Bromise来实现我们的业务代码，实现后的代码如下所示：</p><pre><code>function executor(resolve, reject) {
+    resolve(100)
+}
+//将Promise改成我们自己的Bromsie
+let demo = new Bromise(executor)
+
+function onResolve(value){
+    console.log(value)
+}
+demo.then(onResolve)
+</code></pre><p>执行这段代码，我们发现执行出错，输出的内容是：</p><pre><code>Uncaught TypeError: onResolve_ is not a function
+    at resolve (&lt;anonymous&gt;:10:13)
+    at executor (&lt;anonymous&gt;:17:5)
+    at new Bromise (&lt;anonymous&gt;:13:5)
+    at &lt;anonymous&gt;:19:12
+</code></pre><p>之所以出现这个错误，是由于Bromise的延迟绑定导致的，在调用到onResolve_函数的时候，Bromise.then还没有执行，所以执行上述代码的时候，当然会报“onResolve_ is not a function“的错误了。</p><p>也正是因为此，我们要改造Bromise中的resolve方法，让resolve延迟调用onResolve_。</p><p>要让resolve中的onResolve_函数延后执行，可以在resolve函数里面加上一个定时器，让其延时执行onResolve_函数，你可以参考下面改造后的代码：</p><pre><code>function resolve(value) {
+          setTimeout(()=&gt;{
+              onResolve_(value)
+            },0)
+    }
+</code></pre><p>上面采用了定时器来推迟onResolve的执行，不过使用定时器的效率并不是太高，好在我们有微任务，所以Promise又把这个定时器改造成了微任务了，这样既可以让onResolve_延时被调用，又提升了代码的执行效率。这就是Promise中使用微任务的原由了。</p><h2>总结</h2><p>好了，今天我们就聊到这里，下面我来总结下今天所讲的内容。</p><p>首先，我们回顾了Web页面是单线程架构模型，这种模型决定了我们编写代码的形式——异步编程。基于异步编程模型写出来的代码会把一些关键的逻辑点打乱，所以这种风格的代码不符合人的线性思维方式。接下来我们试着把一些不必要的回调接口封装起来，简单封装取得了一定的效果，不过，在稍微复制点的场景下依然存在着回调地狱的问题。然后我们分析了产生回调地狱的原因：</p><ol>
+<li>多层嵌套的问题；</li>
+<li>每种任务的处理结果存在两种可能性（成功或失败），那么需要在每种任务执行结束后分别处理这两种可能性。</li>
+</ol><p>Promise通过回调函数延迟绑定、回调函数返回值穿透和错误“冒泡”技术解决了上面的两个问题。</p><p>最后，我们还分析了Promise之所以要使用微任务是由Promise回调函数延迟绑定技术导致的。</p><h2>思考时间</h2><p>终于把Promise讲完了，这一篇文章非常有难度，所以需要你课后慢慢消消化，再次提醒，Promise非常重要。那么今天我给你留三个思考题：</p><ol>
+<li>Promise中为什么要引入微任务？</li>
+<li>Promise中是如何实现回调函数返回值穿透的？</li>
+<li>Promise出错后，是怎么通过“冒泡”传递给最后那个捕获异常的函数？</li>
+</ol><p>这三个问题你不用急着完成，可以先花一段时间查阅材料，然后再来一道一道解释。搞清楚了这三道题目，你也就搞清楚了Promise。</p><p>欢迎在留言区与我分享你的想法，也欢迎你在留言区记录你的思考过程。感谢阅读，如果你觉得这篇文章对你有帮助的话，也欢迎把它分享给更多的朋友。</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJ0F94uoYZQicRd7YEFjEJWm0EaUJXzkhiaqa5GQQ8a1FkicQIoHC4sp2ZG9m1JAFABuGsj34ucztjibA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_Jamorx</span>
+  </div>
+  <div class="_2_QraFYR_0">这三个题目非常重要，就跟做笔记一样回答了<br>1、Promise 中为什么要引入微任务？<br><br>由于promise采用.then延时绑定回调机制，而new Promise时又需要直接执行promise中的方法，即发生了先执行方法后添加回调的过程，此时需等待then方法绑定两个回调后才能继续执行方法回调，便可将回调添加到当前js调用栈中执行结束后的任务队列中，由于宏任务较多容易堵塞，则采用了微任务<br><br>2、Promise 中是如何实现回调函数返回值穿透的？<br>首先Promise的执行结果保存在promise的data变量中，然后是.then方法返回值为使用resolved或rejected回调方法新建的一个promise对象，即例如成功则返回new Promise（resolved），将前一个promise的data值赋给新建的promise<br><br>3、Promise 出错后，是怎么通过“冒泡”传递给最后那个捕获<br>promise内部有resolved_和rejected_变量保存成功和失败的回调，进入.then（resolved，rejected）时会判断rejected参数是否为函数，若是函数，错误时使用rejected处理错误；若不是，则错误时直接throw错误，一直传递到最后的捕获，若最后没有被捕获，则会报错。可通过监听unhandledrejection事件捕获未处理的promise错误<br><br><br><br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-17 14:40:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/c1/05/fd1d47b6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>空间</span>
+  </div>
+  <div class="_2_QraFYR_0">异步AJAX请求是宏任务吧？Promise是微任务，那么用Promise进行的异步Ajax调用时宏任务还是微任务？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: ajax就是xmlhttprequest，必然是宏任务！<br><br>准确地说，Promise在执行resolve或者reject时，触发微任务，所以在Promise的executor函数中调用xmlhttprequest会触发宏任务。<br><br>如果xmlhttprequest请求成功了，通过resolve触发微任务<br><br>如果xmlhttprequest请求失败了，通过reject触发微任务</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-18 09:47:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/49/57/978fb576.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>皮皮大神</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，我觉得这章没有前面的讲得透彻，手写的bromise非常不完整，希望老师答疑的时候可以带我们写一遍完整promise源码，三种状态的切换，还有.then为什么可以连续调用，内部如何解决多层异步嵌套，我觉得都很值得讲解，老师带我们飞。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这个加餐可以有！<br><br>这篇问题主要在宏观视角建立对Promise的认知。<br><br>关于手写 或者细节内容课程结束之后我们慢慢聊。<br><br>目前被编辑追稿子压力大，好多问题没及时回复还望理解哈。课程结束之后我会相信回复大家的问题的。<br></p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-18 11:52:23</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/ae/a0/707350ef.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>穿秋裤的男孩</span>
+  </div>
+  <div class="_2_QraFYR_0">promise.then是订阅者，订阅promise状态的改变，并且负责回掉；promise.resolve和promise.reject为发布者，发布promise的状态改变的信息。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-17 10:35:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Rapheal</span>
+  </div>
+  <div class="_2_QraFYR_0">Promise的改进版，测试过也无问题。之前使用闭包存放所有回调函数有些问题，所有的Promise对象都是共享，这样会造成全局数据结构有问题。当前是基于回调函数数组传递在Promise对象之间传递实现。<br><br><br>    function _Promise(executor) {<br>        this._resolve = [];<br>        this._reject = [];<br>        this._catch;<br><br>        &#47;*临时保存引用*&#47;<br>        let self = this;<br>        <br>        this.then = function (resolve, reject) {<br>            resolve &amp;&amp; this._resolve.push(resolve);<br>            reject &amp;&amp; this._reject.push(reject);<br>            return this;<br>        }<br><br>        <br>        this.resolve = function (data) {<br>            setTimeout(() =&gt; {<br>                let callback = self._resolve.shift();<br>                self._reject &amp;&amp; self._reject.shift();<br>                let pro;<br>                callback &amp;&amp; (pro = callback(data));<br>                self._resolve &amp;&amp; (pro._resolve = self._resolve);<br>                self._reject &amp;&amp; (pro._reject = self._reject);<br>                self._catch &amp;&amp; (pro._catch = self._catch);<br><br>            }, 0)<br>        }<br><br>        this.reject = function (error) {        <br>            setTimeout(() =&gt; {<br>                let callback;<br>                self._reject &amp;&amp; (callback = self._reject.shift());<br>                callback &amp;&amp; callback(error);<br>                callback || self._catch(error);<br><br>            }, 0);<br>        }<br><br>        this.catch = function (callback) {<br>            this._catch = callback;<br>            return this;<br>        }<br>        executor(this.resolve, this.reject);<br>    }<br><br><br>function executor(resolve, reject) {<br>    let rand = Math.random();<br>    console.log(1)<br>    console.log(rand)<br>    if (rand &gt; 0.5)<br>        resolve(rand)<br>    else<br>        reject(rand)<br>}<br>var p0 = new _Promise(executor);<br><br>var p1 = p0.then((value) =&gt; {<br>    console.log(&quot;succeed-1&quot;)<br>    return new _Promise(executor)<br>})<br><br>var p3 = p1.then((value) =&gt; {<br>    console.log(&quot;succeed-2&quot;)<br>    return new _Promise(executor)<br>})<br><br>var p4 = p3.then((value) =&gt; {<br>    console.log(&quot;succeed-3&quot;)<br>    return new _Promise(executor)<br>})<br><br>p4.catch((error) =&gt; {<br>    console.log(&quot;error&quot;)<br>})<br><br><br>console.log(2)<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-05 16:06:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/04/bb/5e5c37c1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Angus</span>
+  </div>
+  <div class="_2_QraFYR_0">看完这节之后我自己去实现了手写Promise，回顾了一下Promise，关于这方面的文章很多，我觉得老师大可不必在这里花大量篇幅去讲。专栏的名字是浏览器工作原理与实践，所以我希望老师能够更加着重这一方面的讲解。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-20 10:43:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>乔小爷</span>
+  </div>
+  <div class="_2_QraFYR_0">不是说要手写promise吗，，怎么在教程里面没有看到</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-15 17:57:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_be6d3f</span>
+  </div>
+  <div class="_2_QraFYR_0">请问以下，在“异步编程的问题：代码逻辑不连续”这段中，代码下方的第一行，老师说“这短短的一段代码里面竟然出现了五次回调”，可是我怎么数，都只有三次回调啊，还有两次在哪里？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-11 14:34:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/52/0e/c5ff46d2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>CondorHero</span>
+  </div>
+  <div class="_2_QraFYR_0">```js<br>new Promise((r, rj) =&gt; {<br>    r();<br>}).then(() =&gt; {<br>    new Promise((r, rj) =&gt; {<br>        r();<br>    }).then(() =&gt; {<br>        console.log(&quot;inner then1&quot;)<br>        return new Promise((r, rj) =&gt; {<br>            r();<br>        })<br>    }).then(() =&gt; {<br>        console.log(&quot;inner then2&quot;)<br>    })<br>})<br>.then(() =&gt; {<br>    console.log(&quot;outer then2&quot;);<br>})<br>.then(() =&gt; {<br>    console.log(&quot;outer then3&quot;);<br>})<br>.then(() =&gt; {<br>    console.log(&quot;outer then4&quot;);<br>})<br>.then(() =&gt; {<br>    console.log(&quot;outer then5&quot;);<br>})<br>.then(() =&gt; {<br>    console.log(&quot;outer then6&quot;);<br>})<br>```<br>输出结果：<br><br>```<br>inner then1<br>outer then2<br>outer then3<br>outer then4<br>inner then2<br>outer then5<br>outer then6<br>```<br>老师能帮忙解释下这段代码的输出逻辑吗？<br><br>搞不懂输出 `outer then2` 之后紧接着输出了 `outer then3` 和  `outer then4` ，然后才输出 `inner then2`。<br><br>而我理解的是 `outer then2` 之后直接输出 `inner then2` 才对，我理解的顺序：<br><br>```<br>inner then1<br>outer then2<br>inner then2<br>outer then3<br>outer then4<br>outer then5<br>outer then6<br>```<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-05-10 12:21:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/5f/80/51269d88.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Hurry</span>
+  </div>
+  <div class="_2_QraFYR_0">这个太赞了 “ Promise 通过回调函数延迟绑定、回调函数返回值穿透和和错误“冒泡”技术 “， 之前看到别人手写实现 Promise，代码虽然可以看懂，但是理解不深，所以关键还是看如何实现这个三个点 回调函数延迟绑定、回调函数返回值穿透和和错误“冒泡”，结合这三个点和 promise API，手写一个 Promise, So easy<br><br>```js<br>class PromiseSimple {<br>  constructor(executionFunction) {<br>    this.promiseChain = []; &#47;&#47; 1.通过数组存储 callback，实现callback 延迟执行<br>    this.handleError = () =&gt; {};<br><br>    this.onResolve = this.onResolve.bind(this);<br>    this.onReject = this.onReject.bind(this);<br><br>    executionFunction(this.onResolve, this.onReject);<br>  }<br><br>  then(onResolve) {<br>    this.promiseChain.push(onResolve);<br><br>    return this;<br>  }<br><br>  catch(handleError) {<br>    this.handleError = handleError;<br><br>    return this;<br>  }<br><br>  onResolve(value) {<br>    let storedValue = value;<br><br>    try {<br>      this.promiseChain.forEach((nextFunction) =&gt; {<br>         storedValue = nextFunction(storedValue); &#47;&#47; 2.循环，实现 callback 值传递<br>      });<br>    } catch (error) {   &#47;&#47; 3. try catch, 实现错误值冒泡<br>      this.promiseChain = [];<br><br>      this.onReject(error);<br>    }<br>  }<br><br>  onReject(error) {<br>    this.handleError(error);<br>  }<br>}<br>```<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-20 11:40:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/f8/99/8e760987.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>許敲敲</span>
+  </div>
+  <div class="_2_QraFYR_0">面试手写promise也不怕了</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 手写我加餐来讲</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-17 08:12:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/63/5a/4ec96cfe.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>林高鸿</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，我理解是这样，这里感觉大部分人（可能也包括老师）都弄错了，我理解的是：<br><br>对我们（普通使用者）来说，用 Promise 是因为有宏任务问题（AJAX，SetTimeout）需要解决，而专注问题解决时是不需要考虑工具（Promise）自身实现原理（微任务）的<br><br>简言之，对普通使用者来说，把 Promise 和微任务联系起来是本末倒置<br><br><br>PS：其实，如果能保证用 Promise 解决的是异步问题（宏任务&#47;微任务），那 Promise 自身实现原理也不需要微任务来“延迟绑定”（因为异步回来要 resolve 时，then 一定已经执行绑定...）</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-08-02 17:09:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/04/13/84d35588.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张萌</span>
+  </div>
+  <div class="_2_QraFYR_0">一个简易版的 Promise<br>class Promise {<br>  constructor(fn) {<br>    this.state = Promise.PENDING;<br>    this.value = undefined;<br>    this.reason = null;<br>    this.onFulfilledCallbacks = [];<br>    this.onRejectedCallbacks = [];<br>    fn(this.resolve.bind(this), this.reject.bind(this));<br>  }<br><br>  then(onFulfilled, onRejected) {<br>    if (this.state === Promise.FULFILLED) {<br>      onFulfilled(this.value);<br>    } else if (this.state === Promise.REJECTED) {<br>      onRejected(this.reason);<br>    } else {<br>      this.onFulfilledCallbacks.push(onFulfilled);<br>      this.onRejectedCallbacks.push(onRejected);<br>    }<br>    return this;<br>  }<br><br>  resolve(value) {<br>    this.state = Promise.FULFILLED;<br>    this.value = value;<br>    if (value.constructor === this.constructor) {<br>      value.onFulfilledCallbacks = [...this.onFulfilledCallbacks];<br>      value.onRejectedCallbacks = [...this.onRejectedCallbacks];<br>    } else {<br>      this.onFulfilledCallbacks.forEach((item) =&gt; {<br>        if (typeof item === &#39;function&#39;) {<br>          item(value);<br>        }<br>      });<br>    }<br>  }<br><br>  reject(reason) {<br>    this.state = Promise.REJECTED;<br>    this.reason = reason;<br>    this.onRejectedCallbacks.forEach((item) =&gt; {<br>      if (typeof item === &#39;function&#39;) {<br>        item(reason);<br>      }<br>    });<br>  }<br>}<br><br>Promise.PENDING = &#39;pending&#39;;<br>Promise.FULFILLED = &#39;fulfilled&#39;;<br>Promise.REJECTED = &#39;rejected&#39;;<br><br><br>module.exports = Promise;</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-24 10:50:33</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Rapheal</span>
+  </div>
+  <div class="_2_QraFYR_0">自己手写了一个_Promise,运行老师上面的程序，没啥毛病。除了使用宏任务，可以解决嵌套和参数穿透问题。<br><br><br>var _Promise = (function () {<br>    <br>    &#47;*使用闭包 保存所有的回调函数 *&#47; <br>    var _resolve = [];<br>    var _reject = [];<br>    var _catch;<br><br>    return function (executor) {<br><br>        this.print = function () {<br>            console.log(_resolve)<br>            console.log(_catch)<br><br>        }<br>        this.then = function (resolve, reject) {<br>            resolve &amp;&amp; _resolve.push(resolve);<br>            reject &amp;&amp; _reject.push(reject);<br>            return this;<br>        }<br><br>        this.resolve = function (data) {<br>            setTimeout(function () {<br>                let callback = _resolve.shift();<br>                let pro;<br>                callback &amp;&amp; (pro = callback(data));<br>                _reject.shift();<br><br>            }, 0)<br>        }<br><br>        this.reject = function (error) {<br>            setTimeout(function () {<br>                let callback = _reject.shift();<br>                callback &amp;&amp; callback(error);<br>                callback || _catch(error);<br><br>            }, 0);<br>        }<br><br>        this.catch = function (callback) {<br>            _catch = callback;<br>            return this;<br>        }<br>        executor(this.resolve, this.reject);<br>    }<br>})()<br><br>function executor(resolve, reject) {<br>    let rand = Math.random();<br>    console.log(1)<br>    console.log(rand)<br>    if (rand &gt; 0.5)<br>        resolve(rand)<br>    else<br>        reject(rand)<br>}<br>var p0 = new _Promise(executor);<br><br>var p1 = p0.then((value) =&gt; {<br>    console.log(&quot;succeed-1&quot;)<br>    return new _Promise(executor)<br>})<br><br>var p3 = p1.then((value) =&gt; {<br>    console.log(&quot;succeed-2&quot;)<br>    return new _Promise(executor)<br>})<br><br>var p4 = p3.then((value) =&gt; {<br>    console.log(&quot;succeed-3&quot;)<br>    return new _Promise(executor)<br>})<br><br>p4.catch((error) =&gt; {<br>    console.log(&quot;error&quot;)<br>})<br><br><br>console.log(2)<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-05 13:49:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/mX9k3VNGc2mZkfTmI9zia209EugGkpFyLXl8ia1HcnhJCrAsoJ2UliaHQaeDjKOkoCaQOia6iaoj1Dkv3gZqsONlaMg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>悠米</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，手写 Promise 什么时候会有？非常期待~</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-31 15:20:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/23/71/57c16ecb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>任振鹏</span>
+  </div>
+  <div class="_2_QraFYR_0">老师 渲染流水线 在 微任务 之前 还是 之后 执行啊？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 微任务也可以不触发渲染操作，也可以出发渲染操作！<br><br>比如你也可以在微任务中通过js来修改dom，触发重绘，重排等动作！<br><br>你也可以在微任务中执行一些逻辑运算，这就和页面渲染没有关系了！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-07 13:25:24</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/67/8e/14f06610.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>胖虎</span>
+  </div>
+  <div class="_2_QraFYR_0">&quot;回调函数返回值穿透到最外层&quot; 这句话配合老师您讲的例子是错误的  return x2  这个x2按照您那种方式没办法返回到最外层  最外层的x2和里面函数return 出来的x2根本就是两个东西</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-22 18:46:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/ad/ec/776c9f72.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>袋袋</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，最后说定时器的效率不高，promise又把定时器改造成了微任务，可以说下具体是怎么改造的吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 微任务是v8来实现的，具体实现方式等我课程录完来手写一个Promise。<br></p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-18 21:26:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/eb/09/ba5f0135.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Chao</span>
+  </div>
+  <div class="_2_QraFYR_0">老师 你有答疑环节吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 有，现在写稿子时间紧，等我主要稿件写完会抽出大把时间来专门解答问题。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-17 11:48:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/28/53/a7/a3f98d9c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>黄秋生</span>
+  </div>
+  <div class="_2_QraFYR_0">突然发现之前看的内容都漏球很严重，有的东西就是略过了，或者根本没讲</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-12-24 10:59:41</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

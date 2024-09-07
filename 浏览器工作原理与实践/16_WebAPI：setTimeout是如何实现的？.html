@@ -1,0 +1,532 @@
+<audio title="16_WebAPI：setTimeout是如何实现的？" src="https://static001.geekbang.org/resource/audio/58/ea/585b20c34207844c01dcb487b2c4e8ea.mp3" controls="controls"></audio> 
+<p>在<a href="https://time.geekbang.org/column/article/132931">上一篇文章</a>中我们介绍了页面中的事件和消息队列，知道了<strong>浏览器页面是由消息队列和事件循环系统来驱动的</strong>。</p><p>那在接下来的两篇文章中，我会通过<strong>setTimeout</strong>和<strong>XMLHttpRequest</strong>这两个WebAPI来介绍事件循环的应用。这两个WebAPI是两种不同类型的应用，比较典型，并且在JavaScript中的使用频率非常高。你可能觉得它们太简单、太基础，但有时候恰恰是基础简单的东西才最重要，了解它们是如何工作的会有助于你写出更加高效的前端代码。</p><p>本篇文章主要介绍的是<strong>setTimeout</strong>。其实说起setTimeout方法，从事开发的同学想必都不会陌生，它就是一个<strong>定时器，用来指定某个函数在多少毫秒之后执行</strong>。它会返回一个整数，表示定时器的编号，同时你还可以通过该编号来取消这个定时器。下面的示例代码就演示了定时器最基础的使用方式：</p><pre><code>function showName(){
+  console.log(&quot;极客时间&quot;)
+}
+var timerID = setTimeout(showName,200);
+</code></pre><p>执行上述代码，输出的结果也很明显，通过setTimeout指定在200毫秒之后调用showName函数，并输出“极客时间”四个字。</p><p>简单了解了setTimeout的使用方法后，那接下来我们就来看看浏览器是如何实现定时器的，然后再介绍下定时器在使用过程中的一些注意事项。</p><!-- [[[read_end]]] --><h2>浏览器怎么实现setTimeout</h2><p>要了解定时器的工作原理，就得先来回顾下之前讲的事件循环系统，我们知道渲染进程中所有运行在主线程上的任务都需要先添加到消息队列，然后事件循环系统再按照顺序执行消息队列中的任务。下面我们来看看那些典型的事件：</p><ul>
+<li>当接收到HTML文档数据，渲染引擎就会将“解析DOM”事件添加到消息队列中，</li>
+<li>当用户改变了Web页面的窗口大小，渲染引擎就会将“重新布局”的事件添加到消息队列中。</li>
+<li>当触发了JavaScript引擎垃圾回收机制，渲染引擎会将“垃圾回收”任务添加到消息队列中。</li>
+<li>同样，如果要执行一段异步JavaScript代码，也是需要将执行任务添加到消息队列中。</li>
+</ul><p>以上列举的只是一小部分事件，这些事件被添加到消息队列之后，事件循环系统就会按照消息队列中的顺序来执行事件。</p><p>所以说要执行一段异步任务，需要先将任务添加到消息队列中。不过通过定时器设置回调函数有点特别，它们需要在指定的时间间隔内被调用，但消息队列中的任务是按照顺序执行的，所以为了保证回调函数能在指定时间内执行，你不能将定时器的回调函数直接添加到消息队列中。</p><p>那么该怎么设计才能让定时器设置的回调事件在规定时间内被执行呢？你也可以思考下，如果让你在消息循环系统的基础之上加上定时器的功能，你会如何设计？</p><p>在Chrome中除了正常使用的消息队列之外，还有另外一个消息队列，这个队列中维护了需要延迟执行的任务列表，包括了定时器和Chromium内部一些需要延迟执行的任务。所以当通过JavaScript创建一个定时器时，渲染进程会将该定时器的回调任务添加到延迟队列中。</p><p>如果感兴趣，你可以参考<a href="https://cs.chromium.org/chromium/src/base/task/sequence_manager/task_queue_impl.h">Chromium中关于队列部分的源码</a>。</p><p>源码中延迟执行队列的定义如下所示：</p><pre><code> DelayedIncomingQueue delayed_incoming_queue;
+</code></pre><p>当通过JavaScript调用setTimeout设置回调函数的时候，渲染进程将会创建一个回调任务，包含了回调函数showName、当前发起时间、延迟执行时间，其模拟代码如下所示：</p><pre><code>struct DelayTask{
+  int64 id；
+  CallBackFunction cbf;
+  int start_time;
+  int delay_time;
+};
+DelayTask timerTask;
+timerTask.cbf = showName;
+timerTask.start_time = getCurrentTime(); //获取当前时间
+timerTask.delay_time = 200;//设置延迟执行时间
+</code></pre><p>创建好回调任务之后，再将该任务添加到延迟执行队列中，代码如下所示：</p><pre><code>delayed_incoming_queue.push(timerTask)；
+</code></pre><p>现在通过定时器发起的任务就被保存到延迟队列中了，那接下来我们再来看看消息循环系统是怎么触发延迟队列的。</p><p>我们可以来完善<a href="https://time.geekbang.org/column/article/132931">上一篇文章</a>中消息循环的代码，在其中加入执行延迟队列的代码，如下所示：</p><pre><code>void ProcessTimerTask(){
+  //从delayed_incoming_queue中取出已经到期的定时器任务
+  //依次执行这些任务
+}
+
+TaskQueue task_queue；
+void ProcessTask();
+bool keep_running = true;
+void MainTherad(){
+  for(;;){
+    //执行消息队列中的任务
+    Task task = task_queue.takeTask();
+    ProcessTask(task);
+    
+    //执行延迟队列中的任务
+    ProcessDelayTask()
+
+    if(!keep_running) //如果设置了退出标志，那么直接退出线程循环
+        break; 
+  }
+}
+</code></pre><p>从上面代码可以看出来，我们添加了一个<strong>ProcessDelayTask函数</strong>，该函数是专门用来处理延迟执行任务的。这里我们要重点关注它的执行时机，在上段代码中，处理完消息队列中的一个任务之后，就开始执行ProcessDelayTask函数。ProcessDelayTask函数会根据发起时间和延迟时间计算出到期的任务，然后依次执行这些到期的任务。等到期的任务执行完成之后，再继续下一个循环过程。通过这样的方式，一个完整的定时器就实现了。</p><p>设置一个定时器，JavaScript引擎会返回一个定时器的ID。那通常情况下，当一个定时器的任务还没有被执行的时候，也是可以取消的，具体方法是调用<strong>clearTimeout函数</strong>，并传入需要取消的定时器的ID。如下面代码所示：</p><pre><code>clearTimeout(timer_id)
+</code></pre><p>其实浏览器内部实现取消定时器的操作也是非常简单的，就是直接从delayed_incoming_queue延迟队列中，通过ID查找到对应的任务，然后再将其从队列中删除掉就可以了。</p><h2>使用setTimeout的一些注意事项</h2><p>现在你应该知道在浏览器内部定时器是如何工作的了。不过在使用定时器的过程中，如果你不了解定时器的一些细节，那么很有可能掉进定时器的一些陷阱里。所以接下来，我们就来讲解一下在使用定时器过程中存在的那些陷阱。</p><h3>1. 如果当前任务执行时间过久，会影响定时器任务的执行</h3><p>在使用setTimeout的时候，有很多因素会导致回调函数执行比设定的预期值要久，其中一个就是当前任务执行时间过久从而导致定时器设置的任务被延后执行。我们先看下面这段代码：</p><pre><code>function bar() {
+    console.log('bar')
+}
+function foo() {
+    setTimeout(bar, 0);
+    for (let i = 0; i &lt; 5000; i++) {
+        let i = 5+8+8+8
+        console.log(i)
+    }
+}
+foo()
+</code></pre><p>这段代码中，在执行foo函数的时候使用setTimeout设置了一个0延时的回调任务，设置好回调任务后，foo函数会继续执行5000次for循环。</p><p>通过setTimeout设置的回调任务被放入了消息队列中并且等待下一次执行，这里并不是立即执行的；要执行消息队列中的下个任务，需要等待当前的任务执行完成，由于当前这段代码要执行5000次的for循环，所以当前这个任务的执行时间会比较久一点。这势必会影响到下个任务的执行时间。</p><p>你也可以打开Performance来看看其执行过程，如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/1a/4f/1adf4da8ca4315cfb565e798649bd74f.png?wh=1142*497" alt=""></p><center><span class="reference">长任务导致定时器被延后执行</span></center><p>从图中可以看到，执行foo函数所消耗的时长是500毫秒，这也就意味着通过setTimeout设置的任务会被推迟到500毫秒以后再去执行，而设置setTimeout的回调延迟时间是0。</p><h3>2. 如果setTimeout存在嵌套调用，那么系统会设置最短时间间隔为4毫秒</h3><p>也就是说在定时器函数里面嵌套调用定时器，也会延长定时器的执行时间，可以先看下面的这段代码：</p><pre><code>function cb() { setTimeout(cb, 0); }
+setTimeout(cb, 0);
+</code></pre><p>上述这段代码你有没有看出存在什么问题？</p><p>你还是可以通过Performance来记录下这段代码的执行过程，如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/cb/cd/cbb3b2b1ac8eb4752a585df5445412cd.png?wh=1084*398" alt=""></p><center><span class="reference">循环嵌套调用setTimeout</span></center><p>上图中的竖线就是定时器的函数回调过程，从图中可以看出，前面五次调用的时间间隔比较小，嵌套调用超过五次以上，后面每次的调用最小时间间隔是4毫秒。之所以出现这样的情况，是因为在Chrome中，定时器被嵌套调用5次以上，系统会判断该函数方法被阻塞了，如果定时器的调用时间间隔小于4毫秒，那么浏览器会将每次调用的时间间隔设置为4毫秒。下面是<a href="https://cs.chromium.org/chromium/src/third_party/blink/renderer/core/frame/dom_timer.cc">Chromium实现4毫秒延迟的代码</a>，你可以看下：</p><pre><code>static const int kMaxTimerNestingLevel = 5;
+
+// Chromium uses a minimum timer interval of 4ms. We'd like to go
+// lower; however, there are poorly coded websites out there which do
+// create CPU-spinning loops.  Using 4ms prevents the CPU from
+// spinning too busily and provides a balance between CPU spinning and
+// the smallest possible interval timer.
+static constexpr base::TimeDelta kMinimumInterval = base::TimeDelta::FromMilliseconds(4);
+</code></pre><pre><code>base::TimeDelta interval_milliseconds =
+      std::max(base::TimeDelta::FromMilliseconds(1), interval);
+
+  if (interval_milliseconds &lt; kMinimumInterval &amp;&amp;
+      nesting_level_ &gt;= kMaxTimerNestingLevel)
+    interval_milliseconds = kMinimumInterval;
+
+  if (single_shot)
+    StartOneShot(interval_milliseconds, FROM_HERE);
+  else
+    StartRepeating(interval_milliseconds, FROM_HERE);
+</code></pre><p>所以，一些实时性较高的需求就不太适合使用setTimeout了，比如你用setTimeout来实现JavaScript动画就不是一个很好的主意。</p><h3>3. 未激活的页面，setTimeout执行最小间隔是1000毫秒</h3><p>除了前面的4毫秒延迟，还有一个很容易被忽略的地方，那就是未被激活的页面中定时器最小值大于1000毫秒，也就是说，如果标签不是当前的激活标签，那么定时器最小的时间间隔是1000毫秒，目的是为了优化后台页面的加载损耗以及降低耗电量。这一点你在使用定时器的时候要注意。</p><h3>4. 延时执行时间有最大值</h3><p>除了要了解定时器的回调函数时间比实际设定值要延后之外，还有一点需要注意下，那就是Chrome、Safari、Firefox都是以32个bit来存储延时值的，32bit最大只能存放的数字是2147483647毫秒，这就意味着，如果setTimeout设置的延迟值大于 2147483647毫秒（大约24.8天）时就会溢出，那么相当于延时值被设置为0了，这导致定时器会被立即执行。你可以运行下面这段代码：</p><pre><code>function showName(){
+  console.log(&quot;极客时间&quot;)
+}
+var timerID = setTimeout(showName,2147483648);//会被理解调用执行
+</code></pre><p>运行后可以看到，这段代码是立即被执行的。但如果将延时值修改为小于2147483647毫秒的某个值，那么执行时就没有问题了。</p><h3>5. 使用setTimeout设置的回调函数中的this不符合直觉</h3><p>如果被setTimeout推迟执行的回调函数是某个对象的方法，那么该方法中的this关键字将指向全局环境，而不是定义时所在的那个对象。这点在前面介绍this的时候也提过，你可以看下面这段代码的执行结果：</p><pre><code>var name= 1;
+var MyObj = {
+  name: 2,
+  showName: function(){
+    console.log(this.name);
+  }
+}
+setTimeout(MyObj.showName,1000)
+</code></pre><p>这里输出的是1，因为这段代码在编译的时候，执行上下文中的this会被设置为全局window，如果是严格模式，会被设置为undefined。</p><p>那么该怎么解决这个问题呢？通常可以使用下面这两种方法。</p><p>第一种是将<code>MyObj.showName</code>放在匿名函数中执行，如下所示：</p><pre><code>//箭头函数
+setTimeout(() =&gt; {
+    MyObj.showName()
+}, 1000);
+//或者function函数
+setTimeout(function() {
+  MyObj.showName();
+}, 1000)
+</code></pre><p>第二种是使用bind方法，将showName绑定在MyObj上面，代码如下所示：</p><pre><code>setTimeout(MyObj.showName.bind(MyObj), 1000)
+</code></pre><h2>总结</h2><p>好了，今天我们就介绍到这里，下面我来总结下今天的内容。</p><ul>
+<li>首先，为了支持定时器的实现，浏览器增加了延时队列。</li>
+<li>其次，由于消息队列排队和一些系统级别的限制，通过setTimeout设置的回调任务并非总是可以实时地被执行，这样就不能满足一些实时性要求较高的需求了。</li>
+<li>最后，在定时器中使用过程中，还存在一些陷阱，需要你多加注意。</li>
+</ul><p>通过分析和讲解，你会发现函数setTimeout在时效性上面有很多先天的不足，所以对于一些时间精度要求比较高的需求，应该有针对性地采取一些其他的方案。</p><h2>思考时间</h2><p>今天我们介绍了setTimeout，相信你现在也知道它是怎么工作的了，不过由于使用setTimeout设置的回调任务实时性并不是太好，所以很多场景并不适合使用setTimeout。比如你要使用JavaScript来实现动画效果，函数requestAnimationFrame就是个很好的选择。</p><p>那么今天留给你的作业是：你需要网上搜索了解下requestAnimationFrame的工作机制，并对比setTimeout，然后分析出requestAnimationFrame实现的动画效果比setTimeout好的原因。</p><p>欢迎在留言区与我分享你的想法，也欢迎你在留言区记录你的思考过程。感谢阅读，如果你觉得这篇文章对你有帮助的话，也欢迎把它分享给更多的朋友。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/ibZVAmmdAibBeVpUjzwId8ibgRzNk7fkuR5pgVicB5mFSjjmt2eNadlykVLKCyGA0GxGffbhqLsHnhDRgyzxcKUhjg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>pyhhou</span>
+  </div>
+  <div class="_2_QraFYR_0">使用 requestAnimationFrame 不需要设置具体的时间，由系统来决定回调函数的执行时间，requestAnimationFrame 里面的回调函数是在页面刷新之前执行，它跟着屏幕的刷新频率走，保证每个刷新间隔只执行一次，内如果页面未激活的话，requestAnimationFrame 也会停止渲染，这样既可以保证页面的流畅性，又能节省主线程执行函数的开销</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-10 07:36:31</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/04/bb/5e5c37c1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Angus</span>
+  </div>
+  <div class="_2_QraFYR_0">我没有太理解这个异步延迟队列，既然是队列，但好像完全不符合先进先出的特点。在每次执行完任务队列中的一个任务之后都会去执行那些已经到期的延迟任务，这些延迟的任务具体是如何取出的呢。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我文章说是队列，为了和消息队列统一起来，不然表述起来有点拗口。<br><br>其实是一个hashmap结构，等到执行这个结构的时候，会计算hashmap中的每个任务是否到期了，到期了就去执行，直到所有到期的任务都执行结束，才会进入下一轮循环！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-10 10:14:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/f5/b8/9f165f4b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>mfist</span>
+  </div>
+  <div class="_2_QraFYR_0">requestAnimationFrame 提供一个原生的API去执行动画的效果，它会在一帧（一般是16ms）间隔内根据选择浏览器情况去执行相关动作。<br>setTimeout是在特定的时间间隔去执行任务，不到时间间隔不会去执行，这样浏览器就没有办法去自动优化。<br><br>今日得到<br>浏览器的页面是通过消息队列和事件循环系统来驱动的。settimeout的函数会被加入到延迟消息队列中，<br>等到执行完Task任务之后就会执行延迟队列中的任务。然后分析几种场景下面的setimeout的执行方式。<br>1. 如果执行一个很耗时的任务，会影响延迟消息队列中任务的执行<br>2. 存在嵌套带调用时候，系统会设置最短时间间隔为4s（超过5层）<br>3. 未激活的页面，setTimeout最小时间间隔为1000ms<br>4. 延时执行时间的最大值2147483647，溢出会导致定时器立即执行<br>5. setTimeout设置回调函数this会是回调时候对应的this对象，可以使用箭头函数解决</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 回答的很棒，raf是按照系统刷新的节奏调用的！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-11 07:01:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>moss</span>
+  </div>
+  <div class="_2_QraFYR_0">这一节学习到了不少setTimeout的知识。不过关于消息队列我有不同的理解。<br>1. 关于任务优先级。whatwg标准里，“An event loop has one or more task queues”。消息队列其实不算是队列，因为有很多个task queue。“a task queue is a set of tasks”。每一个task queue才是一个队列。而对于每一个task queue里的task，其task source是一致的，或者说不同的task source会被推入到不同的task queue。就是规范里说的“every task source must be associated with a specific task queue”。而task sources都有哪些呢？比如DOM操作，UI事件，网络事件等。这个setTimout应该也算是一种task source吧？会放到专门的队列里。上一轮事件循环结束后，会先选择一个高优先级的task queue，然后取出task queue的第一个task，也因此而有了事件的优先级，老师将的延时队列我有点不太知道怎么融入我现有的知识体系。<br>2. “重新布局”是task吗？<br>老师说“重新布局”的事件会被放到消息队列。我的理解是task -&gt; microtask -&gt; update the rendering。当然不是每次循环都走渲染过程，因为每次循环都特别快不可能每次都走一次渲染，浏览器会遵循17ms一桢的原则走一次update the rendering，其中rAF也在此阶段执行，也是老师题目里rAF更流畅的原因。而重新布局也是在update the rendering阶段执行的，resize和onscroll都是在update the rendering阶段。标准里在update the rendering阶段，会有“run the resize steps”，“run the scroll steps”，这也是为啥scrolling自带节流效果最多17ms触发一次回调的原因，所以我认为连续事件（resize，scroll）既然都不是task -&gt; microtask -&gt; update the rendering里的task，而是update the rendering阶段，应该不会推送到某一个task queue才对。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 第一个问题我在18节也回答过了，一个是标准，一个是实现，标准定义了很多队列，而浏览器只实现了一个普通队列和一个延时队列！<br><br>第二个问题，你说的那个update the randering就是说rAF吧？rAF是用户调用的，重新布局是渲染引擎自动安排的任务，必然要放到消息队列中！<br><br>滚动一般默认都是在合成线程里面完成的，这种都没用到主线程</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-18 14:53:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/c8/e9/c7c5cbf5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>l1shu</span>
+  </div>
+  <div class="_2_QraFYR_0">为什么有些文章说渲染进程中有一个定时器线程用来计时的 到时间后会把回调函数塞到消息队列  而没有提到延迟队列这个说法  求老师解答</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-22 08:30:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTKJrOl63enWXCRxN0SoucliclBme0qrRb19ATrWIOIvibKIz8UAuVgicBMibIVUznerHnjotI4dm6ibODA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Helios</span>
+  </div>
+  <div class="_2_QraFYR_0">请问老师不是说settimeout属于宏任务不，不应该属于在上节课讲的消息队列中么<br>怎么这次有跑到延时队列中了呢，这两个队列有什么关系呢，延时队列也分宏任务和微任务？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-11 23:43:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83eo2GMhevabZrribH3tMFmIuLialgyyictMg1N3ZPPMjmGOdlZ3KXjzPBLWw2dhgR9UGtAXsmKaHCqicew/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>吴海燕</span>
+  </div>
+  <div class="_2_QraFYR_0">老师有空的时候能否画一个包含延时队列和微任务，宏任务，消息队列关系运行图</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-22 10:26:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/39/08/09055b47.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>淡</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，你好。<br>请问微任务的执行是在延迟队列任务执行之前吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 没有之前之后啊，延时队列里面是宏任务，普通的消息队列里面也是宏任务，微任务是在宏任务快要执行结束之前执行的！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-17 17:43:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/2d/dd/f2e79297.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Djan Unchained</span>
+  </div>
+  <div class="_2_QraFYR_0">requestAnimationFrame 也是在主线程上执行吗？如果当前任务执行时间过久，也会导致 requestAnimationFrame 被延后执行吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的，raf的回调函数也是在主线程上执行的，如果其中的一个回调函数执行过久，会影响到其他的任务的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-25 13:03:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/cd/72/b7083420.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Zzzrd</span>
+  </div>
+  <div class="_2_QraFYR_0">看完还是很迷惑：<br>1. setTimeout是宏任务，宏任务应该放在消息队列中，文中说是放在延迟队列中，为什么？延迟队列和消息队列的区别是什么？<br>2. 延迟队列的任务是在当前宏任务执行完之后执行，微任务队列是在当前宏任务将要结束时执行对吗？<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 延迟队列也是宏任务，实际上blink维护了很多不同优先级的队列，这些队列里面都是宏任务<br><br>微任务是在宏任务执行过程中的某个时间点执行的，通常是在宏任务快要结束的时候执行</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-19 14:38:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/e6/06/2045daa5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Wlt</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，您好，延迟队列和消息队列是什么关系，怎么配合工作的？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 延迟消息队列主要是放一些定时执行的任务，如JavaScript设置定时器的回调，还有浏览器内部的一些定时回调任务！ 这类任务需要等到指定时间间隔之后才会被执行！<br><br>而正常的消息队列中的任务只会按照顺序执行，执行完上个任务接着执行下个任务，不需要关系时间间隔！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-28 17:51:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/4d/04/5e0d3713.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>李懂</span>
+  </div>
+  <div class="_2_QraFYR_0">1.执行延迟队列的任务，是一次循环只取出一个，还是检查只要时间到了，就执行？<br>2.微任务是在宏任务里的，是执行完一个宏任务，就去执行宏任务里面的微任务？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 比如有五个定时的任务到期了,那么会分别把这个五个定时器的任务执行掉，再开始下次循环过程！<br><br>chromium中，当执行一个宏任务时，才会创建微任务队列，等遇到checkpoint时就会执行微任务！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-10 10:24:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/b3/2f/867b94d8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>4!!</span>
+  </div>
+  <div class="_2_QraFYR_0">传入requestAnimationFrame的回调并不会添加到消息队列或延迟队列中，传入requestAnimationFrame的回调会在页面下次重绘之前被调用，可以保证动画更实时准确。与setTimeout相比还有几个优点：1.当页面不可见或未被激活时，requestAnimationFrame的回调不会被调用；2.requestAnimationFrame的循环调用会有个自动节流处理，使得动画足够流畅，而函数不被过于频繁调用。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-31 20:42:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/ae/a0/707350ef.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>穿秋裤的男孩</span>
+  </div>
+  <div class="_2_QraFYR_0">评论好多说延迟队列得，其实就是一个定时器线程吧，定时器线程负责计时，到点了就把回掉push到消息队列中。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-16 12:01:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/7b/f0/269139d5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Cris</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，您这里未激活的页面是什么意思？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 就是后台页面，比如你在浏览器中打开了多个标签，除了你当前操作的页面，其他的标签页都是后台页面</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-03 09:28:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/a4/eb/c092f833.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>晓东</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，对processDelayTask这块有个疑惑。这里会把所有的到期任务都执行完才会开始下一个while循环吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-18 11:32:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c6/e0/d2360a29.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>纪年</span>
+  </div>
+  <div class="_2_QraFYR_0">如果 setTimeout 设置的延迟值大于 2147483647 毫秒时就会溢出，这导致定时器会被立即执行。<br>问题：这里的立即执行其实是不是相当于setTimeout（fun, 0）的意思？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的，说立即执行的确有点不准确哈，这个我来优化下说法！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-23 17:51:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/08/36/401ce5e8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>follaw</span>
+  </div>
+  <div class="_2_QraFYR_0">系统如何筛选出到期的任务，如果有10000个呢，是循环一万次？这个系统内部怎么处理的呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 每次执行完一个任务后，都会计算下是否有定时器的任务到期</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-14 01:41:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/19/06/4a/14c31e5c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>以武会友-刘华强</span>
+  </div>
+  <div class="_2_QraFYR_0">怎么优化setTimeout 时间值不准的问题呢？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-14 22:23:14</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/44/0e/ce14b7d3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>-_-|||</span>
+  </div>
+  <div class="_2_QraFYR_0">&#39;32bit 最大只能存放的数字是 2147483647 毫秒&#39;,最大能存放的数字不是2^32-1吗？4294967295，为什么是 2147483647 毫秒</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 因为要一位表示正负数啊</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-06 14:58:13</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

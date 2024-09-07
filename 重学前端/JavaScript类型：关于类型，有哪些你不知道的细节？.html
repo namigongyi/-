@@ -1,0 +1,539 @@
+<audio title="JavaScript类型：关于类型，有哪些你不知道的细节？" src="https://static001.geekbang.org/resource/audio/5d/02/5d547304bd595d7ae180de74d8c48302.mp3" controls="controls"></audio> 
+<p>你好，我是winter。今天我们来讲讲JavaScript的内容，在这个部分，我首先想跟你聊一聊类型。</p><p>JavaScript类型对每个前端程序员来说，几乎都是最为熟悉的概念了。但是你真的很了解它们吗？我们不妨来看看下面的几个问题。</p><ul>
+<li>为什么有的编程规范要求用void 0代替undefined？</li>
+<li>字符串有最大长度吗？</li>
+<li>0.1 + 0.2不是等于0.3么？为什么JavaScript里不是这样的？</li>
+<li>ES6新加入的Symbol是个什么东西？</li>
+<li>为什么给对象添加的方法能用在基本类型上？</li>
+</ul><p>如果你答起来还有些犹豫的地方，这就说明你对这部分知识点，还是有些遗漏之处的。没关系，今天我来帮你一一补上。</p><p>我在前面提到过，我们的JavaScript模块会从运行时、文法和执行过程三个角度去剖析JS的知识体系，本篇我们就从运行时的角度去看JavaScript的类型系统。</p><blockquote>
+<p><span class="reference">运行时类型是代码实际执行过程中我们用到的类型。所有的类型数据都会属于7个类型之一。从变量、参数、返回值到表达式中间结果，任何JavaScript代码运行过程中产生的数据，都具有运行时类型</span>。</p>
+</blockquote><h2>类型</h2><p>JavaScript语言的每一个值都属于某一种数据类型。JavaScript语言规定了7种语言类型。语言类型广泛用于变量、函数参数、表达式、函数返回值等场合。根据最新的语言标准，这7种语言类型是：</p><!-- [[[read_end]]] --><ol>
+<li>Undefined；</li>
+<li>Null；</li>
+<li>Boolean；</li>
+<li>String；</li>
+<li>Number；</li>
+<li>Symbol；</li>
+<li>Object。</li>
+</ol><p>除了ES6中新加入的Symbol类型，剩下6种类型都是我们日常开发中的老朋友了，但是，要想回答文章一开始的问题，我们需要重新认识一下这些老朋友，下面我们就来从简单到复杂，重新学习一下这些类型。</p><h2>Undefined、Null</h2><p>我们的第一个问题，为什么有的编程规范要求用void 0代替undefined？现在我们就分别来看一下。</p><p>Undefined 类型表示未定义，它的类型只有一个值，就是 undefined。任何变量在赋值前是 Undefined 类型、值为 undefined，一般我们可以用全局变量undefined（就是名为undefined的这个变量）来表达这个值，或者 void 运算来把任意一个表达式变成 undefined 值。</p><p>但是呢，因为JavaScript的代码undefined是一个变量，而并非是一个关键字，这是JavaScript语言公认的设计失误之一，所以，我们为了避免无意中被篡改，我建议使用 void 0 来获取undefined值。</p><p>Undefined跟 Null 有一定的表意差别，Null表示的是：“定义了但是为空”。所以，在实际编程时，我们一般不会把变量赋值为 undefined，这样可以保证所有值为 undefined 的变量，都是从未赋值的自然状态。</p><p>Null 类型也只有一个值，就是 null，它的语义表示空值，与 undefined 不同，null 是 JavaScript 关键字，所以在任何代码中，你都可以放心用 null 关键字来获取 null 值。</p><h2>Boolean</h2><p>Boolean 类型有两个值， true 和 false，它用于表示逻辑意义上的真和假，同样有关键字 true 和 false 来表示两个值。这个类型很简单，我就不做过多介绍了。</p><h2>String</h2><p>我们来看看字符串是否有最大长度。</p><p>String 用于表示文本数据。String 有最大长度是 2^53 - 1，这在一般开发中都是够用的，但是有趣的是，这个所谓最大长度，并不完全是你理解中的字符数。</p><p>因为String 的意义并非“字符串”，而是字符串的 UTF16 编码，我们字符串的操作 charAt、charCodeAt、length 等方法针对的都是 UTF16 编码。所以，字符串的最大长度，实际上是受字符串的编码长度影响的。</p><blockquote>
+<p><span class="reference">Note：现行的字符集国际标准，字符是以 Unicode 的方式表示的，每一个 Unicode 的码点表示一个字符，理论上，Unicode 的范围是无限的。UTF是Unicode的编码方式，规定了码点在计算机中的表示方法，常见的有 UTF16 和 UTF8。 Unicode 的码点通常用 U+??? 来表示，其中 ??? 是十六进制的码点值。 0-65536（U+0000 - U+FFFF）的码点被称为基本字符区域（BMP）。</span></p>
+</blockquote><p>JavaScript 中的字符串是永远无法变更的，一旦字符串构造出来，无法用任何方式改变字符串的内容，所以字符串具有值类型的特征。</p><p>JavaScript 字符串把每个 UTF16 单元当作一个字符来处理，所以处理非BMP（超出 U+0000 - U+FFFF 范围）的字符时，你应该格外小心。</p><p>JavaScript 这个设计继承自 Java，最新标准中是这样解释的，这样设计是为了“性能和尽可能实现起来简单”。因为现实中很少用到 BMP 之外的字符。</p><h2>Number</h2><p>下面，我们来说说Number类型。Number类型表示我们通常意义上的“数字”。这个数字大致对应数学中的有理数，当然，在计算机中，我们有一定的精度限制。</p><p>JavaScript中的Number类型有 18437736874454810627(即2^64-2^53+3) 个值。</p><p>JavaScript 中的 Number 类型基本符合 IEEE 754-2008 规定的双精度浮点数规则，但是JavaScript为了表达几个额外的语言场景（比如不让除以0出错，而引入了无穷大的概念），规定了几个例外情况：</p><ul>
+<li>NaN，占用了 9007199254740990，这原本是符合IEEE规则的数字；</li>
+<li>Infinity，无穷大；</li>
+<li>-Infinity，负无穷大。</li>
+</ul><p>另外，值得注意的是，JavaScript中有 +0 和 -0，在加法类运算中它们没有区别，但是除法的场合则需要特别留意区分，“忘记检测除以-0，而得到负无穷大”的情况经常会导致错误，而区分 +0 和 -0 的方式，正是检测 1/x 是 Infinity 还是 -Infinity。</p><p>根据双精度浮点数的定义，Number类型中有效的整数范围是-0x1fffffffffffff至0x1fffffffffffff，所以Number无法精确表示此范围外的整数。</p><p>同样根据浮点数的定义，非整数的Number类型无法用 ==（===也不行） 来比较，一段著名的代码，这也正是我们第三题的问题，为什么在JavaScript中，0.1+0.2不能=0.3：</p><pre><code>  console.log( 0.1 + 0.2 == 0.3);
+</code></pre><p>这里输出的结果是false，说明两边不相等的，这是浮点运算的特点，也是很多同学疑惑的来源，浮点数运算的精度问题导致等式左右的结果并不是严格相等，而是相差了个微小的值。</p><p>所以实际上，这里错误的不是结论，而是比较的方法，正确的比较方法是使用JavaScript提供的最小精度值：</p><pre><code>  console.log( Math.abs(0.1 + 0.2 - 0.3) &lt;= Number.EPSILON);
+</code></pre><p>检查等式左右两边差的绝对值是否小于最小精度，才是正确的比较浮点数的方法。这段代码结果就是 true 了。</p><h2>Symbol</h2><p>Symbol 是 ES6 中引入的新类型，它是一切非字符串的对象key的集合，在ES6规范中，整个对象系统被用Symbol 重塑。</p><p>在后面的文章中，我会详细叙述 Symbol 跟对象系统。这里我们只介绍Symbol类型本身：它有哪些部分，它表示什么意思，以及如何创建Symbol类型。</p><p>Symbol 可以具有字符串类型的描述，但是即使描述相同，Symbol也不相等。</p><p>我们创建 Symbol 的方式是使用全局的 Symbol 函数。例如：</p><pre><code>    var mySymbol = Symbol(&quot;my symbol&quot;);
+</code></pre><p>一些标准中提到的 Symbol，可以在全局的 Symbol 函数的属性中找到。例如，我们可以使用 Symbol.iterator 来自定义 for…of 在对象上的行为：</p><pre><code>    var o = new Object
+
+    o[Symbol.iterator] = function() {
+        var v = 0
+        return {
+            next: function() {
+                return { value: v++, done: v &gt; 10 }
+            }
+        }        
+    };
+
+    for(var v of o) 
+        console.log(v); // 0 1 2 3 ... 9
+</code></pre><p>代码中我们定义了iterator之后，用for(var v of o)就可以调用这个函数，然后我们可以根据函数的行为，产生一个for…of的行为。</p><p>这里我们给对象o添加了 Symbol.iterator 属性，并且按照迭代器的要求定义了一个0到10的迭代器，之后我们就可以在for of中愉快地使用这个o对象啦。</p><p>这些标准中被称为“众所周知”的 Symbol，也构成了语言的一类接口形式。它们允许编写与语言结合更紧密的 API。</p><h2>Object</h2><p>Object 是 JavaScript 中最复杂的类型，也是 JavaScript 的核心机制之一。Object表示对象的意思，它是一切有形和无形物体的总称。</p><p>下面我们来看一看，为什么给对象添加的方法能用在基本类型上？</p><p>在 JavaScript 中，对象的定义是“属性的集合”。属性分为数据属性和访问器属性，二者都是key-value结构，key可以是字符串或者 Symbol类型。</p><p>关于对象的机制，后面会有单独的一篇来讲述，这里我重点从类型的角度来介绍对象类型。</p><p>提到对象，我们必须要提到一个概念：类。</p><p>因为 C++ 和 Java 的成功，在这两门语言中，每个类都是一个类型，二者几乎等同，以至于很多人常常会把JavaScript的“类”与类型混淆。</p><p>事实上，JavaScript 中的“类”仅仅是运行时对象的一个私有属性，而JavaScript中是无法自定义类型的。</p><p>JavaScript中的几个基本类型，都在对象类型中有一个“亲戚”。它们是：</p><ul>
+<li>Number；</li>
+<li>String；</li>
+<li>Boolean；</li>
+<li>Symbol。</li>
+</ul><p>所以，我们必须认识到 3 与 new Number(3) 是完全不同的值，它们一个是 Number 类型， 一个是对象类型。</p><p>Number、String和Boolean，三个构造器是两用的，当跟 new 搭配时，它们产生对象，当直接调用时，它们表示强制类型转换。</p><p>Symbol 函数比较特殊，直接用 new 调用它会抛出错误，但它仍然是 Symbol 对象的构造器。</p><p>JavaScript 语言设计上试图模糊对象和基本类型之间的关系，我们日常代码可以把对象的方法在基本类型上使用，比如：</p><pre><code>    console.log(&quot;abc&quot;.charAt(0)); //a
+</code></pre><p>甚至我们在原型上添加方法，都可以应用于基本类型，比如以下代码，在 Symbol 原型上添加了hello方法，在任何 Symbol 类型变量都可以调用。</p><pre><code>    Symbol.prototype.hello = () =&gt; console.log(&quot;hello&quot;);
+
+    var a = Symbol(&quot;a&quot;);
+    console.log(typeof a); //symbol，a并非对象
+    a.hello(); //hello，有效
+</code></pre><p>所以我们文章开头的问题，答案就是<code>.</code> 运算符提供了装箱操作，它会根据基础类型构造一个临时对象，使得我们能在基础类型上调用对应对象的方法。</p><h2>类型转换</h2><p>讲完了基本类型，我们来介绍一个现象：类型转换。</p><p>因为JS是弱类型语言，所以类型转换发生非常频繁，大部分我们熟悉的运算都会先进行类型转换。大部分类型转换符合人类的直觉，但是如果我们不去理解类型转换的严格定义，很容易造成一些代码中的判断失误。</p><p>其中最为臭名昭著的是JavaScript中的“ == ”运算，因为试图实现跨类型的比较，它的规则复杂到几乎没人可以记住。</p><p>这里我们当然也不打算讲解==的规则，它属于设计失误，并非语言中有价值的部分，很多实践中推荐禁止使用“ ==”，而要求程序员进行显式地类型转换后，用 === 比较。</p><p>其它运算，如加减乘除大于小于，也都会涉及类型转换。幸好的是，实际上大部分类型转换规则是非常简单的，如下表所示：</p><p><img src="https://static001.geekbang.org/resource/image/71/20/71bafbd2404dc3ffa5ccf5d0ba077720.jpg?wh=1127*447" alt=""></p><p>在这个里面，较为复杂的部分是Number和String之间的转换，以及对象跟基本类型之间的转换。我们分别来看一看这几种转换的规则。</p><h3>StringToNumber</h3><p>字符串到数字的类型转换，存在一个语法结构，类型转换支持十进制、二进制、八进制和十六进制，比如：</p><ul>
+<li>30；</li>
+<li>0b111；</li>
+<li>0o13；</li>
+<li>0xFF。</li>
+</ul><p>此外，JavaScript支持的字符串语法还包括正负号科学计数法，可以使用大写或者小写的e来表示：</p><ul>
+<li>1e3；</li>
+<li>-1e-2。</li>
+</ul><p>需要注意的是，parseInt 和 parseFloat 并不使用这个转换，所以支持的语法跟这里不尽相同。</p><p>在不传入第二个参数的情况下，parseInt只支持16进制前缀“0x”，而且会忽略非数字字符，也不支持科学计数法。</p><p>在一些古老的浏览器环境中，parseInt还支持0开头的数字作为8进制前缀，这是很多错误的来源。所以在任何环境下，都建议传入parseInt的第二个参数，而parseFloat则直接把原字符串作为十进制来解析，它不会引入任何的其他进制。</p><p>多数情况下，Number 是比 parseInt 和 parseFloat 更好的选择。</p><h3>NumberToString</h3><p>在较小的范围内，数字到字符串的转换是完全符合你直觉的十进制表示。当Number绝对值较大或者较小时，字符串表示则是使用科学计数法表示的。这个算法细节繁多，我们从感性的角度认识，它其实就是保证了产生的字符串不会过长。</p><p>具体的算法，你可以去参考JavaScript的语言标准。由于这个部分内容，我觉得在日常开发中很少用到，所以这里我就不去详细地讲解了。</p><h3>装箱转换</h3><p>每一种基本类型Number、String、Boolean、Symbol在对象中都有对应的类，所谓装箱转换，正是把基本类型转换为对应的对象，它是类型转换中一种相当重要的种类。</p><p>前文提到，全局的 Symbol 函数无法使用 new 来调用，但我们仍可以利用装箱机制来得到一个 Symbol 对象，我们可以利用一个函数的call方法来强迫产生装箱。</p><p>我们定义一个函数，函数里面只有return this，然后我们调用函数的call方法到一个Symbol类型的值上，这样就会产生一个symbolObject。</p><p>我们可以用console.log看一下这个东西的type of，它的值是object，我们使用symbolObject instanceof 可以看到，它是Symbol这个类的实例，我们找它的constructor也是等于Symbol的，所以我们无论从哪个角度看，它都是Symbol装箱过的对象：</p><pre><code>    var symbolObject = (function(){ return this; }).call(Symbol(&quot;a&quot;));
+
+    console.log(typeof symbolObject); //object
+    console.log(symbolObject instanceof Symbol); //true
+    console.log(symbolObject.constructor == Symbol); //true
+</code></pre><p>装箱机制会频繁产生临时对象，在一些对性能要求较高的场景下，我们应该尽量避免对基本类型做装箱转换。</p><p>使用内置的 Object 函数，我们可以在JavaScript代码中显式调用装箱能力。</p><pre><code>    var symbolObject = Object(Symbol(&quot;a&quot;));
+
+    console.log(typeof symbolObject); //object
+    console.log(symbolObject instanceof Symbol); //true
+    console.log(symbolObject.constructor == Symbol); //true
+</code></pre><p>每一类装箱对象皆有私有的 Class 属性，这些属性可以用 Object.prototype.toString 获取：</p><pre><code>    var symbolObject = Object(Symbol(&quot;a&quot;));
+
+    console.log(Object.prototype.toString.call(symbolObject)); //[object Symbol]
+</code></pre><p>在 JavaScript 中，没有任何方法可以更改私有的 Class 属性，因此Object.prototype.toString 是可以准确识别对象对应的基本类型的方法，它比 instanceof 更加准确。</p><p>但需要注意的是，call本身会产生装箱操作，所以需要配合 typeof 来区分基本类型还是对象类型。</p><h3>拆箱转换</h3><p>在JavaScript标准中，规定了 ToPrimitive 函数，它是对象类型到基本类型的转换（即，拆箱转换）。</p><p>对象到 String 和 Number 的转换都遵循“先拆箱再转换”的规则。通过拆箱转换，把对象变成基本类型，再从基本类型转换为对应的 String 或者 Number。</p><p>拆箱转换会尝试调用 valueOf 和 toString 来获得拆箱后的基本类型。如果 valueOf 和 toString 都不存在，或者没有返回基本类型，则会产生类型错误 TypeError。</p><pre><code>    var o = {
+        valueOf : () =&gt; {console.log(&quot;valueOf&quot;); return {}},
+        toString : () =&gt; {console.log(&quot;toString&quot;); return {}}
+    }
+
+    o * 2
+    // valueOf
+    // toString
+    // TypeError
+</code></pre><p>我们定义了一个对象o，o有valueOf和toString两个方法，这两个方法都返回一个对象，然后我们进行o*2这个运算的时候，你会看见先执行了valueOf，接下来是toString，最后抛出了一个TypeError，这就说明了这个拆箱转换失败了。</p><p>到 String 的拆箱转换会优先调用 toString。我们把刚才的运算从o*2换成 String(o)，那么你会看到调用顺序就变了。</p><pre><code>    var o = {
+        valueOf : () =&gt; {console.log(&quot;valueOf&quot;); return {}},
+        toString : () =&gt; {console.log(&quot;toString&quot;); return {}}
+    }
+
+   String(o)
+    // toString
+    // valueOf
+    // TypeError
+</code></pre><p>在 ES6 之后，还允许对象通过显式指定 @@toPrimitive Symbol 来覆盖原有的行为。</p><pre><code>    var o = {
+        valueOf : () =&gt; {console.log(&quot;valueOf&quot;); return {}},
+        toString : () =&gt; {console.log(&quot;toString&quot;); return {}}
+    }
+
+    o[Symbol.toPrimitive] = () =&gt; {console.log(&quot;toPrimitive&quot;); return &quot;hello&quot;}
+
+
+    console.log(o + &quot;&quot;)
+    // toPrimitive
+    // hello
+</code></pre><h2>结语</h2><p>在本篇文章中，我们介绍了 JavaScript 运行时的类型系统。这里回顾一下今天讲解的知识点。</p><p>除了这七种语言类型，还有一些语言的实现者更关心的规范类型。</p><ul>
+<li>List 和 Record： 用于描述函数传参过程。</li>
+<li>Set：主要用于解释字符集等。</li>
+<li>Completion Record：用于描述异常、跳出等语句执行过程。</li>
+<li>Reference：用于描述对象属性访问、delete等。</li>
+<li>Property Descriptor：用于描述对象的属性。</li>
+<li>Lexical Environment 和 Environment Record：用于描述变量和作用域。</li>
+<li>Data Block：用于描述二进制数据。</li>
+</ul><p>有一个说法是：程序 = 算法 + 数据结构，运行时类型包含了所有 JavaScript 执行时所需要的数据结构的定义，所以我们要对它格外重视。</p><p>最后我们留一个实践问题，如果我们不用原生的Number和parseInt，用JavaScript代码实现String到Number的转换，该怎么做呢？请你把自己的代码留言给我吧！</p><hr></hr><h2>补充阅读</h2><p>事实上，“类型”在 JavaScript 中是一个有争议的概念。一方面，标准中规定了运行时数据类型； 另一方面，JavaScript语言中提供了 typeof 这样的运算，用来返回操作数的类型，但 typeof 的运算结果，与运行时类型的规定有很多不一致的地方。我们可以看下表来对照一下。</p><p><img src="https://static001.geekbang.org/resource/image/ec/6b/ec4299a73fb84c732efcd360fed6e16b.png?wh=610*556" alt=""></p><p>在表格中，多数项是对应的，但是请注意object——Null和function——Object是特例，我们理解类型的时候需要特别注意这个区别。</p><p>从一般语言使用者的角度来看，毫无疑问，我们应该按照 typeof 的结果去理解语言的类型系统。但JavaScript之父本人也在多个场合表示过，typeof 的设计是有缺陷的，只是现在已经错过了修正它的时机。</p><h1>猜你喜欢</h1><p><a href="https://time.geekbang.org/course/intro/163?utm_term=zeusMTA7L&amp;utm_source=app&amp;utm_medium=chongxueqianduan&amp;utm_campaign=163-presell"><img src="https://static001.geekbang.org/resource/image/1a/08/1a49758821bdbdf6f0a8a1dc5bf39f08.jpg?wh=1032*330" alt="unpreview"></a></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/70/4b/9b7c7258.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>bertZuo</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，对于Number 类型有一个疑惑，您举列的console.log( 0.1 + 0.2 == 0.3)为false，我就另测试了了一下console.log( 0.3 + 0.2 == 0.5)就为true了呢，试试其他都是true，为啥只有是否等于0.3才为false呀？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-28 10:39:33</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/9d/65/ef4fc8e1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>咕叽咕叽</span>
+  </div>
+  <div class="_2_QraFYR_0">感谢winter老师的分享，受益匪浅。<br><br>但是本文有两点是值得商榷的。<br>其一：<br>原文：Undefined 跟 null 有一定的表意差别，null表示的是：“定义了但是为空”。<br>私以为，undefined表示的是：“定义了但是为空”。而非null。<br><br>二：<br>原文：<br>    var o = {<br>        valueOf : () =&gt; {console.log(&quot;valueOf&quot;); return {}},<br>        toString : () =&gt; {console.log(&quot;toString&quot;); return {}}<br>    }<br><br>    o + &quot;&quot;<br>    &#47;&#47; toString<br>    &#47;&#47; valueOf<br>    &#47;&#47; TypeError<br><br>很多朋友已经提出来了，应该是先执行valueof，再执行toString。<br><br>这个问题，可以从ecmascript规范中寻找答案：<br><br>规范指出，类型转换的内部实现是通过ToPrimitive ( input [ , PreferredType ] )方法进行转换的，这个方法的作用就是将input转换成一个非对象类型。<br><br>参数preferredType是可选的，它的作用是，指出了input被期待转成的类型。<br><br>如果不传preferredType进来，默认的是&#39;number&#39;。<br><br>如果preferredType的值是&quot;string&quot;，那就先执行&quot;toString&quot;, 后执行&quot;valueOf&quot;。否则，先执行&quot;valueOf&quot;, 后执行&quot;toString&quot;。<br><br>由此可见，&quot;toString&quot;, &quot;valueOf&quot;的执行顺序，取决于preferred的值。<br><br>规范原文请移步：http:&#47;&#47;www.ecma-international.org&#47;ecma-262&#47;#sec-toprimitive<br><br>再回到我们的例子<br>var o = {<br>        valueOf : () =&gt; {console.log(&quot;valueOf&quot;); return {}},<br>        toString : () =&gt; {console.log(&quot;toString&quot;); return {}}<br>}<br><br>o + &quot;&quot;<br><br>类型转换时，把对象o进行转换，调用toPrimitive方法，即toPrimitive(o[ , PreferredType ] )。关键的点是，preferredType是否被传值，传的是什么值？<br><br>我们再去看下规范，看看加法运算符的规则。<br><br>加法运算符运算过程中有两行代码很重要，如下<br>    Let lprim be ? ToPrimitive(lval).<br>    Let rprim be ? ToPrimitive(rval).<br><br>可以看出，调用ToPrimitive方法时，第二个参数是没有传参的。<br><br>所以preferredType取默认的值&quot;number&quot;。最终先执行&quot;valueOf&quot;, 后执行&quot;toString&quot;。<br><br>个人愚见，如有纰漏，还请各位同仁指正。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 一、undefined确实是表示未定义，从字面即可看出来。<br><br>取JavaScript对象的未定义过的属性得到的都是undefined。<br><br>二、嗯，这个地方我确实写错了，等下改过来。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-15 19:43:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/cb/3a/b030da22.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>奔跑的兔子</span>
+  </div>
+  <div class="_2_QraFYR_0">我发现有很多同学都在纠结undefined问题，为什么不去读一下mdn呢。<br>https:&#47;&#47;developer.mozilla.org&#47;en-US&#47;docs&#47;Web&#47;JavaScript&#47;Reference&#47;Global_Objects&#47;undefined<br>前两段写的很明确了。<br>undefined is a property of the global object; i.e., it is a variable in global scope. The initial value of undefined is the primitive value undefined.<br>In modern browsers (JavaScript 1.8.5 &#47; Firefox 4+), undefined is a non-configurable, non-writable property per the ECMAScript 5 specification. Even when this is not the case, avoid overriding it.<br>在ES5之前的时候，undefined是可以被赋值的。在现代浏览器当中已经把undefined设置为一个non-configurable, non-writable属性的值了。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-28 08:56:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/18/d0/ba4d7a90.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>yuuk</span>
+  </div>
+  <div class="_2_QraFYR_0">undefined在全局环境没法被赋值，在局部环境是可以被赋值的！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 19:27:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/48/b7/c41ee146.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>🍃Spring🍃</span>
+  </div>
+  <div class="_2_QraFYR_0">String转number<br>Math.floor(&quot;1000&quot;)<br>Math.round(&quot;1000&quot;)<br>Math.ceil(&quot;1000&quot;)<br>var num = +&quot;1000&quot;<br>&quot;1000&quot;&gt;&gt;&gt;0<br>~~&quot;1000&quot;<br>&quot;1000&quot;*1<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 23:42:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/fd/84/0017fe79.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>饭小笛 🐱</span>
+  </div>
+  <div class="_2_QraFYR_0">关于Number类型，如果想要进一步理解可以去参考IEEE 754中关于浮点数的表达规范，了解这64位中各个位数段表达的含义<br><br>文中有几个叙述不清的地方：<br><br>1. NaN和+Infinity的规定实际是IEEE 754标准规定的特殊值：<br><br>（e为指数的位数，双精度中e=11）<br><br>- 指数为2^e – 1且尾数的小数部分全0，这个数字是±∞。（符号位决定正负）<br>- 指数为2^e – 1且尾数的小数部分非全0，这个数字是NaN，比如单精度浮点数中按位表示：S111 1111 1AXX XXXX XXXX XXXX XXXX XXXX，S为符号位值无所谓，A是小数位的最高位（整数位1省略），其取值表示了NaN的类型：X不能全为0，并被称为NaN的payload<br><br>2. NaN，占用了 9007199254740990，这个叙述不对<br><br>留言里很多童鞋都提出了 9007199254740990 被占用是什么意思的疑问，实际是第一点描述的关于NaN规定和参考双精度浮点数的表达方式，尾数共有53位，指数固定为2^e – 1并去掉±∞两个值，那么NaN其实是 2^53-2 个特殊数字的合集（2^53-2 = 9007199254740990 ）；<br><br>并不是 9007199254740990 被占用，而是 9007199254740990 个特殊值被占用来表示 NaN<br><br>扩展一下，我们就可以理解为什么NaN !== NaN了，它确实不是一个值，而是一群值呢0 0！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-04 15:11:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/e5/d9/8fd0aef1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>于江水</span>
+  </div>
+  <div class="_2_QraFYR_0"><br>1. 实现字符串转数字的同学，不要单纯考虑这个字符串一定全是数字而用运算符来实现。放在实际场景会出现大量 NaN。<br><br>2. “需要注意的是，parseInt 和 parseFloat 并不使用这个转换，所以支持的语法跟这里不尽相同。” 使用是不是打错了？应该是 适用？<br><br>3. 代码 Object((Symbol(‘a’)) 要么左边多了括号要么右边少了括号。<br><br>4. 希望类似装箱转换、拆箱转换这样的专属名词如果有英文单词可以补充下方便检索更多信息。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-29 22:00:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/02/e2/f646601b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>爱烤火的鱼</span>
+  </div>
+  <div class="_2_QraFYR_0">前面还听得懂，越到后面越听不懂，讲的不是很具象，估计有基础好的人才听得懂。基础不好的听了云山雾罩的...</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-08 16:16:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/c0/99/259a412f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geeker</span>
+  </div>
+  <div class="_2_QraFYR_0">1. JavaScript 七种数据类型；<br>2. 数据类型转换；<br>3. 数据类型检测；<br>貌似留言不能直接发图片呢，那我放一个语雀上传后的地址吧，图片是看完这篇课程的简要总结，不包含数据类型转换和检测。<br>地址：https:&#47;&#47;cdn.nlark.com&#47;yuque&#47;0&#47;2019&#47;png&#47;119718&#47;1548515753198-ac12f382-49f8-424d-b242-a5764968e2d2.png</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 23:17:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/01/09/a35710f0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>啊咩</span>
+  </div>
+  <div class="_2_QraFYR_0">在chrome 70我尝试拆箱转换对象，但是无论是转String还是Number都是先valueOf 再toString呀～</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-27 08:55:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/b3/26/cc28a05a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>悬炫</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，虽然undefined可以被赋值，但是发现对他赋值是没有意义的<br>undefined=9;<br>let a=undefined;<br>console.log(a)<br>此处的a的值还是undefined，并不是9；<br>这是不是意味着，void 0这种写法已经没什么意义了，因为现在看来，把一个值赋值为undefined，那这个值就是undefined。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 10:05:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/4b/cb/48a7f660.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>warmlyice</span>
+  </div>
+  <div class="_2_QraFYR_0">字符串类型转换成Number类型，可以使用算术运算符，运算时进行隐式转换。如下:<br>+&quot;&quot;<br>&quot;&quot; - 0<br>&quot;&quot; * 1<br>&quot;&quot; &#47; 1</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 21:43:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/61/c1/93031a2a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Aaaaaaaaaaayou</span>
+  </div>
+  <div class="_2_QraFYR_0">实验证明 undefined 被赋值后再打印，还是 undefined。实验环境 mac 10.14.2 chrome71</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 11:57:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>yansj</span>
+  </div>
+  <div class="_2_QraFYR_0">0.1+0.2==0.3 false 主要是因为小数的二进制表示时就有误差。1.因为十进制转二进制的小数部分的原则是乘2取整顺序表达，这边会发现0.1 0.2 0.3这三个数都不能有限表达，会产生无限位数。2.固定位数二进制无法表示无限循环序列（截断部分会进行进位或者舍去，这边会产生误差）</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-07 16:58:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/1e/1f/41e35a24.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>測試中……</span>
+  </div>
+  <div class="_2_QraFYR_0">null 的类型是 object，这是由于历史原因造成的。1995 年的 JavaScript 语言第一版，只设计了五种数据类型（对象、整数、浮点数、字符串和布尔值），没考虑 null，只把它当作 object 的一种特殊值。后来null 独立出来，作为一种单独的数据类型，为了兼容以前的代码，typeof null 返回 object 就没法改变了。<br><br>来自：https:&#47;&#47;wangdoc.com&#47;javascript&#47;types&#47;general.html</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-27 19:05:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://wx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTKLLTwMonrzBnx3tuRqY0NJtV3R68xibgZyFwewBPE1MTbLulicYWBFSqMw68qZqjKW6ibjr0IVucXJg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>blueshell</span>
+  </div>
+  <div class="_2_QraFYR_0">#### 重写十进制的parseInt&#47;parseFloat<br>`<br>var myParse = function (val) {<br>    if (val) {<br>        var num = val.match(&#47;^\d*\.?\d+&#47;);<br>        if (num !== null) {<br>            return num[0] - 0;<br>        }else{<br>            return NaN;<br>        }<br>    }else{<br>        return NaN;<br>    }<br>}<br>`</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 嗯 不错 <br><br>不过用正则和剑法自动转换可就偷懒了，而且这些东西有太多你没搞清楚的细节了。<br><br>比如你看看我写的十进制的正则：<br><br>&#47;\.[0-9]+|(?:[1-9]+[0-9]*|0)(?:\.[0-9]*|\.)?)(?:[eE][+-]{0,1}[0-9]+)?(?![_$a-zA-Z0-9])&#47;</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-19 22:02:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>头皮发麻</span>
+  </div>
+  <div class="_2_QraFYR_0">老师居然不是地中海加秃头，还是个二次元的肥宅，，，，</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-29 17:30:02</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/s0bx4WXQNkAJ3c3map0g6dlt3sKDgTtN7Ria96YoufjQcVVI8Shv5CN1jnK1ZTImNnlPcibRqvyiaUuhpIvV1TpnQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>wingsico</span>
+  </div>
+  <div class="_2_QraFYR_0">对于规范类型部分，winter描述的并不详细。因此，在查阅相关资料后，对其进行补充。<br>共有以下7种规范类型：<br><br>1. List和Record：List是用来描述参数列表的执行，其实跟ES中规定的数组的意义相近，但是写规范的时候还不存在ES的数组类型，所以使用List代替，写作&lt;&lt;1,2&gt;&gt;。而Record是用来描述算法中的数据聚合的，可以简单理解为ES中的对象，这类类型的话内部聚合了一个或多个命名字段（可以理解为键值对），其中命名字段的值一般是ES规范中的值或者是Record类型关联的抽象值（可以简单对应为JS中的基本类型的值或者是对象类型的值），字段的名称始终用 `[[name]]` 表示。你可以在JS对象的原型链上或原型链中的某个属性中看到类型的表示，例如 `[[Scopes]]`，但一般涉及语言实现，不会对外暴露出具体信息。<br><br>2. Set和Relation：Set主要是解释内存模型中使用的无序元素集合，即数学意义上的集合，其中的元素出现不超过一次，应该与ES6中的Set类型对应，在语言层面上会用于描述字符集之类的。Relation用于解释Set之间的关系，例如包含、交叉等，可以参考数学定义上的集合关系。<br><br>3. Completion Record：翻译过来即是完成时的记录，这里的完成时一般是指语句执行后的完成状态。这个完成状态有几种类型，例如正常的复赋值语句完成后，他的完成状态就是normal，但例如break, continue,return, throw这些语句执行完成后，其完成状态就是对应的状态（break,continue,return,throw）。<br><br>4. Reference类型：用来解释诸如delete，typeof，赋值运算符，super关键字和其他语言特征等运算符的行为。 简单理解，就是如何去解析这些运算符的使用，有点类似词法作用域中对变量的LHS，RHS的查找。<br><br>5.  Property Descriptor类型：就是属性描述符，用来解释对象属性的特性的操作，其值为Record类型，分为数据属性描述符和访问器属性描述符。例如 `[[Writable]]，[[Get]]` 等<br>6. Lexical Environment和Environment Record类型：主要是用来描述ES里作用域，标识符绑定等等。这个要详细描述的话有点长，可以查询一下相关资料。关于作用域、闭包的解释都可以从这个层面来说明。<br>7. Data Blocks：主要是描述二进制数据，用来描述字节大小（8位）数值的不同且可变的序列。这个我也不太懂，就不详细说明了。<br><br>以上就是对 winter 对规范类型的补充说明，也是我自己刨根问底的一种尝试吧。但是由于2000个字的限制，我删除了较多部分。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-29 22:18:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/d5/52/dba8a8a2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Mr.z</span>
+  </div>
+  <div class="_2_QraFYR_0">winter你好，关于js精度那块的问题，我在实际业务中遇到的情况是，后端产生了一个long类型的数值eg：1089723723231137792，但是在页面js获取的时候就变成了1089723723231137800，我查资料说是js精度问题，但是具体的解决方式是后端将这个long转成String类型然后在前段输出，请问如果不将这个long类型转换String后输出，前端js是否真的无法精确的获取这个long的数值呢？谢谢。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-28 11:18:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/4a/c7/ec18673b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>大斌</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，最后小结图是不是有些问题？typeof function那里？？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 09:25:57</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

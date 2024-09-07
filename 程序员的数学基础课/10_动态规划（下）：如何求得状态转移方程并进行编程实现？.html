@@ -1,0 +1,499 @@
+<audio title="10_动态规划（下）：如何求得状态转移方程并进行编程实现？" src="https://static001.geekbang.org/resource/audio/f1/44/f17edfee45c537cf87b7989d030bcb44.mp3" controls="controls"></audio> 
+<p>你好，我是黄申。</p><p>上一节，我从查询推荐的业务需求出发，介绍了编辑距离的概念，今天我们要基于此，来获得状态转移方程，然后才能进行实际的编码实现。</p><h2>状态转移方程和编程实现</h2><p>上一节我讲到了使用状态转移表来展示各个子串之间的关系，以及编辑距离的推导。不过，我没有完成那张表格。现在我把它补全，你可以和我的结果对照一下。</p><p><img src="https://static001.geekbang.org/resource/image/26/8c/265fb5d134bfebb2fd2cf712f759468c.png?wh=1280*536" alt=""></p><p>这里面求最小值的min函数里有三个参数，分别对应我们上节讲的三种情况的编辑距离，分别是：A串插入、B串插入（A串删除）和替换字符。在表格的右下角我标出了两个字符串的编辑距离1。</p><p>概念和分析过程你都理解了，作为程序员，最终还是要落脚在编码上，我这里带你做些编码前的准备工作。</p><p>我们假设字符数组A[]和B[]分别表示字符串A和B，A[i]表示字符串A中第i个位置的字符，B[i]表示字符串B中第i个位置的字符。二维数组d[,]表示刚刚用于推导的二维表格，而d[i,j]表示这张表格中第i行、第j列求得的最终编辑距离。函数r(i, j)表示替换时产生的编辑距离。如果A[i]和B[j]相同，函数的返回值为0，否则返回值为1。</p><p>有了这些定义，下面我们用迭代来表达上述的推导过程。</p><ul>
+<li>
+<p>如果i为0，且j也为0，那么d[i, j]为0。</p>
+</li>
+<li>
+<p>如果i为0，且j大于0，那么d[i, j]为j。</p>
+</li>
+<li>
+<p>如果i大于0，且j为0，那么d[i, j]为i。</p>
+</li>
+<li>
+<p>如果i大于0，且 j大于0，那么d[i, j]=min(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + r(i, j))。</p>
+</li>
+</ul><!-- [[[read_end]]] --><p>这里面最关键的一步是d[i, j]=min(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + r(i, j))。这个表达式表示的是动态规划中从上一个状态到下一个状态之间可能存在的一些变化，以及基于这些变化的最终决策结果。我们把这样的表达式称为<strong>状态转移方程</strong>。我上节最开始就说过，在所有动态规划的解法中，状态转移方程是关键，所以你一定要掌握它。</p><p>有了状态转移方程，我们就可以很清晰地用数学的方式，来描述状态转移及其对应的决策过程，而且，有了状态转移方程，具体的编码其实就很容易了。基于编辑距离的状态转移方程，我在这里列出了一种编码的实现，你可以看看。</p><p>我们首先要定义函数的参数和返回值，你需要注意判断一下a和b为null的情况。</p><pre><code> public class Lesson10_1 {
+	
+	/**
+    * @Description:	使用状态转移方程，计算两个字符串之间的编辑距离
+    * @param a-第一个字符串，b-第二个字符串
+    * @return int-两者之间的编辑距离
+    */
+	
+	public static int getStrDistance(String a, String b) {
+		
+		if (a == null || b == null) return -1;
+</code></pre><p>然后，初始化状态转移表。我用int型的二维数组来表示这个状态转移表，并对i为0且j大于0的元素，以及i大于0且j为0的元素，赋予相应的初始值。</p><pre><code>  // 初始用于记录化状态转移的二维表
+		int[][] d = new int[a.length() + 1][b.length() + 1];
+		
+		// 如果i为0，且j大于等于0，那么d[i, j]为j
+		for (int j = 0; j &lt;= b.length(); j++) {
+			d[0][j] = j;
+		}
+		
+		// 如果i大于等于0，且j为0，那么d[i, j]为i
+		for (int i = 0; i &lt;= a.length(); i++) {
+			d[i][0] = i;
+		}
+</code></pre><p>我这里实现的时候，i和j都是从0开始，所以我计算的d[i+1, j+1]，而不是d[i, j]。而d[i+1, j+1] = min(d[i, j+1] + 1, d[i+1, j] + 1, d[i, j] + r(i, j)。</p><pre><code>  // 实现状态转移方程
+		// 请注意由于Java语言实现的关系，代码里的状态转移是从d[i, j]到d[i+1, j+1]，而不是从d[i-1, j-1]到d[i, j]。本质上是一样的。
+		for (int i = 0; i &lt; a.length(); i++) {
+			for (int j = 0; j &lt; b.length(); j++) {
+				
+				int r = 0;
+				if (a.charAt(i) != b.charAt(j)) {
+					r = 1;
+				} 
+				
+				int first_append = d[i][j + 1] + 1;
+				int second_append = d[i + 1][j] + 1;
+				int replace = d[i][j] + r;
+				
+				int min = Math.min(first_append, second_append);
+				min = Math.min(min, replace);
+				d[i + 1][j + 1] = min;
+				
+			}
+		}
+		
+		return d[a.length()][b.length()];
+				
+	}
+
+}
+</code></pre><p>最后，我们用测试代码测试不同字符串之间的编辑距离。</p><pre><code>public static void main(String[] args) {
+  // TODO Auto-generated method stub
+  System.out.println(Lesson10_1.getStrDistance(&quot;mouse&quot;, &quot;mouuse&quot;));
+
+ }
+</code></pre><p>从推导的表格和最终的代码可以看出，我们相互比较长度为m和n的两个字符串，一共需要求mxn个子问题，因此计算量是mxn这个数量级。和排列法的m^n相比，这已经降低太多太多了。</p><p>我们现在可以快速计算出编辑距离，所以就能使用这个距离作为衡量字符串之间相似度的一个标准，然后就可以进行查询推荐了。</p><p>到这里，使用动态规划来实现的编辑距离其实就讲完了。我把两个字符串比较的问题，分解成很多子串进行比较的子问题，然后使用状态转移方程来描述状态（也就是子问题）之间的关系，并根据问题的定义，保留最小的值作为当前的编辑距离，直到过程结束。</p><p>如果我们使用动态规划法来实现编辑距离的测算，那就能确保查询推荐的效率和效果。不过，基于编辑距离的算法也有局限性，它只适用于拉丁语系的相似度衡量，所以通常只用于英文或者拼音相关的查询。如果是在中文这种亚洲语系中，差一个汉字（或字符）语义就会差很远，所以并不适合使用基于编辑距离的算法。</p><h2>实战演练：钱币组合的新问题</h2><p>和排列组合等穷举的方法相比，动态规划法关注发现某种最优解。如果一个问题无需求出所有可能的解，而是要找到满足一定条件的最优解，那么你就可以思考一下，是否能使用动态规划来降低求解的工作量。</p><p>还记得之前我们提到的新版舍罕王奖赏的故事吗？国王需要支付一定数量的赏金，而宰相要列出所有可能的钱币组合，这使用了排列组合的思想。如果这个问题再变化为“给定总金额和可能的钱币面额，能否找出钱币数量最少的奖赏方式？”，那么我们是否就可以使用动态规划呢？</p><p>思路和之前是类似的。我们先把这个问题分解成很多更小金额的子问题，然后试图找出状态转移方程。如果增加一枚钱币c，那么当前钱币的总数量就是增加c之前的钱币总数再加上当前这枚。举个例子，假设这里我们有三种面额的钱币，2元、3元和7元。为了凑满100元的总金额，我们有三种选择。</p><p>第一种，总和98元的钱币，加上1枚2元的钱币。如果凑到98元的最少币数是$x_{1}$，那么增加一枚2元后就是($x_{1}$ + 1)枚。</p><p>第二种，总和97元的钱币，加上1枚3元的钱币。如果凑到97元的最少币数是$x_{2}$，那么增加一枚3元后就是($x_{2}$ + 1)枚。</p><p>第三种，总和93元的钱币，加上1枚7元的钱币。如果凑到93元的最少币数是$x_{3}$，那么增加一枚7元后就是($x_{3}$ + 1)枚。</p><p><img src="https://static001.geekbang.org/resource/image/e5/d9/e5a9b9e6d931049bfae92ead29e37cd9.jpg?wh=1142*627" alt=""></p><p>比较一下以上三种情况的钱币总数，取最小的那个就是总额为100元时，最小的钱币数。换句话说，由于奖赏的总金额是固定的，所以最后选择的那枚钱币的面额，将决定到上一步为止的金额，同时也决定了上一步为止钱币的最少数量。根据这个，我们可以得出如下状态转移方程：</p><p><img src="https://static001.geekbang.org/resource/image/d8/27/d81e704031156e605b61610ef681c427.jpg?wh=1142*301" alt=""></p><p>其中，c[i]表示总额为i的时候，所需要的最少钱币数，其中j=1,2,3,…,n，表示n种面额的钱币，value[j]表示第j种钱币的面额。c[i - values(j)]表示选择第j种钱币的时候，上一步为止最少的钱币数。需要注意的是，i - value(j)需要大于等于0，而且c[0] = 0。</p><p>我这里使用这个状态转移方程，做些推导，具体的数据你可以看下面这个表格。表格每一行表示奖赏的总额，前3列表示3种钱币的面额，最后一列记录最少的钱币数量。表中的“/”表示不可能，或者说无解。</p><p><img src="https://static001.geekbang.org/resource/image/e7/58/e78354fe2f577d07649882fed69bd358.png?wh=1282*794" alt=""></p><p>这张状态转移表同样可以帮助你来理解状态转移方程的正确性。一旦状态转移方程确定了，要编写代码来实现就不难了。</p><h2>小结</h2><p>通过这两节的内容，我讲述了动态规划主要的思想和应用。如果仅仅看这两个案例，也许你觉得动态规划不难理解。不过，在实际应用中，你可能会产生这些疑问：什么时候该用动态规划？这个问题可以用动态规划解决啊，为什么我没想到？我这里就讲一些我个人的经验。</p><p>首先，如果一个问题有很多种可能，看上去需要使用排列或组合的思想，但是最终求的只是某种最优解（例如最小值、最大值、最短子串、最长子串等等），那么你不妨试试是否可以使用动态规划。</p><p>其次，状态转移方程是个关键。你可以用状态转移表来帮助自己理解整个过程。如果能找到准确的转移方程，那么离最终的代码实现就不远了。当然，最好的方式，还是结合工作中的项目，不断地实践，尝试，然后总结。</p><p><img src="https://static001.geekbang.org/resource/image/7e/5b/7e084bc699b4939b78226718756fd65b.jpg?wh=1242*1521" alt=""></p><h2>思考题</h2><p>对于总金额固定、找出最少钱币数的题目，用循环或者递归的方式该如何进行编码呢？</p><p><span class="orange">欢迎在留言区交作业，并写下你今天的学习笔记。你可以点击“请朋友读”，把今天的内容分享给你的好友，和他一起精进。</span></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/5b/6f/113e24e6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>阿信</span>
+  </div>
+  <div class="_2_QraFYR_0">编辑距离，刚开始没看太明白。后台看了下其他的博客，结合一起进行理解。表格里面min三个数值为：<br>d[i, j]=min(d[i-1, j] + 1, d[i,j-1]+1, d[i-1,j-1]+r(i,j))<br>涉及两个数组，是二维的。描述了从垂直、水平、斜对角 三个方向分别到达(i, j)这个位置时的距离。<br><br>我是先看懂了后面的推导公式，再看明白编辑推导表格。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-06-11 08:25:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/BAuQlia9Dc07m3icOkibIqu2lhbnLD6cjgCNE8FSzG5Aj4cd26eRgspicTsWvA7WK1ftlQBD34PYRucZRXML5FA27A/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>cwtxz</span>
+  </div>
+  <div class="_2_QraFYR_0">中国程序员的最大阻碍是语言障碍，英语不好，无法和世界各地的人交流技术，坐井观天的人很多。第二个严重的问题就是学习能力不强而且没有毅力，很容易放弃，不肯花时间深入思考问题和钻研，大多思考如何能少加班，如何能赚更多，如何在工作中偷懒等等。第三个问题就是好高骛远不能脚踏实地，很多人刚毕业就想要很多钱，换一份工作就想涨很多钱，但是能力不够，基础不扎实，有些连在简历中写的技术都说不清楚。曾经我是他们中的一员，但是我想改变去，不想继续平庸下去，所以，我来了，加油，坚持坚持再坚持!!!</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我很佩服你有如此的思考，坚信自己选择的方向，从脚下的路开始，你一定会得到属于自己的成功</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-28 22:14:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6a/8e/7b6ea886.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Joe</span>
+  </div>
+  <div class="_2_QraFYR_0">1.C++实现，对总金额100的最小纸币是15.<br>2.用递归法总金额为30就要算很久。<br>3.另外的数学办法可以用总金额依次对最大金额纸币求余数，直到为0.商相加为答案。如：若 {1, 2, 3, 7}为纸币金额，对于100，所需最小纸币数：100&#47;7=14余2; 2&#47;2 = 1余0;则纸币数为14+1=15.<br><br>&#47;&#47; 动态规划问题<br>#include &lt;iostream&gt;<br>#include &lt;string&gt;<br>#include &lt;vector&gt;<br>using namespace std;<br><br>class DynamicProgramming {<br> private:<br>  vector&lt;int&gt; money = {1, 2, 3, 7};  &#47;&#47; 纸币种类<br><br> public:<br>  &#47;**<br>   * Description: 对于金额固定，找出最少钱币数及方式。<br>   * prams: amountMoney- 输入总金额<br>   * return: 所需最小纸币数<br>   *&#47;<br>  int findFewerstMethod(int amountMoney) {<br>    int c[amountMoney];<br>    c[0] = 0;<br><br>    int temp;<br>    for (unsigned int i = 1; i &lt; amountMoney; i++) {<br>      &#47;&#47; 用最大值初始化<br>      int tempMin = amountMoney;<br>      for (unsigned int j = 0; j &lt; money.size(); j++) {<br>        int diff = i - money[j];<br>        if (0 &lt;= diff) {<br>          temp = c[diff] + 1;<br>        } else {<br>          &#47;&#47; 此情况表示该纸币无效，选择最大值。<br>          temp = amountMoney;<br>        }<br>        &#47;&#47; 求出最小值<br>        if (temp &lt; tempMin) {<br>          tempMin = temp;<br>        }<br>      }<br>      c[i] = tempMin;<br>    }<br><br>    return c[amountMoney - 1];<br>  }<br>};<br><br>&#47;&#47; test<br>int main(void) {<br>  DynamicProgramming test;<br>  int res = test.findFewerstMethod(100);<br>  cout &lt;&lt; res &lt;&lt; endl;<br>  return 0;<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 答案正确 👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-14 09:05:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/nSvVtStiaQzslFM7YRnlhP7FxdVsz8abjlwY6XZ4guKtkXNUgG8EibxztoeosKL2YuxDsb159NTQhVXFBkj31kBw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>云开</span>
+  </div>
+  <div class="_2_QraFYR_0">还是弄不明白编辑距离 为什么插入时是从空串开始 替换确并不计算从空串到有字符的过程</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你可以参考那张状态转移表，看看是从哪一格到哪一格，字符串是如何变换的，相邻格子的变换就三种方式，插入、删除和替换。替换可以将字符串中的某个字符替换成另一个字符</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-31 19:19:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/0f/e4/b44d863f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>冰木</span>
+  </div>
+  <div class="_2_QraFYR_0">老大，我可能没有得到要领，可以推到下，表格中，第一行，第二列吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是min(3, 1, 2)对吧，这个是mo和m的比较，3表示增加一个m再增加一个o，再删掉一个o，编辑距离是2+1=3。1表示两个字符串都是m，其中一个再增加一个o，编辑距离是1。2表示一个m增加o，一个从空集到m，编辑距离是2。你可以顺着第9讲最后的表格来推导。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-26 08:50:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>梅坊帝卿</span>
+  </div>
+  <div class="_2_QraFYR_0">按照面值排序优先取最大的方法 不一定能取到解 除非有万能的面额1 比如 2 5 7 总数15 </div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是的 可能无解👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-04 16:48:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/7d/6b/648c30bc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>予悠悠</span>
+  </div>
+  <div class="_2_QraFYR_0">用python交作业<br>用递归来实现时，运行非常慢。用循环实现时，由于记录了每一步的计算结果，不需要重复计算，速度快很多。<br><br>递归：<br>import sys<br>def least_bills_recursion(total):<br>	if total == 0:<br>		return 0<br>	if total &lt; 0:<br>		return sys.maxint<br>	min_bills = min(1 + least_bills_recursion(total-2), 1 + least_bills_recursion(total - 3),<br>		1 + least_bills_recursion(total-7))<br>	return min_bills<br><br>循环：<br>def least_bills_iteration(total):<br>	current = 0<br>	dp = [0] * (total + 1)<br>	dp[2] = 1<br>	dp[3] = 1<br>	dp[7] = 1<br>	for i in xrange(3, total+1, 1):<br>		if i &gt;= 7:<br>			dp[i] = min(dp[i-2], dp[i-3], dp[i-7]) + 1<br>		elif i &gt;= 3 and i &lt; 7:<br>			dp[i] = min(dp[i-2], dp[i-3]) + 1<br>		else:<br>			dp[i] = dp[i-2] + 1<br>	return dp[total]<br><br>当总金额为100时，答案为15.</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 实现了两种方法，并进行了对比，赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-22 00:00:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/2b/ec/af6d0b10.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>caohuan</span>
+  </div>
+  <div class="_2_QraFYR_0">本篇所得： 1.求解 最值可用动态规划 方法;<br>2.状态转移 可以把 大问题 分解为 小问题，再分解为 可以处理的问题，即 把 不可以处理的问题 分解为可以 处理的小问题（ 也为子问题）;<br>3.动态规划 适用于 下一个 状态与上一个状态有固定关系;<br>4.搜索引擎的 搜索词的查询推荐， 英文可用 编辑距离，中文 需要 转化 比 如转为英文 再使用 编辑距离;<br>5.从问题开始 ，初步分解 大问题为可解的子问题 为动态规划的方法，由问题 推到答案，也为反向思维法。<br><br>回答老师的问题：固定金额，找最小钱币数量，可用倒推法，总金额 减去 最大的 钱币数额 ，然后从钱币中寻找该数额，没有 再把该数额逐渐减去 大的数额，一步步分解，可得 钱币的数量，该方法是 动态规划，但不能保证寻找的是最小的数量，局部最优 不一定全局最优，如果 需要寻找全部最优 需要运用 排列和组合。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-21 18:09:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/6b/5e/b76e7a79.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>我心留</span>
+  </div>
+  <div class="_2_QraFYR_0">public class Lesson10_2 {<br>&#47;**	<br> * 动态规划求最小钱币数	<br> * @param c 用一维数组记录每一步的总金额	 * @param value 用一维数组记录三种面额的纸币	<br> * @return 	<br> *&#47;	<br>public static int getMinMoney(int[] c, int[] value) {<br>		int[] t = new int[3];		<br>                for (int i = 0; i &lt; c.length; i++) {		<br>                       for (int j = 0; j &lt; value.length; j++) {				<br>                              if (i - value[j] &gt;= 0) {					<br>                                    t[j] = c[i - value[j]] + 1;				<br>                               }			<br>                        }			<br>                  int min = Math.min(t[0], t[1]);			<br>                  min = Math.min(min, t[2]);			<br>                  c[i] = min;		<br>                }		<br>                return c[c.length - 1];<br>}	<br>public static void main(String[] args) {		<br>        int[] c = new int[100];		<br>        int[] value = new int[] { 2, 3, 7 };		<br>        System.out.println(getMinMoney(c, value)+1);	<br> }<br>}<br>老师看一下代码对吗，运行结果是15</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 代码的逻辑是对的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-05 09:22:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJOc0n02eNKflX5ey4TYl1NBfb0kicc20AgayEAGDYylalqHnLTeqMnaJ2iaZsLVmqEo0T0YViadU9Ig/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>lianlian</span>
+  </div>
+  <div class="_2_QraFYR_0">方法1，动态规划，最快。方法2递归有点慢，方法三递归，超级慢。在aim数值大于30的时候，三种写法，在我电脑速度快慢特别明显。用2元,3元,5元去找开100块，用递归方法，我的电脑要等到地老天荒O(∩_∩)O哈哈~<br>#include&lt;iostream&gt;<br>#include&lt;vector&gt;<br><br>using namespace std;<br><br>int dp_solve(int *a, int n, int aim){<br>	vector&lt;vector&lt;int&gt;&gt; dp(n, vector&lt;int&gt;(aim+1, 0));<br><br>	for(int j = 1; j &lt;= aim; j++){<br>		dp[0][j] = INT_MAX;<br>		if(j &gt;= a[0] &amp;&amp; dp[0][j - a[0]] != INT_MAX)<br>			dp[0][j] = dp[0][j - a[0]] + 1;<br>	}<br><br>	for(int i = 1; i &lt; n; i++){<br>		for(int j = 1; j &lt;= aim; j++)<br>		{<br>			int tmp = INT_MAX;<br>			if(j - a[i] &gt;= 0 &amp;&amp; dp[i][j - a[i]] != INT_MAX)<br>				tmp = dp[i][j - a[i]] + 1;<br><br>			dp[i][j] = min(dp[i-1][j], tmp);<br>		}<br>	}<br><br>	return dp[n-1][aim] == INT_MAX ? -1 : dp[n-1][aim];<br>}<br><br>int min_res = INT_MAX;<br>void recur_solve(int *a, int n, int aim, int k){<br>	if(aim == 0){<br>		min_res = min(min_res, k);<br>		return;<br>	}<br>	if(aim &lt; 0)<br>		return;<br>	for(int i = 0; i &lt; n; i++){<br>		aim -= a[i];<br>		k++;<br>		recur_solve(a, n, aim, k);<br>		aim += a[i];<br>		k--;<br>	}<br>}<br><br>int min_res2 = INT_MAX;<br>void recur_solve2(int *a, int n, int aim, vector&lt;int&gt; res){<br>	if(aim == 0){<br>		int size = res.size();<br>		min_res2 = min(min_res2, size);<br>		return;<br>	}<br>	if(aim &lt; 0)<br>		return;<br>	for(int i = 0; i &lt; n; i++){<br>		res.push_back(a[i]);<br>		recur_solve2(a, n, aim - a[i], res);<br>		res.pop_back();<br>	}<br>}<br><br>int main(){<br>	int a[] = {2,3,7};<br>	int sum = 25;<br>	&#47;***dp最快**&#47;<br>	cout &lt;&lt; dp_solve(a, 3, sum) &lt;&lt; endl;<br><br>	&#47;***这种递归有点久**&#47;<br>	recur_solve(a, 3, sum, 0);<br>	cout &lt;&lt; min_res &lt;&lt; endl;<br><br>	&#47;**这个太久了**&#47;<br>	vector&lt;int&gt; result;<br>	recur_solve2(a, 3, sum, result);<br>	cout &lt;&lt; min_res2 &lt;&lt; endl;<br>	return 0;<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 动手实验，比较不同的实现，👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-04 14:40:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/0c/0f/93d1c8eb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>mickey</span>
+  </div>
+  <div class="_2_QraFYR_0">package Part01;<br><br>import java.util.ArrayList;<br>import java.util.Arrays;<br>import java.util.List;<br><br>public class Lesson10_ex {<br>	public static void main(String[] args) {<br>		switchMoney(2, 3, 7, 100);<br>	}<br><br>	private static void switchMoney(int mz1, int mz2, int mz3, int total) {<br>		List&lt;Integer[]&gt; list = new ArrayList&lt;Integer[]&gt;();<br>		int s1 = total &#47; mz1;<br>		int s2 = total &#47; mz2 + 1;<br>		int s3 = total &#47; mz3 + 1;<br>		for (int i = 0; i &lt;= s1; i++) {<br>			for (int j = 0; j &lt;= s2; j++) {<br>				for (int k = 0; k &lt;= s3; k++) {<br>					if (mz1 * i + mz2 * j + mz3 * k == 100) {<br>						list.add(new Integer[] { i, j, k });<br>					}<br>				}<br>			}<br>		}<br>		Integer[] result = new Integer[3];<br>		int min = total;<br>		for (Integer[] integers : list) {<br>			int sum = 0;<br>			for (Integer num : integers) {<br>				sum += num;<br>			}<br>			if (min &gt; sum) {<br>				min = sum;<br>				result = integers;<br>			}<br>		}<br>		System.out.println(&quot;最小数：&quot; + min);<br>		System.out.println(Arrays.toString(result));<br>	}<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-04 16:53:06</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/42/df/a034455d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>罗耀龙@坐忘</span>
+  </div>
+  <div class="_2_QraFYR_0">茶艺师学编程<br><br>昨天讲编辑距离，今天讲状态转移方程。<br><br>我试着这样理解，状态转移方程，就是要看到这一堆数字的“每一份”变化会给整体带来什么影响。这就好像，在自己的脑海中，模拟一遍“小树是怎么长成大树”，找到其中的“规律”。<br><br>摸到了规律，再结合给定的条件，即可寻找“最优解”。<br><br>在现实中，当一个人跟你说“我要最好的”，你可以反问TA两句，“你了解其中的规律（状态转换方程）吗？你的约束条件是什么?”</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-02 17:57:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJUzv6S9wroyXaoFIwvC1mdDiav4BVS4BbPTuwtvWibthL5PyMuxFNicY06QJMZicVpib7E88S19nH4I9Q/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>木子皿</span>
+  </div>
+  <div class="_2_QraFYR_0">动态规划的这两篇文章看了一个星期，总算是看懂了！</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 确实不太好理解，不过一旦理解了对解题很有帮助</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-19 13:39:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/0c/c2/bad34a50.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张洋</span>
+  </div>
+  <div class="_2_QraFYR_0">答案是15 种 <br>private static int totalNumberForMoney(int[] moneyKind,int total){<br>        &#47;&#47;初始化 c数组<br>        int[] c = new int[total+1];<br>        for(int i=1;i&lt;c.length;i++){<br>            c[i] = -1;<br>        }<br>        c[0] = 0;<br>        for(int i=1;i&lt;=total;i++){<br>             int[] data = new int[moneyKind.length];<br>              for(int j = 0;j&lt;moneyKind.length;j++){<br>                  if((i - moneyKind[j])&lt;0){<br>                      data[j]= -1;<br>                      continue;<br>                  }<br>                  data[j] =  c[i - moneyKind[j]];<br>              }<br>              int min =  min(data);<br>              if(min == -1){<br>                  continue;<br>              }<br>              c[i] = min + 1;<br>            System.out.println(i + &quot;min&quot; + c[i]);<br>        }<br>        return c[total];<br>    }<br><br>    private static int min(int[] data) {<br>        boolean flag = true;<br>        int min = -1;<br>        for(int i=0;i&lt;data.length;i++){<br>            if(data[i]==-1){<br>                continue;<br>            }<br>            if(flag){<br>                min = data[i];<br>                flag = false;<br>                continue;<br>            }<br>            if(data[i]&lt;min){<br>                min = data[i];<br>            }<br>        }<br>        return min;<br>    }</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-10-17 16:23:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/30/5a/84/2d9a6785.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ACHL</span>
+  </div>
+  <div class="_2_QraFYR_0">package firstPart;<br><br>import java.util.Arrays;<br><br><br>public class Lessonpratice_10_1 {<br><br>	&#47;**<br>	 * @Description: 使用动态规划，解决给定金额求最小纸币数问题<br>	 * @param  C-给定的金额，m-给定的可能纸币<br>	 * @return int-最小纸币数<br>	 *&#47;<br>	public static int Getres_version1(int C, int[] m) {<br>		if (C &lt; 0) {<br>			return -1;<br>		}<br>		if (C == 0) {<br>			return 0;<br>		}<br>	    int[] dp = new int[C + 1];<br>	    Arrays.fill(dp, (int)0x3f3f3f3f);<br>	    dp[0] = 0;<br>		for (int i = 1; i &lt;= C; i++) {<br>			for (int j = 0; j &lt; m.length; j++) {<br>				if (i &gt;= m[j]) {<br>					 dp[i] = Math.min(dp[i - m[j]] + 1, dp[i]);<br>				}<br>			}<br>		}<br>		return dp[C];<br>	}<br>	&#47;**<br>	 * @Description: 使用贪心算法，解决给定金额求最小纸币数问题<br>	 * @param  C-给定的金额，m-给定的可能纸币<br>	 * @return int-最小纸币数<br>	 *&#47;<br>	public static int Getres_version2(int C, int[] m) {<br>		if (C &lt; 0) {<br>			return -1;<br>		}<br>		if (C == 0) {<br>			return 0;<br>		}<br>		Arrays.sort(m);<br>		int left = C;<br>		int idx = m.length - 1;<br>		int res = 0;<br>		while (true) {<br>			if (left == 0) break;<br>			int k = left &#47; m[idx];<br>			res += k;<br>			left -= k * m[idx];<br>			idx--;<br>		}<br>		return res;<br>	}<br>	public static void main(String[] args) {<br>		   int[] m = new int[]{2, 3, 7};<br>		   int C = 100;<br>           System.out.println(Lessonpratice_10_1.Getres_version2(0, m));<br>	}<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-09-09 11:40:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/20/86/38/379a9da5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Duke</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;&#47; 作业<br>void Main()<br>{<br>	&#47;&#47; 面额已经按照大到小排序<br>	&#47;&#47;Console.WriteLine(Get(100, new int[] { 2, 3, 7 }));<br><br>	Get2(10, null); &#47;&#47; 100 算太慢了。这种太耗资源了<br>	Console.WriteLine($&quot;共有【{count}】个解。&quot;);<br>	Console.WriteLine($&quot;最优解：{string.Join(&quot;,&quot;,result)}&quot;);<br>}<br><br>#region 动态规划解法，也就是循环<br>static int Get(int total, int[] value)<br>{<br>	if (total &lt; 0 || value.Length &lt; 1) return -1;<br><br>	int[,] c = new int[total + 1, value.Length + 1];<br><br>	for (int i = 1; i &lt;= total; i++)<br>	{<br>		var min = -1; &#47;&#47; -1 表示无解<br>		var str =&quot;[&quot;;<br>		for (int j = 0; j &lt; value.Length; j++)<br>		{<br>			if (i - c[i, j] &gt;= 0 &amp;&amp; i - value[j] &gt;= 0 &amp;&amp; c[i - value[j], value.Length] &gt; -1)<br>			{<br>				c[i, j] = c[i - value[j], value.Length] + 1;<br>				min = c[i, j];<br>			}<br>			else<br>			{<br>				c[i, j] = -1;<br>			}<br>			str += c[i, j] +&quot;\t ,&quot;;<br>		}<br><br>		c[i, value.Length] = min;<br>		str += min + &quot;]&quot;;<br>		<br>		Console.WriteLine(str);<br>	}<br><br>	&#47;&#47;Console.WriteLine(c);&#47;&#47; linqpad 可以直接打印表格形式<br>	return c[total, value.Length];<br>}<br>#endregion 动态规划解法，也就是循环<br><br>#region 递归解法<br>static List&lt;int&gt; rewards = new List&lt;int&gt; { 2,3,7 };<br>static int minLength = int.MaxValue;<br>static int count = 0;<br>static List&lt;int&gt; result = new List&lt;int&gt;();<br><br>static void Get2(int total, List&lt;int&gt; dest)<br>{<br>	if(total &lt; 0) return; &#47;&#47; 无解<br>	<br>	if(total == 0)<br>	{<br>		count++;<br>		Console.WriteLine(string.Join(&quot;,&quot;, dest));<br><br>		if (dest.Count &lt; minLength)<br>		{<br>			minLength = dest.Count;<br>			result.Clear();<br>			<br>			dest.ForEach(i =&gt; result.Add(i));<br>		}<br>	}<br>	<br>	if(dest == null) dest = new List&lt;int&gt;();<br><br>	rewards.ForEach(<br>		item =&gt;<br>		{<br>			var newDest = new List&lt;int&gt;();<br>			dest.ForEach(r =&gt; newDest.Add(r));<br>			newDest.Add(item);<br>			<br>			Get2(total - item, newDest);<br>		}<br>	);<br>}<br>#endregion 递归解法</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-09-14 10:37:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/33/a7/b1c90605.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>别人家的康少</span>
+  </div>
+  <div class="_2_QraFYR_0">说到动态规划，你说是考虑当前子问题的最优解，我于是想到了贪心算法，请问这两者有什么区别呢</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 动态规划虽然是当前子问题的最优解，不过由于不断的通过子问题递推到整个问题，其实是完成了对所有解的搜索，只是通过状态转移方程，缩减了很多不必要的搜索路径，是可以得到全局最优的。而贪心算法的本质决定了到达一定条件后就停止搜索，而全局最优解可能会存在于未被搜索的空间之中。简单来理解，动态规划确实搜索了所有的可能，只是在一定程度上提升了效率。而贪心可能效率更高，但是遗漏了全局最优。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-12-08 04:55:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/39/c6/1e12f271.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>凹凸鸿</span>
+  </div>
+  <div class="_2_QraFYR_0">https:&#47;&#47;www.jianshu.com&#47;p&#47;a617d20162cf<br>这篇文章写得更清楚</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 感谢这个信息，我也来学习一下如何将这个问题说得更清楚</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-12-04 17:58:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83eomCrCRrLAWib0gMI2L2NbicMummlxOY6nVmphsDO0J3xx7OygNd8wJicc88RbNoHrcuXBsKLtCMvgFQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>zart</span>
+  </div>
+  <div class="_2_QraFYR_0">public class Lesson10_2 {<br>    public static int minCoinCount(int money, ArrayList&lt;Integer&gt; coinArray){<br>        if (coinArray == null || coinArray.isEmpty() || money &lt;= 0){<br>            return -1;<br>        }<br>        int minCoinValue = Collections.min(coinArray);<br>        if (money &lt; minCoinValue){<br>            return -1;<br>        }<br><br>        int[] c = new int[money+1];<br><br>        for (int i=0; i&lt;minCoinValue; i++){<br>            c[i] = -1;<br>        }<br><br>        for (int i=minCoinValue; i&lt;=money; i++){<br>            ArrayList&lt;Integer&gt; coinNumList = new ArrayList&lt;&gt;(coinArray.size());<br>            for (int coin : coinArray){<br>                 if (i == coin){<br>                    coinNumList.add(1);<br>                } else if (i-coin&gt;0 &amp;&amp; c[i-coin]!=-1){<br>                    coinNumList.add(c[i-coin] +1);<br>                }<br>            }<br>            c[i] = Collections.min(coinNumList);<br>        }<br>        return c[money];<br>    }<br><br>    public static void main(String[] args) {<br>        ArrayList&lt;Integer&gt; coinArray = new ArrayList&lt;&gt;(3);<br>        coinArray.add(2);<br>        coinArray.add(3);<br>        coinArray.add(7);<br>        System.out.println(minCoinCount(100, coinArray));<br>    }<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-10-31 17:30:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/21/1e/7a/fdaf2f45.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张楠</span>
+  </div>
+  <div class="_2_QraFYR_0">老师您好，我数学不是很好本课程中第二个案例（钱币组合的案例）表格中推导公式不太理解，比如：面额5 这行中2对应的c(3)+1 =2、3对应c(2) + 1 = 2，如果您有方便能给讲解下么？怎么推导出来的，谢谢</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: c(3)表示目前已经有3元，+1表示增加一个2元纸币或硬币获得总共5元，而c(2)表示目前已经有2元，+1表示增加一个3元纸币或硬币获得总共5元</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-09-21 22:28:33</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

@@ -1,0 +1,748 @@
+<audio title="33_理论五：让你最快速地改善代码质量的20条编程规范（下）" src="https://static001.geekbang.org/resource/audio/3d/f5/3d70a002608ebd837fe6dc3c6f899ff5.mp3" controls="controls"></audio> 
+<p>上两节课，我们讲了命名和注释、代码风格，今天我们来讲一些比较实用的编程技巧，帮你切实地提高代码可读性。这部分技巧比较琐碎，也很难罗列全面，我仅仅总结了一些我认为比较关键的，更多的技巧需要你在实践中自己慢慢总结、积累。</p><p>话不多说，让我们正式开始今天的学习吧！</p><h2>1.把代码分割成更小的单元块</h2><p>大部分人阅读代码的习惯都是，先看整体再看细节。所以，我们要有模块化和抽象思维，善于将大块的复杂逻辑提炼成类或者函数，屏蔽掉细节，让阅读代码的人不至于迷失在细节中，这样能极大地提高代码的可读性。不过，只有代码逻辑比较复杂的时候，我们其实才建议提炼类或者函数。毕竟如果提炼出的函数只包含两三行代码，在阅读代码的时候，还得跳过去看一下，这样反倒增加了阅读成本。</p><p>这里我举一个例子来进一步解释一下。代码具体如下所示。重构前，在invest()函数中，最开始的那段关于时间处理的代码，是不是很难看懂？重构之后，我们将这部分逻辑抽象成一个函数，并且命名为isLastDayOfMonth，从名字就能清晰地了解它的功能，判断今天是不是当月的最后一天。这里，我们就是通过将复杂的逻辑代码提炼成函数，大大提高了代码的可读性。</p><pre><code>// 重构前的代码
+public void invest(long userId, long financialProductId) {
+  Calendar calendar = Calendar.getInstance();
+  calendar.setTime(date);
+  calendar.set(Calendar.DATE, (calendar.get(Calendar.DATE) + 1));
+  if (calendar.get(Calendar.DAY_OF_MONTH) == 1) {
+    return;
+  }
+  //...
+}
+
+// 重构后的代码：提炼函数之后逻辑更加清晰
+public void invest(long userId, long financialProductId) {
+  if (isLastDayOfMonth(new Date())) {
+    return;
+  }
+  //...
+}
+
+public boolean isLastDayOfMonth(Date date) {
+  Calendar calendar = Calendar.getInstance();
+  calendar.setTime(date);
+  calendar.set(Calendar.DATE, (calendar.get(Calendar.DATE) + 1));
+  if (calendar.get(Calendar.DAY_OF_MONTH) == 1) {
+   return true;
+  }
+  return false;
+}
+</code></pre><!-- [[[read_end]]] --><h2>2.避免函数参数过多</h2><p>我个人觉得，函数包含3、4个参数的时候还是能接受的，大于等于5个的时候，我们就觉得参数有点过多了，会影响到代码的可读性，使用起来也不方便。针对参数过多的情况，一般有2种处理方法。</p><ul>
+<li>考虑函数是否职责单一，是否能通过拆分成多个函数的方式来减少参数。示例代码如下所示：</li>
+</ul><pre><code>public User getUser(String username, String telephone, String email);
+
+// 拆分成多个函数
+public User getUserByUsername(String username);
+public User getUserByTelephone(String telephone);
+public User getUserByEmail(String email);
+</code></pre><ul>
+<li>将函数的参数封装成对象。示例代码如下所示：</li>
+</ul><pre><code>public void postBlog(String title, String summary, String keywords, String content, String category, long authorId);
+
+// 将参数封装成对象
+public class Blog {
+  private String title;
+  private String summary;
+  private String keywords;
+  private Strint content;
+  private String category;
+  private long authorId;
+}
+public void postBlog(Blog blog);
+</code></pre><p>除此之外，如果函数是对外暴露的远程接口，将参数封装成对象，还可以提高接口的兼容性。在往接口中添加新的参数的时候，老的远程接口调用者有可能就不需要修改代码来兼容新的接口了。</p><h2>3.勿用函数参数来控制逻辑</h2><p>不要在函数中使用布尔类型的标识参数来控制内部逻辑，true的时候走这块逻辑，false的时候走另一块逻辑。这明显违背了单一职责原则和接口隔离原则。我建议将其拆成两个函数，可读性上也要更好。我举个例子来说明一下。</p><pre><code>public void buyCourse(long userId, long courseId, boolean isVip);
+
+// 将其拆分成两个函数
+public void buyCourse(long userId, long courseId);
+public void buyCourseForVip(long userId, long courseId);
+</code></pre><p>不过，如果函数是private私有函数，影响范围有限，或者拆分之后的两个函数经常同时被调用，我们可以酌情考虑保留标识参数。示例代码如下所示：</p><pre><code>// 拆分成两个函数的调用方式
+boolean isVip = false;
+//...省略其他逻辑...
+if (isVip) {
+  buyCourseForVip(userId, courseId);
+} else {
+  buyCourse(userId, courseId);
+}
+
+// 保留标识参数的调用方式更加简洁
+boolean isVip = false;
+//...省略其他逻辑...
+buyCourse(userId, courseId, isVip);
+</code></pre><p>除了布尔类型作为标识参数来控制逻辑的情况外，还有一种“根据参数是否为null”来控制逻辑的情况。针对这种情况，我们也应该将其拆分成多个函数。拆分之后的函数职责更明确，不容易用错。具体代码示例如下所示：</p><pre><code>public List&lt;Transaction&gt; selectTransactions(Long userId, Date startDate, Date endDate) {
+  if (startDate != null &amp;&amp; endDate != null) {
+    // 查询两个时间区间的transactions
+  }
+  if (startDate != null &amp;&amp; endDate == null) {
+    // 查询startDate之后的所有transactions
+  }
+  if (startDate == null &amp;&amp; endDate != null) {
+    // 查询endDate之前的所有transactions
+  }
+  if (startDate == null &amp;&amp; endDate == null) {
+    // 查询所有的transactions
+  }
+}
+
+// 拆分成多个public函数，更加清晰、易用
+public List&lt;Transaction&gt; selectTransactionsBetween(Long userId, Date startDate, Date endDate) {
+  return selectTransactions(userId, startDate, endDate);
+}
+
+public List&lt;Transaction&gt; selectTransactionsStartWith(Long userId, Date startDate) {
+  return selectTransactions(userId, startDate, null);
+}
+
+public List&lt;Transaction&gt; selectTransactionsEndWith(Long userId, Date endDate) {
+  return selectTransactions(userId, null, endDate);
+}
+
+public List&lt;Transaction&gt; selectAllTransactions(Long userId) {
+  return selectTransactions(userId, null, null);
+}
+
+private List&lt;Transaction&gt; selectTransactions(Long userId, Date startDate, Date endDate) {
+  // ...
+}
+</code></pre><h2>4.函数设计要职责单一</h2><p>我们在前面讲到单一职责原则的时候，针对的是类、模块这样的应用对象。实际上，对于函数的设计来说，更要满足单一职责原则。相对于类和模块，函数的粒度比较小，代码行数少，所以在应用单一职责原则的时候，没有像应用到类或者模块那样模棱两可，能多单一就多单一。</p><p>具体的代码示例如下所示：</p><pre><code>public boolean checkUserIfExisting(String telephone, String username, String email)  { 
+  if (!StringUtils.isBlank(telephone)) {
+    User user = userRepo.selectUserByTelephone(telephone);
+    return user != null;
+  }
+  
+  if (!StringUtils.isBlank(username)) {
+    User user = userRepo.selectUserByUsername(username);
+    return user != null;
+  }
+  
+  if (!StringUtils.isBlank(email)) {
+    User user = userRepo.selectUserByEmail(email);
+    return user != null;
+  }
+  
+  return false;
+}
+
+// 拆分成三个函数
+public boolean checkUserIfExistingByTelephone(String telephone);
+public boolean checkUserIfExistingByUsername(String username);
+public boolean checkUserIfExistingByEmail(String email);
+</code></pre><h2>5.移除过深的嵌套层次</h2><p>代码嵌套层次过深往往是因为if-else、switch-case、for循环过度嵌套导致的。我个人建议，嵌套最好不超过两层，超过两层之后就要思考一下是否可以减少嵌套。过深的嵌套本身理解起来就比较费劲，除此之外，嵌套过深很容易因为代码多次缩进，导致嵌套内部的语句超过一行的长度而折成两行，影响代码的整洁。</p><p>解决嵌套过深的方法也比较成熟，有下面4种常见的思路。</p><ul>
+<li>去掉多余的if或else语句。代码示例如下所示：</li>
+</ul><pre><code>// 示例一
+public double caculateTotalAmount(List&lt;Order&gt; orders) {
+  if (orders == null || orders.isEmpty()) {
+    return 0.0;
+  } else { // 此处的else可以去掉
+    double amount = 0.0;
+    for (Order order : orders) {
+      if (order != null) {
+        amount += (order.getCount() * order.getPrice());
+      }
+    }
+    return amount;
+  }
+}
+
+// 示例二
+public List&lt;String&gt; matchStrings(List&lt;String&gt; strList,String substr) {
+  List&lt;String&gt; matchedStrings = new ArrayList&lt;&gt;();
+  if (strList != null &amp;&amp; substr != null) {
+    for (String str : strList) {
+      if (str != null) { // 跟下面的if语句可以合并在一起
+        if (str.contains(substr)) {
+          matchedStrings.add(str);
+        }
+      }
+    }
+  }
+  return matchedStrings;
+}
+</code></pre><ul>
+<li>使用编程语言提供的continue、break、return关键字，提前退出嵌套。代码示例如下所示：</li>
+</ul><pre><code>// 重构前的代码
+public List&lt;String&gt; matchStrings(List&lt;String&gt; strList,String substr) {
+  List&lt;String&gt; matchedStrings = new ArrayList&lt;&gt;();
+  if (strList != null &amp;&amp; substr != null){ 
+    for (String str : strList) {
+      if (str != null &amp;&amp; str.contains(substr)) {
+        matchedStrings.add(str);
+        // 此处还有10行代码...
+      }
+    }
+  }
+  return matchedStrings;
+}
+
+// 重构后的代码：使用continue提前退出
+public List&lt;String&gt; matchStrings(List&lt;String&gt; strList,String substr) {
+  List&lt;String&gt; matchedStrings = new ArrayList&lt;&gt;();
+  if (strList != null &amp;&amp; substr != null){ 
+    for (String str : strList) {
+      if (str == null || !str.contains(substr)) {
+        continue; 
+      }
+      matchedStrings.add(str);
+      // 此处还有10行代码...
+    }
+  }
+  return matchedStrings;
+}
+</code></pre><ul>
+<li>调整执行顺序来减少嵌套。具体的代码示例如下所示：</li>
+</ul><pre><code>// 重构前的代码
+public List&lt;String&gt; matchStrings(List&lt;String&gt; strList,String substr) {
+  List&lt;String&gt; matchedStrings = new ArrayList&lt;&gt;();
+  if (strList != null &amp;&amp; substr != null) {
+    for (String str : strList) {
+      if (str != null) {
+        if (str.contains(substr)) {
+          matchedStrings.add(str);
+        }
+      }
+    }
+  }
+  return matchedStrings;
+}
+
+// 重构后的代码：先执行判空逻辑，再执行正常逻辑
+public List&lt;String&gt; matchStrings(List&lt;String&gt; strList,String substr) {
+  if (strList == null || substr == null) { //先判空
+    return Collections.emptyList();
+  }
+
+  List&lt;String&gt; matchedStrings = new ArrayList&lt;&gt;();
+  for (String str : strList) {
+    if (str != null) {
+      if (str.contains(substr)) {
+        matchedStrings.add(str);
+      }
+    }
+  }
+  return matchedStrings;
+}
+</code></pre><ul>
+<li>将部分嵌套逻辑封装成函数调用，以此来减少嵌套。具体的代码示例如下所示：</li>
+</ul><pre><code>// 重构前的代码
+public List&lt;String&gt; appendSalts(List&lt;String&gt; passwords) {
+  if (passwords == null || passwords.isEmpty()) {
+    return Collections.emptyList();
+  }
+  
+  List&lt;String&gt; passwordsWithSalt = new ArrayList&lt;&gt;();
+  for (String password : passwords) {
+    if (password == null) {
+      continue;
+    }
+    if (password.length() &lt; 8) {
+      // ...
+    } else {
+      // ...
+    }
+  }
+  return passwordsWithSalt;
+}
+
+// 重构后的代码：将部分逻辑抽成函数
+public List&lt;String&gt; appendSalts(List&lt;String&gt; passwords) {
+  if (passwords == null || passwords.isEmpty()) {
+    return Collections.emptyList();
+  }
+
+  List&lt;String&gt; passwordsWithSalt = new ArrayList&lt;&gt;();
+  for (String password : passwords) {
+    if (password == null) {
+      continue;
+    }
+    passwordsWithSalt.add(appendSalt(password));
+  }
+  return passwordsWithSalt;
+}
+
+private String appendSalt(String password) {
+  String passwordWithSalt = password;
+  if (password.length() &lt; 8) {
+    // ...
+  } else {
+    // ...
+  }
+  return passwordWithSalt;
+}
+</code></pre><p>除此之外，常用的还有通过使用多态来替代if-else、switch-case条件判断的方法。这个思路涉及代码结构的改动，我们会在后面的章节中讲到，这里就暂时不展开说明了。</p><h2>6.学会使用解释性变量</h2><p>常用的用解释性变量来提高代码的可读性的情况有下面2种。</p><ul>
+<li>常量取代魔法数字。示例代码如下所示：</li>
+</ul><pre><code>public double CalculateCircularArea(double radius) {
+  return (3.1415) * radius * radius;
+}
+
+// 常量替代魔法数字
+public static final Double PI = 3.1415;
+public double CalculateCircularArea(double radius) {
+  return PI * radius * radius;
+}
+</code></pre><ul>
+<li>使用解释性变量来解释复杂表达式。示例代码如下所示：</li>
+</ul><pre><code>if (date.after(SUMMER_START) &amp;&amp; date.before(SUMMER_END)) {
+  // ...
+} else {
+  // ...
+}
+
+// 引入解释性变量后逻辑更加清晰
+boolean isSummer = date.after(SUMMER_START)&amp;&amp;date.before(SUMMER_END);
+if (isSummer) {
+  // ...
+} else {
+  // ...
+} 
+</code></pre><h2>重点回顾</h2><p>好了，今天的内容到此就讲完了。除了今天讲的编程技巧，前两节课我们还分别讲解了命名与注释、代码风格。现在，我们一块来回顾复习一下这三节课的重点内容。</p><p><strong>1.关于命名</strong></p><ul>
+<li>命名的关键是能准确达意。对于不同作用域的命名，我们可以适当地选择不同的长度。</li>
+<li>我们可以借助类的信息来简化属性、函数的命名，利用函数的信息来简化函数参数的命名。</li>
+<li>命名要可读、可搜索。不要使用生僻的、不好读的英文单词来命名。命名要符合项目的统一规范，也不要用些反直觉的命名。</li>
+<li>接口有两种命名方式：一种是在接口中带前缀“I”；另一种是在接口的实现类中带后缀“Impl”。对于抽象类的命名，也有两种方式，一种是带上前缀“Abstract”，一种是不带前缀。这两种命名方式都可以，关键是要在项目中统一。</li>
+</ul><p><strong>2.关于注释</strong></p><ul>
+<li>注释的内容主要包含这样三个方面：做什么、为什么、怎么做。对于一些复杂的类和接口，我们可能还需要写明“如何用”。</li>
+<li>类和函数一定要写注释，而且要写得尽可能全面详细。函数内部的注释要相对少一些，一般都是靠好的命名、提炼函数、解释性变量、总结性注释来提高代码可读性。</li>
+</ul><p><strong>3.关于代码风格</strong></p><ul>
+<li>函数、类多大才合适？函数的代码行数不要超过一屏幕的大小，比如50行。类的大小限制比较难确定。</li>
+<li>一行代码多长最合适？最好不要超过IDE的显示宽度。当然，也不能太小，否则会导致很多稍微长点的语句被折成两行，也会影响到代码的整洁，不利于阅读。</li>
+<li>善用空行分割单元块。对于比较长的函数，为了让逻辑更加清晰，可以使用空行来分割各个代码块。</li>
+<li>四格缩进还是两格缩进？我个人比较推荐使用两格缩进，这样可以节省空间，尤其是在代码嵌套层次比较深的情况下。不管是用两格缩进还是四格缩进，一定不要用tab键缩进。</li>
+<li>大括号是否要另起一行？将大括号放到跟上一条语句同一行，可以节省代码行数。但是将大括号另起新的一行的方式，左右括号可以垂直对齐，哪些代码属于哪一个代码块，更加一目了然。</li>
+<li>类中成员怎么排列？在Google Java编程规范中，依赖类按照字母序从小到大排列。类中先写成员变量后写函数。成员变量之间或函数之间，先写静态成员变量或函数，后写普通变量或函数，并且按照作用域大小依次排列。</li>
+</ul><p><strong>4.关于编码技巧</strong></p><ul>
+<li>将复杂的逻辑提炼拆分成函数和类。</li>
+<li>通过拆分成多个函数或将参数封装为对象的方式，来处理参数过多的情况。</li>
+<li>函数中不要使用参数来做代码执行逻辑的控制。</li>
+<li>函数设计要职责单一。</li>
+<li>移除过深的嵌套层次，方法包括：去掉多余的if或else语句，使用continue、break、return关键字提前退出嵌套，调整执行顺序来减少嵌套，将部分嵌套逻辑抽象成函数。</li>
+<li>用字面常量取代魔法数。</li>
+<li>用解释性变量来解释复杂表达式，以此提高代码可读性。</li>
+</ul><p><strong>5.统一编码规范</strong></p><p>除了这三节讲到的比较细节的知识点之外，最后，还有一条非常重要的，那就是，项目、团队，甚至公司，一定要制定统一的编码规范，并且通过Code Review督促执行，这对提高代码质量有立竿见影的效果。</p><h2>课堂讨论</h2><p>到此为止，我们整个20条编码规范就讲完了。不知道你掌握了多少呢？除了今天我提到的这些，还有哪些其他的编程技巧，可以明显改善代码的可读性？</p><p>试着在留言区总结罗列一下，和同学一起交流和分享。如果有收获，也欢迎你把这篇文章分享给你的朋友。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/a5/ee/6bbac848.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>再见孙悟空</span>
+  </div>
+  <div class="_2_QraFYR_0">不要在函数中使用布尔类型的标识参数来控制内部逻辑，true 的时候走这块逻辑，false 的时候走另一块逻辑。这明显违背了单一职责原则和接口隔离原则。我建议将其拆成两个函数，可读性上也要更好。这个深有感触</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 08:23:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/97/18/a5218104.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>🐾</span>
+  </div>
+  <div class="_2_QraFYR_0">老师晚上好、关于代码规范这块，是不是有好的Java开发脚手架推荐呢？我发现公司的代码没有统一的脚手架，各小组重复造轮子，想规范化这块，但又不知道有哪些通用的脚手架。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 可以看下这篇文章：<br>https:&#47;&#47;mp.weixin.qq.com&#47;s&#47;0eOm3dBOlFUy8Si1_k7OAw<br><br>代码中的很多低级质量问题不需要人工去审查，java开发有很多现成的工具可以使用，比如：checkstyle，findbugs, pmd, jacaco, sonar等。<br><br>Checkstyle,findbugs,pmd是静态代码分析工具，通过分析源代码或者字节码，找出代码的缺陷，比如参数不匹配，有歧义的嵌套语句，错误的递归，非法计算，可能出现的空指针引用等等。三者都可以集成到gradle等构建工具中。<br><br>Jacoco是一种单元测试覆盖率统计工具，也可以集成到gradle等构建工具中，可以生成漂亮的测试覆盖率统计报表，同时Eclipse提供了插件可以EclEmma可以直观的在IDE中查看单元测试的覆盖情况。<br><br>Sonar Sonar 是一个用于代码质量管理的平台。可以在一个统一的平台上显示管理静态分析，单元测试覆盖率等质量报告。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 19:05:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/ca/c7/00e544c2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>黄林晴</span>
+  </div>
+  <div class="_2_QraFYR_0">打卡<br>明天最后一天上班<br>就放假了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 00:04:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/86/56/509535da.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>守拙</span>
+  </div>
+  <div class="_2_QraFYR_0">课堂讨论:<br><br>简单说一个本人常用的改善项目可读性的方法:<br>在每一个module&#47;package下编写一个description.md,简要说明是做什么的,有哪些需要注意的地方.<br><br>不会花很多时间,但可以提高项目整体的可维护性.</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 11:57:06</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/17/27/ec30d30a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jxin</span>
+  </div>
+  <div class="_2_QraFYR_0">1.先提问题：<br>第一块代码里面，存在一点瑕疵:if (calendar.get(Calendar.DAY_OF_MONTH) == 1) { return true; } return false;<br>直接 return calendar.get(Calendar.DAY_OF_MONTH) == 1 ;  即可。<br>2.请老师谈谈你的看法<br>A.boolean isSummer = date.after(SUMMER_START)&amp;&amp;date.before(SUMMER_END);if (isSummer){}；<br>这个场景是定义“isSummer”这个临时变量，还是if(date.after(SUMMER_START)&amp;&amp;date.before(SUMMER_END)){};好点。<br>看过&lt;重构&gt;第三版，里面其实偏向于用函数代替临时变量（变量是魔鬼）。但这可能就会有这种if里面包含比较长的函数调用的场景，可读性其实不好，有点做了两件事的味道。但在代码重构上是比较好的，毕竟没有变量滥用带来的不确定性。拿捏不准，我最后是跟着&lt;重构&gt;的思路走。但这里特请栏主谈谈自己的看法。<br><br>B.boolean isSummer = date.after(SUMMER_START)&amp;&amp;date.before(SUMMER_END); 是否需要写成final boolean isSummer。我的习惯对不可变临时变量都会加final，事实上我基本没有可变临时变量，对可变临时变量很敏感。final会导致语句行变长，但能规范代码，具有明确语义，方便其他人阅读和扩展（约束了行为）。这个也拿捏不准，栏主怎么看？<br><br>C.类中成员属性按字母大小顺序排列。这个感觉不是很合理。拿订单类为例，我会让金额相关字段，地址相关字段，和状态相关字段分隔开各自聚合在一块。这时候就没办法按字母大小排，但语义更强。当然，对金额和地址字段，其实属于值对象，可以单独成类（存对象序列化）。但老项目难有这种设计，往往是一张表平级包含一切。所以这个按大小排序的规范，感觉太“任性”了。 <br><br>3.其他编程规范，篇幅有限，而且是死的东西，不罗列了。感兴趣的同学有时间看看&lt;Effective java&gt;（一礼拜），没时间就看看&lt;阿里开发手册&gt;（2小时）。平时工作重视Sonar的每个告警，慢慢积累就好了。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-18 00:11:09</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/f1/96/9571fa3d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>青青子衿</span>
+  </div>
+  <div class="_2_QraFYR_0">个人以为还有善用和合理运用各个编程语言提供的语法糖和语言特性。比如Java开发，工作中有的老程序员不喜欢不适应lambda表达式，实际上合理恰当的使用lambda表达式可以让代码简洁明了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 09:41:09</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/7f/0f/4874788e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>linlong</span>
+  </div>
+  <div class="_2_QraFYR_0">一般大公司都有自己的编程规范，但执行的效果取决于commiter，而最终还是项目交付进度决定的。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 00:44:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/16/5b/83a35681.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Monday</span>
+  </div>
+  <div class="_2_QraFYR_0">为没有代码规范的我们项目，默哀三分钟。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-11 21:46:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f2/aa/32fc0d54.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>失火的夏天</span>
+  </div>
+  <div class="_2_QraFYR_0">for里面有时候会出现下标0的特殊判断，这个时候就把0下标单独拉出去玩，for从下标1开始。<br><br>我发现我的代码风格居然和争哥有点像，我仿佛在膨胀😁</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 08:48:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epgjuGZNgB6sSJmCIhyfMEbI1x1UbKdUuLudWucGLqib2b2Ob2CeO66x4pV9REHguxbCqgTwzSpWaQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>疯</span>
+  </div>
+  <div class="_2_QraFYR_0">文章中：3. 勿用函数参数来控制逻辑，文中意思尽量要拆分接口，但实际业务判断某个参数的时候会加段逻辑处理包含才其中，但是其他逻辑是一致的，拆分的话是否与DRY原则有矛盾，若接口本身是public的呢，是否需要拆分，这个度要怎么把握？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-12 12:30:59</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/cb/49/0b9ffc8e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>刘大明</span>
+  </div>
+  <div class="_2_QraFYR_0">1.命名长度问题<br>2.利用上下文简化命名<br>3.命名要可读，可搜索<br>4.如何命名接口和抽象类<br>5.注释应该怎么写<br>6.注释是不是越多越好<br>7.类和函数多大才合适<br>8.一行代码多长才合适<br>9.善于用空行分隔符<br>10.缩进是两格还是四格<br>11.大括号是否需要另起一行<br>12.类中成员的排列顺序<br>13.代码应该分割成更小的单元块<br>14.函数参数不要过多<br>15.不要用函数参数来控制逻辑<br>16.函数设计要职责单一<br>17.移除过深的嵌套<br>18.学会使用解释性变量<br>19.<br>20.统一编码规范<br>这些都是开发过程中，让代码更好的一些编码规范<br>我自己在项目开发过程中也会时刻注意是否符合规范。<br>自己在项目中还遇到很多人提交代码不写注释，<br>因为重构很多注释掉的代码不删除<br>重复代码不提取公共类<br>临时代码随意修改，随意提交线上等等很多代码混乱问题。<br>从自身做起，让代码更加整洁，提交的代码尽量减少代码的坏味道。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 08:21:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/ca/c7/00e544c2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>黄林晴</span>
+  </div>
+  <div class="_2_QraFYR_0">老师好 现在我是开始二刷 意识到一个问题就是识不要用标记位来控制代码的执行逻辑 但拆分多个函数不也要先判断标记位再执行对应的方法吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你说的没错，关键看这个标记位的判断是放到上层逻辑还是下层逻辑，理论上讲，这种“ugly”的代码尽量放到上层。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-06-19 08:13:11</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/3c/84/608f679b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>连边</span>
+  </div>
+  <div class="_2_QraFYR_0">作为一名phper，这里有很多话想说，但是最后汇成一句话，没有什么参数不是一个数组不能解决的。解决函数嵌套那块，挺实用的。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 08:20:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/44/47/3ddb94d0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>javaadu</span>
+  </div>
+  <div class="_2_QraFYR_0">打卡30:今日学习《设计模式之美》第33节，主要收获是：复习了改善代码可读性的编程技巧<br>1. 避免多层嵌套、避免复杂的逻辑控制关系，移除过深的嵌套层次，方法包括：去掉多余的 if 或 else 语句，使用 continue、break、return 关键字提前退出嵌套，调整执行顺序来减少嵌套，将部分嵌套逻辑抽象成函数。<br>2. 函数的职责要单一，避免用boolean变量做参数控制函数内部的逻辑<br>3. 尽量抽取出不相关的子问题<br>4. 配合《编写可读代码的艺术》和《代码整洁之道》一起阅读更好</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-24 14:26:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJcxSpNMqwqyicMvdOSr9ic0p1ABiauHnv7g7YQVSJuoHPoQbYDu3YzdpgmSAk2KricUBQ5yibWBWIq75w/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>桂城老托尼</span>
+  </div>
+  <div class="_2_QraFYR_0">感谢争哥分享<br>文中提交的技巧都是实际工作中code的原则，可以作为CR时代码规范项的参考标准。 <br>以前经常踩 问题3 的，主要理论依据就是对外隐藏更多的细节，但违反了单一职责。<br>还有更多的代码规约方面的， Google Java代码规约  和 Alibaba Java 代码开发规范 其实都可以作为案头必备手册了，安利一下。 </div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-18 10:13:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/91/97/3762ca10.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>小情绪</span>
+  </div>
+  <div class="_2_QraFYR_0">王争老师，我瞅了一眼Android的java层源代码，类里面的import包没有按字母从小到大，作用域也没有按大小依次排列，是不是Google并不是严格执行这套标准，还是别的原因？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Android是收购的吧������</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-28 14:42:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/a0/cb/aab3b3e7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张三丰</span>
+  </div>
+  <div class="_2_QraFYR_0">这段代码有违反DRY原则的嫌疑。<br><br>public List&lt;Transaction&gt; selectTransactions(Long userId, Date startDate, Date endDate) {<br>  if (startDate != null &amp;&amp; endDate != null) {<br>    &#47;&#47; 查询两个时间区间的transactions<br>  }<br>  if (startDate != null &amp;&amp; endDate == null) {<br>    &#47;&#47; 查询startDate之后的所有transactions<br>  }<br>  if (startDate == null &amp;&amp; endDate != null) {<br>    &#47;&#47; 查询endDate之前的所有transactions<br>  }<br>  if (startDate == null &amp;&amp; endDate == null) {<br>    &#47;&#47; 查询所有的transactions<br>  }<br>}<br><br>&#47;&#47; 拆分成多个public函数，更加清晰、易用<br>public List&lt;Transaction&gt; selectTransactionsBetween(Long userId, Date startDate, Date endDate) {<br>  return selectTransactions(userId, startDate, endDate);<br>}<br><br>public List&lt;Transaction&gt; selectTransactionsStartWith(Long userId, Date startDate) {<br>  return selectTransactions(userId, startDate, null);<br>}<br><br>public List&lt;Transaction&gt; selectTransactionsEndWith(Long userId, Date endDate) {<br>  return selectTransactions(userId, null, endDate);<br>}<br><br>public List&lt;Transaction&gt; selectAllTransactions(Long userId) {<br>  return selectTransactions(userId, null, null);<br>}<br><br>private List&lt;Transaction&gt; selectTransactions(Long userId, Date startDate, Date endDate) {<br>  &#47;&#47; ...<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-06-05 09:11:46</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/f9/19/7c3b12ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_deb968</span>
+  </div>
+  <div class="_2_QraFYR_0">我感觉最难实现的还是，在不断变化的需求代码重用及原先的命名跟不上变化了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-27 22:54:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/IIkdC2gohpcibib0AJvSdnJQefAuQYGlLySQOticThpF7Ck9WuDUQLJlgZ7ic13LIFnGBXXbMsSP3nZsbibBN98ZjGA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>batman</span>
+  </div>
+  <div class="_2_QraFYR_0">老师公司制定的统一编码规范长什么样子，能不能供大家学习学习</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-30 22:35:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/fa/ab/0d39e745.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>李小四</span>
+  </div>
+  <div class="_2_QraFYR_0">设计模式_33<br>使用参数作为控制逻辑，这一点深有感触，除了故意设计成这样，还有一些是改成这样的(不想改程序结构，或者不能改)，在原来的基础上扩展功能，这样加一个用于控制逻辑的参数，程序就分成了两部分；如果后面再加，代码分成2^n个部分，而是会有大量的重复代码，同一个逻辑要该好几个地方，很容易忘。<br><br>对于代码质量，我有些个人的心得就是：写完代码之后，再看看，如果发现“不舒服”的地方，多想一想。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-17 17:34:14</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

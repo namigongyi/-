@@ -1,0 +1,571 @@
+<audio title="JavaScript对象：你知道全部的对象分类吗？" src="https://static001.geekbang.org/resource/audio/e6/a1/e6da746ef307617e41b7744d4564dea1.mp3" controls="controls"></audio> 
+<p>你好，我是winter。</p><p>在前面的课程中，我已经讲解了JavaScript对象的一些基础知识。但是，我们所讲解的对象，只是特定的一部分，并不能涵盖全部的JavaScript对象。</p><p>比如说，我们不论怎样编写代码，都没法绕开Array，实现一个跟原生的数组行为一模一样的对象，这是由于原生数组的底层实现了一个自动随着下标变化的length属性。</p><p>并且，在浏览器环境中，我们也无法单纯依靠JavaScript代码实现div对象，只能靠document.createElement来创建。这也说明了JavaScript的对象机制并非简单的属性集合+原型。</p><p>我们日常工作中，接触到的主要API，几乎都是由今天所讲解的这些对象提供的。理解这些对象的性质，我们才能真正理解我们使用的API的一些特性。</p><h2>JavaScript中的对象分类</h2><p>我们可以把对象分成几类。</p><ul>
+<li>
+<p>宿主对象（host Objects）：由JavaScript宿主环境提供的对象，它们的行为完全由宿主环境决定。</p>
+</li>
+<li>
+<p>内置对象（Built-in Objects）：由JavaScript语言提供的对象。</p>
+<ul>
+<li>固有对象（Intrinsic Objects ）：由标准规定，随着JavaScript运行时创建而自动创建的对象实例。</li>
+<li>原生对象（Native Objects）：可以由用户通过Array、RegExp等内置构造器或者特殊语法创建的对象。</li>
+<li>普通对象（Ordinary Objects）：由{}语法、Object构造器或者class关键字定义类创建的对象，它能够被原型继承。</li>
+</ul>
+</li>
+</ul><!-- [[[read_end]]] --><p>下面我会为你一一讲解普通对象之外的对象类型。</p><h3>宿主对象</h3><p>首先我们来看看宿主对象。</p><p>JavaScript宿主对象千奇百怪，但是前端最熟悉的无疑是浏览器环境中的宿主了。</p><p>在浏览器环境中，我们都知道全局对象是window，window上又有很多属性，如document。</p><p>实际上，这个全局对象window上的属性，一部分来自JavaScript语言，一部分来自浏览器环境。</p><p>JavaScript标准中规定了全局对象属性，W3C的各种标准中规定了Window对象的其它属性。</p><p>宿主对象也分为固有的和用户可创建的两种，比如document.createElement就可以创建一些DOM对象。</p><p>宿主也会提供一些构造器，比如我们可以使用new Image来创建img元素，这些我们会在浏览器的API部分详细讲解。</p><h2>内置对象·固有对象</h2><p>我们在前面说过，固有对象是由标准规定，随着JavaScript运行时创建而自动创建的对象实例。</p><p>固有对象在任何JavaScript代码执行前就已经被创建出来了，它们通常扮演者类似基础库的角色。我们前面提到的“类”其实就是固有对象的一种。</p><p>ECMA标准为我们提供了一份固有对象表，里面含有150+个固有对象。你可以通过<a href="https://www.ecma-international.org/ecma-262/9.0/index.html#sec-well-known-intrinsic-objects">这个链接</a>查看。</p><p>但是遗憾的是，这个表格并不完整。所以在本篇的末尾，我设计了一个小实验（小实验：获取全部JavaScript固有对象），你可以自己尝试一下，数一数一共有多少个固有对象。</p><h2>内置对象·原生对象</h2><p>我们把JavaScript中，能够通过语言本身的构造器创建的对象称作原生对象。在JavaScript标准中，提供了30多个构造器。按照我的理解，按照不同应用场景，我把原生对象分成了以下几个种类。</p><p><img src="https://static001.geekbang.org/resource/image/6c/d0/6cb1df319bbc7c7f948acfdb9ffd99d0.png?wh=988*375" alt=""></p><p>通过这些构造器，我们可以用new运算创建新的对象，所以我们把这些对象称作原生对象。<br>
+几乎所有这些构造器的能力都是无法用纯JavaScript代码实现的，它们也无法用class/extend语法来继承。</p><p>这些构造器创建的对象多数使用了私有字段,例如：</p><ul>
+<li>Error: [[ErrorData]]</li>
+<li>Boolean: [[BooleanData]]</li>
+<li>Number: [[NumberData]]</li>
+<li>Date: [[DateValue]]</li>
+<li>RegExp: [[RegExpMatcher]]</li>
+<li>Symbol: [[SymbolData]]</li>
+<li>Map: [[MapData]]</li>
+</ul><p>这些字段使得原型继承方法无法正常工作，所以，我们可以认为，所有这些原生对象都是为了特定能力或者性能，而设计出来的“特权对象”。</p><h2>用对象来模拟函数与构造器：函数对象与构造器对象</h2><p>我在前面介绍了对象的一般分类，在JavaScript中，还有一个看待对象的不同视角，这就是用对象来模拟函数和构造器。</p><p>事实上，JavaScript为这一类对象预留了私有字段机制，并规定了抽象的函数对象与构造器对象的概念。</p><p>函数对象的定义是：具有[[call]]私有字段的对象，构造器对象的定义是：具有私有字段[[construct]]的对象。</p><p>JavaScript用对象模拟函数的设计代替了一般编程语言中的函数，它们可以像其它语言的函数一样被调用、传参。任何宿主只要提供了“具有[[call]]私有字段的对象”，就可以被 JavaScript 函数调用语法支持。</p><blockquote>
+<p><span class="reference">[[call]]私有字段必须是一个引擎中定义的函数，需要接受this值和调用参数，并且会产生域的切换，这些内容，我将会在属性访问和执行过程两个章节详细讲述。</span></p>
+</blockquote><p>我们可以这样说，任何对象只需要实现[[call]]，它就是一个函数对象，可以去作为函数被调用。而如果它能实现[[construct]]，它就是一个构造器对象，可以作为构造器被调用。</p><p>对于为JavaScript提供运行环境的程序员来说，只要字段符合，我们在上文中提到的宿主对象和内置对象（如Symbol函数）可以模拟函数和构造器。</p><p>当然了，用户用function关键字创建的函数必定同时是函数和构造器。不过，它们表现出来的行为效果却并不相同。</p><p>对于宿主和内置对象来说，它们实现[[call]]（作为函数被调用）和[[construct]]（作为构造器被调用）不总是一致的。比如内置对象 Date 在作为构造器调用时产生新的对象，作为函数时，则产生字符串，见以下代码：</p><pre><code class="language-JavaScript">    console.log(new Date); // 1
+    console.log(Date())
+</code></pre><p>而浏览器宿主环境中，提供的Image构造器，则根本不允许被作为函数调用。</p><pre><code>console.log(new Image); 
+console.log(Image());//抛出错误
+</code></pre><p>再比如基本类型（String、Number、Boolean），它们的构造器被当作函数调用，则产生类型转换的效果。</p><p>值得一提的是，在ES6之后 =&gt; 语法创建的函数仅仅是函数，它们无法被当作构造器使用，见以下代码：</p><pre><code class="language-JavaScript">    new (a =&gt; 0) // error
+
+</code></pre><p>对于用户使用 function 语法或者Function构造器创建的对象来说，[[call]]和[[construct]]行为总是相似的，它们执行同一段代码。</p><p>我们看一下示例。</p><pre><code class="language-JavaScript">function f(){
+    return 1;
+}
+var v = f(); //把f作为函数调用
+var o = new f(); //把f作为构造器调用
+</code></pre><p>我们大致可以认为，它们[[construct]]的执行过程如下：</p><ul>
+<li>以 Object.prototype 为原型创建一个新对象；</li>
+<li>以新对象为 this，执行函数的[[call]]；</li>
+<li>如果[[call]]的返回值是对象，那么，返回这个对象，否则返回第一步创建的新对象。</li>
+</ul><p>这样的规则造成了个有趣的现象，如果我们的构造器返回了一个新的对象，那么new创建的新对象就变成了一个构造函数之外完全无法访问的对象，这一定程度上可以实现“私有”。</p><pre><code>function cls(){
+    this.a = 100;
+    return {
+        getValue:() =&gt; this.a
+    }
+}
+var o = new cls;
+o.getValue(); //100
+//a在外面永远无法访问到
+</code></pre><h2>特殊行为的对象</h2><p>除了上面介绍的对象之外，在固有对象和原生对象中，有一些对象的行为跟正常对象有很大区别。</p><p>它们常见的下标运算（就是使用中括号或者点来做属性访问）或者设置原型跟普通对象不同，这里我简单总结一下。</p><ul>
+<li>Array：Array的length属性根据最大的下标自动发生变化。</li>
+<li>Object.prototype：作为所有正常对象的默认原型，不能再给它设置原型了。</li>
+<li>String：为了支持下标运算，String的正整数属性访问会去字符串里查找。</li>
+<li>Arguments：arguments的非负整数型下标属性跟对应的变量联动。</li>
+<li>模块的namespace对象：特殊的地方非常多，跟一般对象完全不一样，尽量只用于import吧。</li>
+<li>类型数组和数组缓冲区：跟内存块相关联，下标运算比较特殊。</li>
+<li>bind后的function：跟原来的函数相关联。</li>
+</ul><h2>结语</h2><p>在这篇文章中，我们介绍了一些不那么常规的对象，并且我还介绍了JavaScript中用对象来模拟函数和构造器的机制。</p><p>这是一些不那么有规律、不那么优雅的知识，而JavaScript正是通过这些对象，提供了很多基础的能力。</p><p>我们这次课程留一个挑战任务：不使用new运算符，尽可能找到获得对象的方法。</p><p>例子：</p><pre><code>var o = {}
+var o = function(){}
+</code></pre><p>请把自己的答案留言给我，我们来比比看谁找到的多。</p><h2>小实验：获取全部JavaScript固有对象</h2><p>我们从JavaScript标准中可以找到全部的JavaScript对象定义。JavaScript语言规定了全局对象的属性。</p><p>三个值：</p><p>Infinity、NaN、undefined。</p><p>九个函数：</p><ul>
+<li>eval</li>
+<li>isFinite</li>
+<li>isNaN</li>
+<li>parseFloat</li>
+<li>parseInt</li>
+<li>decodeURI</li>
+<li>decodeURIComponent</li>
+<li>encodeURI</li>
+<li>encodeURIComponent</li>
+</ul><p>一些构造器：<br>
+Array、Date、RegExp、Promise、Proxy、Map、WeakMap、Set、WeakSet、Function、Boolean、String、Number、Symbol、Object、Error、EvalError、RangeError、ReferenceError、SyntaxError、TypeError、URIError、ArrayBuffer、SharedArrayBuffer、DataView、Typed Array、Float32Array、Float64Array、Int8Array、Int16Array、Int32Array、UInt8Array、UInt16Array、UInt32Array、UInt8ClampedArray。</p><p>四个用于当作命名空间的对象：</p><ul>
+<li>Atomics</li>
+<li>JSON</li>
+<li>Math</li>
+<li>Reflect</li>
+</ul><p>我们使用广度优先搜索，查找这些对象所有的属性和Getter/Setter，就可以获得JavaScript中所有的固有对象。</p><p>请你试着先不看我的代码，在自己的浏览器中计算出来JavaScript有多少固有对象。</p><pre><code>var set = new Set();
+var objects = [
+    eval,
+    isFinite,
+    isNaN,
+    parseFloat,
+    parseInt,
+    decodeURI,
+    decodeURIComponent,
+    encodeURI,
+    encodeURIComponent,
+    Array,
+    Date,
+    RegExp,
+    Promise,
+    Proxy,
+    Map,
+    WeakMap,
+    Set,
+    WeakSet,
+    Function,
+    Boolean,
+    String,
+    Number,
+    Symbol,
+    Object,
+    Error,
+    EvalError,
+    RangeError,
+    ReferenceError,
+    SyntaxError,
+    TypeError,
+    URIError,
+    ArrayBuffer,
+    SharedArrayBuffer,
+    DataView,
+    Float32Array,
+    Float64Array,
+    Int8Array,
+    Int16Array,
+    Int32Array,
+    Uint8Array,
+    Uint16Array,
+    Uint32Array,
+    Uint8ClampedArray,
+    Atomics,
+    JSON,
+    Math,
+    Reflect];
+objects.forEach(o =&gt; set.add(o));
+
+for(var i = 0; i &lt; objects.length; i++) {
+    var o = objects[i]
+    for(var p of Object.getOwnPropertyNames(o)) {
+        var d = Object.getOwnPropertyDescriptor(o, p)
+        if( (d.value !== null &amp;&amp; typeof d.value === &quot;object&quot;) || (typeof d.value === &quot;function&quot;))
+            if(!set.has(d.value))
+                set.add(d.value), objects.push(d.value);
+        if( d.get )
+            if(!set.has(d.get))
+                set.add(d.get), objects.push(d.get);
+        if( d.set )
+            if(!set.has(d.set))
+                set.add(d.set), objects.push(d.set);
+    }
+}
+</code></pre>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f1/15/8fcf8038.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>William</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;&#47; 1. 利用字面量<br>var a = [], b = {}, c = &#47;abc&#47;g<br>&#47;&#47; 2. 利用dom api<br>var d = document.createElement(&#39;p&#39;)<br>&#47;&#47; 3. 利用JavaScript内置对象的api<br>var e = Object.create(null)<br>var f = Object.assign({k1:3, k2:8}, {k3: 9})<br>var g = JSON.parse(&#39;{}&#39;)<br>&#47;&#47; 4.利用装箱转换<br>var h = Object(undefined), i = Object(null), k = Object(1), l = Object(&#39;abc&#39;), m = Object(true)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-05 17:09:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/ce/f8/40e72791.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>多啦斯基周</span>
+  </div>
+  <div class="_2_QraFYR_0">这块的内容确实有些复杂，作者讲的很深入。<br>但是个人觉得思路是否可以再整理一下，总是感觉有一些绕，把知识讲得更易理解一些呢？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 17:11:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/e4/60/a011a649.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Alan</span>
+  </div>
+  <div class="_2_QraFYR_0">一期比一期深入，一期比一期了解的更少了，蓝瘦</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-02 02:50:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJy3VhrhNLDDzCjbqs0EAN5lp4svORB4ELRwQJbkOaCAUV3ic38OUIu1OoibwuyMicKhQowZGwSImvjA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>kesikesie</span>
+  </div>
+  <div class="_2_QraFYR_0">    console.log(new Date); &#47;&#47; 1<br>    console.log(Date())<br>这个在控制台打印的都是日期</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-19 23:09:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/f6/3d/7ec71bc4.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>吃不饱</span>
+  </div>
+  <div class="_2_QraFYR_0">前端工作一年，好难理解。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-08 13:59:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/39/30/f7df6ba7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>米斯特菠萝</span>
+  </div>
+  <div class="_2_QraFYR_0">利用构造器的执行规则来实现私有，真是个意外的发现<br><br>之前用class构建一个类，有一些方法暴露给外面总觉得怪怪的。现在好了，在constructor函数里return一个对象，在对象里写方法来对应返回类里写的需要暴露的method就解决了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-03 03:16:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/b1/58/7d4f968f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>plasmatium</span>
+  </div>
+  <div class="_2_QraFYR_0">try {<br>  Image()<br>) catch (err) {<br>  &#47;&#47; 获得一个对象err<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-02 22:37:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/93/4a/de82f373.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>AICC</span>
+  </div>
+  <div class="_2_QraFYR_0">不那么规律不那么优雅看得云里雾里</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-02 10:12:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/1f/ec/dede5cb2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>clannad-</span>
+  </div>
+  <div class="_2_QraFYR_0">1.var o = [];<br>2.document.createElement(&#39;div&#39;)；<br>3.Object.create(Object.prototype);<br>4.var o = Object.assign({});<br>5.var o = JSON.parse(&#39;{}&#39;);</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-02 10:47:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_1d054d</span>
+  </div>
+  <div class="_2_QraFYR_0">老师提到原生构造器无法继承。<br>而阮一峰老师在http:&#47;&#47;es6.ruanyifeng.com&#47;#docs&#47;class-extends中表示，es6已经可以继承原生构造函数，并且能定义子类。<br>以我的理解来看，阮一峰老师的说法没有问题。<br>不知道老师怎么看？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-05-19 11:59:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/s0bx4WXQNkAJ3c3map0g6dlt3sKDgTtN7Ria96YoufjQcVVI8Shv5CN1jnK1ZTImNnlPcibRqvyiaUuhpIvV1TpnQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>wingsico</span>
+  </div>
+  <div class="_2_QraFYR_0">JS中对象的分类一般分为宿主对象和内置对象，宿主对象就是由js运行的环境提供的对象，它的行为由环境控制，例如浏览器中的Window，Node中的global等，而内置对象可以再次细分，分为固有对象、原生对象和普通对象，这些对象可以隶属于多种对象，例如Array 即是固有对象，也是原生对象，固有对象是由环境或者宿主提供的，这里的对象并不但只类似{}这样的对象，函数也是对象。固有对象包含了所有的原生对象的创造者，例如 var array = new Array(), 其中 array 是原生对象，而Array是其创造者，属于固有对象。这些固有对象往往包含两个特殊的私有属性 [[call]] 和 [[construct]]，拥有 [[call]] 的对象可以作为函数进行调用，拥有 [[construct]] 的可以作为构造器被new调用。这两个属性是由js引擎写入，通过上层js代码是无法进行赋值或修改的。对于一些对象的特殊行为，一般都是由js引擎完成的，但通过一些上层js代码模拟，也可以模拟出类似操作。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-05 23:27:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/94/56/4b8395f6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>CC</span>
+  </div>
+  <div class="_2_QraFYR_0">除了老师提到的：<br>var o = {}<br>var o = function(){}<br><br>还有：<br><br>&#47;&#47; 使用 Object 构造器<br>var o = new Object();<br><br>&#47;&#47; 使用 function<br>var o = new function f() {};<br><br>&#47;&#47; 使用 method<br>var o = Object.create(null)<br><br>&#47;&#47; 使用 ES6 class<br>class myOwnObject {<br>  constructor(a) { this.a = a; }<br>}<br>var o = new myOwnObject(‘hey yo’);<br><br>暂时想到这些。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-02 09:57:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/2d/5f/f648ec62.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>覃</span>
+  </div>
+  <div class="_2_QraFYR_0">老师好，看完文章后有两个小疑问<br>1.Js的30多个构造器是怎么实现的？ <br>2.div对象虽然属性很多。那可以用纯js模拟吗？使用document.createElement的时候，浏览器还做了什么别的工作吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-02 08:58:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/13/84/5aeaea9c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>XXX</span>
+  </div>
+  <div class="_2_QraFYR_0">关于原生构造器无法用 class&#47;extend 语法来继承的观点，能否举例说明呢？我写个demo跑了一下，发现还是可以的呐<br><br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 能继承方法，但是没办法跟原生的一模一样</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-26 11:22:51</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/8c/2d/78e39300.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Evo</span>
+  </div>
+  <div class="_2_QraFYR_0">&quot;用对象来模拟函数与构造器：函数对象与构造器对象&quot; 最后一段：“如果我们的构造器返回来一个新的对象，那么new创建的新对象就变成了一个构造函数之外完全无法访问的对象”， 明明是“构造器中的某些属性可以被写成构造函数之外完全无法访问的属性”。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-06 07:55:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/43/9b/ce86894a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Nirvana</span>
+  </div>
+  <div class="_2_QraFYR_0">我发现老师很稀罕猫啊，都是猫的配图</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-03 16:55:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/3b/68/a409de4b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Chen</span>
+  </div>
+  <div class="_2_QraFYR_0">老师你说的那个console.log(new Date)和console.log(Date())在控制台全部输出时间字符串，咋回事</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-20 09:38:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/a4/45/3cb5cdc6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>拾迹</span>
+  </div>
+  <div class="_2_QraFYR_0">1、使用 Object 构造函数<br>var person1 = new Object();<br>2、使用对象字面量<br>var person1 = {}<br>3、工厂模式<br>function createPerson(name, age, job){<br>    var o = new Object();<br>    o.name = name;<br>    o.age = age;<br>    o.job = job;<br>    o.sayName = function(){<br>        alert(this.name);<br>    }<br>    return o;<br>}<br>var person1 = createPerson(&#39;zs&#39;, 18, &#39;programmer&#39;);<br>var person2 = createPerson(&#39;ls&#39;, 28, &#39;teacter&#39;);<br>4、构造函数<br>function Person(){...}<br>var p = new Person()<br>5、原型模式<br>function Person(){...}<br>Person.prototype.x = ...<br>var p = new Person()<br>6、Object.create()</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-28 18:13:50</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/cviaNUiaiaMq9eicjZTupibehtBk1sY9NKWuIsYjB5514Sj1IV3oKIhjicerlnl2FFicW1BEUUqHU1qn0lRdq8bWOzyag/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_657e73</span>
+  </div>
+  <div class="_2_QraFYR_0">不要为了 去凑 而凑好吧，我看了下面的创造对象的方法，瑟瑟发抖，你们比官方还专业，去项目中那么写试试，第二天就被开除，自以为很高大上，其实就是在给被人制造麻烦，现有的都不会更搞不懂，老师说实话 目前看了前几节，感觉该需要去解释说明的，一掠而过，让人感觉很遥远很模糊</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-06-10 18:35:55</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/dGa4C9GU5rcZYK2ibfSFh9J2bQ2IgLibGWdZH1ORESCKDCWdHiaMqicNawibqoWErBDyU8jVB68dUxbN8MM53BVqofA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_hx</span>
+  </div>
+  <div class="_2_QraFYR_0">读此篇后，觉得我还是先去重学JavaScript吧</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-20 16:58:38</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

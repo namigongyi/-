@@ -1,0 +1,530 @@
+<audio title="28_如何在原生应用中混编Flutter工程？" src="https://static001.geekbang.org/resource/audio/8b/28/8b5212c17afc34708c24b9cc4a91d828.mp3" controls="controls"></audio> 
+<p>你好，我是陈航。今天，我来和你聊聊如何在原生应用中接入Flutter。</p><p>在前面两篇文章中，我与你分享了如何在Dart层引入Android/iOS平台特定的能力，来提升App的功能体验。</p><p>使用Flutter从头开始写一个App，是一件轻松惬意的事情。但，对于成熟产品来说，完全摒弃原有App的历史沉淀，而全面转向Flutter并不现实。用Flutter去统一iOS/Android技术栈，把它作为已有原生App的扩展能力，通过逐步试验有序推进从而提升终端开发效率，可能才是现阶段Flutter最具吸引力的地方。</p><p>那么，Flutter工程与原生工程该如何组织管理？不同平台的Flutter工程打包构建产物该如何抽取封装？封装后的产物该如何引入原生工程？原生工程又该如何使用封装后的Flutter能力？</p><p>这些问题使得在已有原生App中接入Flutter看似并不是一件容易的事情。那接下来，我就和你介绍下如何在原生App中以最自然的方式接入Flutter。</p><h2>准备工作</h2><p>既然是要在原生应用中混编Flutter，相信你一定已经准备好原生应用工程来实施今天的改造了。如果你还没有准备好也没关系，我会以一个最小化的示例和你演示这个改造过程。</p><!-- [[[read_end]]] --><p>首先，我们分别用Xcode与Android Studio快速建立一个只有首页的基本工程，工程名分别为iOSDemo与AndroidDemo。</p><p>这时，Android工程就已经准备好了；而对于iOS工程来说，由于基本工程并不支持以组件化的方式管理项目，因此我们还需要多做一步，将其改造成使用CocoaPods管理的工程，也就是要在iOSDemo根目录下创建一个只有基本信息的Podfile文件：</p><pre><code>use_frameworks!
+platform :ios, '8.0'
+target 'iOSDemo' do
+#todo
+end
+</code></pre><p>然后，在命令行输入pod install后，会自动生成一个iOSDemo.xcworkspace文件，这时我们就完成了iOS工程改造。</p><h2>Flutter混编方案介绍</h2><p>如果你想要在已有的原生App里嵌入一些Flutter页面，有两个办法：</p><ul>
+<li>将原生工程作为Flutter工程的子工程，由Flutter统一管理。这种模式，就是统一管理模式。</li>
+<li>将Flutter工程作为原生工程共用的子模块，维持原有的原生工程管理方式不变。这种模式，就是三端分离模式。</li>
+</ul><p><img src="https://static001.geekbang.org/resource/image/43/e3/43959076df5aadeb751dff0d7b1134e3.png?wh=1304*326" alt=""></p><center><span class="reference">图1 Flutter混编工程管理方式</span></center><p>由于Flutter早期提供的混编方式能力及相关资料有限，国内较早使用Flutter混合开发的团队大多使用的是统一管理模式。但是，随着功能迭代的深入，这种方案的弊端也随之显露，不仅三端（Android、iOS、Flutter）代码耦合严重，相关工具链耗时也随之大幅增长，导致开发效率降低。</p><p>所以，后续使用Flutter混合开发的团队陆续按照三端代码分离的模式来进行依赖治理，实现了Flutter工程的轻量级接入。</p><p>除了可以轻量级接入，三端代码分离模式把Flutter模块作为原生工程的子模块，还可以快速实现Flutter功能的“热插拔”，降低原生工程的改造成本。而Flutter工程通过Android Studio进行管理，无需打开原生工程，可直接进行Dart代码和原生代码的开发调试。</p><p><strong>三端工程分离模式的关键是抽离Flutter工程，将不同平台的构建产物依照标准组件化的形式进行管理</strong>，即Android使用aar、iOS使用pod。换句话说，接下来介绍的混编方案会将Flutter模块打包成aar和pod，这样原生工程就可以像引用其他第三方原生组件库那样快速接入Flutter了。</p><p>听起来是不是很兴奋？接下来，我们就开始正式采用三端分离模式来接入Flutter模块吧。</p><h2>集成Flutter</h2><p>我曾在前面的文章中提到，Flutter的工程结构比较特殊，包括Flutter工程和原生工程的目录（即iOS和Android两个目录）。在这种情况下，原生工程就会依赖于Flutter相关的库和资源，从而无法脱离父目录进行独立构建和运行。</p><p>原生工程对Flutter的依赖主要分为两部分：</p><ul>
+<li>Flutter库和引擎，也就是Flutter的Framework库和引擎库；</li>
+<li>Flutter工程，也就是我们自己实现的Flutter模块功能，主要包括Flutter工程lib目录下的Dart代码实现的这部分功能。</li>
+</ul><p>在已经有原生工程的情况下，我们需要在同级目录创建Flutter模块，构建iOS和Android各自的Flutter依赖库。这也很好实现，Flutter就为我们提供了这样的命令。我们只需要在原生项目的同级目录下，执行Flutter命令创建名为flutter_library的模块即可：</p><pre><code>Flutter create -t module flutter_library
+</code></pre><p>这里的Flutter模块，也是Flutter工程，我们用Android Studio打开它，其目录如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/61/89/61d3530bcf7a23e1708c536b53ced789.png?wh=872*1268" alt=""></p><center><span class="reference">图2 Flutter模块工程结构</span></center><p>可以看到，和传统的Flutter工程相比，Flutter模块工程也有内嵌的Android工程与iOS工程，因此我们可以像普通工程一样使用Android Studio进行开发调试。</p><p>仔细查看可以发现，<strong>Flutter模块有一个细微的变化</strong>：Android工程下多了一个Flutter目录，这个目录下的build.gradle配置就是我们构建aar的打包配置。这就是模块工程既能像Flutter传统工程一样使用Android Studio开发调试，又能打包构建aar与pod的秘密。</p><p>实际上，iOS工程的目录结构也有细微变化，但这个差异并不影响打包构建，因此我就不再展开了。</p><p>然后，我们打开main.dart文件，将其逻辑更新为以下代码逻辑，即一个写着“Hello from Flutter”的全屏红色的Flutter Widget：</p><pre><code>import 'package:flutter/material.dart';
+import 'dart:ui';
+
+void main() =&gt; runApp(_widgetForRoute(window.defaultRouteName));//独立运行传入默认路由
+
+Widget _widgetForRoute(String route) {
+  switch (route) {
+    default:
+      return MaterialApp(
+        home: Scaffold(
+          backgroundColor: const Color(0xFFD63031),//ARGB红色
+          body: Center(
+            child: Text(
+              'Hello from Flutter', //显示的文字
+              textDirection: TextDirection.ltr,
+              style: TextStyle(
+                fontSize: 20.0,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ),
+      );
+  }
+}
+</code></pre><p>注意：我们创建的Widget实际上是包在一个switch-case语句中的。这是因为封装的Flutter模块一般会有多个页面级Widget，原生App代码则会通过传入路由标识字符串，告诉Flutter究竟应该返回何种Widget。为了简化案例，在这里我们忽略标识字符串，统一返回一个MaterialApp。</p><p>接下来，我们要做的事情就是把这段代码编译打包，构建出对应的Android和iOS依赖库，实现原生工程的接入。</p><p>现在，我们首先来看看Android工程如何接入。</p><h3>Android模块集成</h3><p>之前我们提到原生工程对Flutter的依赖主要分为两部分，对应到Android平台，这两部分分别是：</p><ul>
+<li>Flutter库和引擎，也就是icudtl.dat、libFlutter.so，还有一些class文件。这些文件都封装在Flutter.jar中。</li>
+<li>Flutter工程产物，主要包括应用程序数据段isolate_snapshot_data、应用程序指令段isolate_snapshot_instr、虚拟机数据段vm_snapshot_data、虚拟机指令段vm_snapshot_instr、资源文件Flutter_assets。</li>
+</ul><p>搞清楚Flutter工程的Android编译产物之后，我们对Android的Flutter依赖抽取步骤如下：</p><p>首先在Flutter_library的根目录下，执行aar打包构建命令：</p><pre><code>Flutter build apk --debug
+</code></pre><p>这条命令的作用是编译工程产物，并将Flutter.jar和工程产物编译结果封装成一个aar。你很快就会想到，如果是构建release产物，只需要把debug换成release就可以了。</p><p><strong>其次</strong>，打包构建的flutter-debug.aar位于.android/Flutter/build/outputs/aar/目录下，我们把它拷贝到原生Android工程AndroidDemo的app/libs目录下，并在App的打包配置build.gradle中添加对它的依赖:</p><pre><code>...
+repositories {
+    flatDir {
+        dirs 'libs'   // aar目录
+    }
+}
+android {
+    ...
+    compileOptions {
+        sourceCompatibility 1.8 //Java 1.8
+        targetCompatibility 1.8 //Java 1.8
+    }
+    ...
+}
+
+dependencies {
+    ...
+    implementation(name: 'flutter-debug', ext: 'aar')//Flutter模块aar
+    ...
+}
+</code></pre><p>Sync一下，Flutter模块就被添加到了Android项目中。</p><p>再次，我们试着改一下MainActivity.java的代码，把它的contentView改成Flutter的widget：</p><pre><code>protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    View FlutterView = Flutter.createView(this, getLifecycle(), &quot;defaultRoute&quot;); //传入路由标识符
+    setContentView(FlutterView);//用FlutterView替代Activity的ContentView
+}
+</code></pre><p>最后点击运行，可以看到一个写着“Hello from Flutter”的全屏红色的Flutter Widget就展示出来了。至此，我们完成了Android工程的接入。</p><p><img src="https://static001.geekbang.org/resource/image/36/5b/3648bb9b0ec126fe07963d5e4cbede5b.png?wh=1440*2560" alt=""></p><center><span class="reference">图3 Android工程接入示例</span></center><h3>iOS模块集成</h3><p>iOS工程接入的情况要稍微复杂一些。在iOS平台，原生工程对Flutter的依赖分别是：</p><ul>
+<li>Flutter库和引擎，即Flutter.framework；</li>
+<li>Flutter工程的产物，即App.framework。</li>
+</ul><p>iOS平台的Flutter模块抽取，实际上就是通过打包命令生成这两个产物，并将它们封装成一个pod供原生工程引用。</p><p>类似地，首先我们在Flutter_library的根目录下，执行iOS打包构建命令：</p><pre><code>Flutter build ios --debug
+</code></pre><p>这条命令的作用是编译Flutter工程生成两个产物：Flutter.framework和App.framework。同样，把debug换成release就可以构建release产物（当然，你还需要处理一下签名问题）。</p><p><strong>其次</strong>，在iOSDemo的根目录下创建一个名为FlutterEngine的目录，并把这两个framework文件拷贝进去。iOS的模块化产物工作要比Android多一个步骤，因为我们需要把这两个产物手动封装成pod。因此，我们还需要在该目录下创建FlutterEngine.podspec，即Flutter模块的组件定义：</p><pre><code>Pod::Spec.new do |s|
+  s.name             = 'FlutterEngine'
+  s.version          = '0.1.0'
+  s.summary          = 'XXXXXXX'
+  s.description      = &lt;&lt;-DESC
+TODO: Add long description of the pod here.
+                       DESC
+  s.homepage         = 'https://github.com/xx/FlutterEngine'
+  s.license          = { :type =&gt; 'MIT', :file =&gt; 'LICENSE' }
+  s.author           = { 'chenhang' =&gt; 'hangisnice@gmail.com' }
+  s.source       = { :git =&gt; &quot;&quot;, :tag =&gt; &quot;#{s.version}&quot; }
+  s.ios.deployment_target = '8.0'
+  s.ios.vendored_frameworks = 'App.framework', 'Flutter.framework'
+end
+</code></pre><p>pod lib lint一下，Flutter模块组件就已经做好了。趁热打铁，我们再修改Podfile文件把它集成到iOSDemo工程中：</p><pre><code>...
+target 'iOSDemo' do
+    pod 'FlutterEngine', :path =&gt; './'
+end
+</code></pre><p>pod install一下，Flutter模块就集成进iOS原生工程中了。</p><p>再次，我们试着修改一下AppDelegate.m的代码，把window的rootViewController改成FlutterViewController：</p><pre><code>- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
+
+{
+    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    FlutterViewController *vc = [[FlutterViewController alloc]init];
+    [vc setInitialRoute:@&quot;defaultRoute&quot;]; //路由标识符
+    self.window.rootViewController = vc;
+    [self.window makeKeyAndVisible];
+    return YES;
+}
+</code></pre><p>最后点击运行，一个写着“Hello from Flutter”的全屏红色的Flutter Widget也展示出来了。至此，iOS工程的接入我们也顺利搞定了。</p><p><img src="https://static001.geekbang.org/resource/image/a5/42/a511d31edbbbf2949763af49453ac642.png?wh=828*1792" alt=""></p><center><span class="reference">图4 iOS工程接入示例</span></center><h2>总结</h2><p>通过分离Android、iOS和Flutter三端工程，抽离Flutter库和引擎及工程代码为组件库，以Android和iOS平台最常见的aar和pod形式接入原生工程，我们就可以低成本地接入Flutter模块，愉快地使用Flutter扩展原生App的边界了。</p><p>但，我们还可以做得更好。</p><p>如果每次通过构建Flutter模块工程，都是手动搬运Flutter编译产物，那很容易就会因为工程管理混乱导致Flutter组件库被覆盖，从而引发难以排查的Bug。而要解决此类问题的话，我们可以引入CI自动构建框架，把Flutter编译产物构建自动化，原生工程通过接入不同版本的构建产物，实现更优雅的三端分离模式。</p><p>而关于自动化构建，我会在后面的文章中和你详细介绍，这里就不再赘述了。</p><p>接下来，我们简单回顾一下今天的内容。</p><p>原生工程混编Flutter的方式有两种。一种是，将Flutter工程内嵌Android和iOS工程，由Flutter统一管理的集中模式；另一种是，将Flutter工程作为原生工程共用的子模块，由原生工程各自管理的三端工程分离模式。目前，业界采用的基本都是第二种方式。</p><p>而对于三端工程分离模式最主要的则是抽离Flutter工程，将不同平台的构建产物依照标准组件化的形式进行管理，即：针对Android平台打包构建生成aar，通过build.gradle进行依赖管理；针对iOS平台打包构建生成framework，将其封装成独立的pod，并通过podfile进行依赖管理。</p><p>我把今天分享所涉及到的知识点打包到了GitHub（<a href="https://github.com/cyndibaby905/28_module_page">flutter_module_page</a>、<a href="https://github.com/cyndibaby905/28_iOSDemo">iOS_demo</a>、<a href="https://github.com/cyndibaby905/28_AndroidDemo">Android_Demo</a>）中，你可以下载下来，反复运行几次，加深理解与记忆。</p><h2>思考题</h2><p>最后，我给你下留一个思考题吧。</p><p>对于有资源依赖的Flutter模块工程而言，其打包构建的产物，以及抽离Flutter组件库的过程会有什么不同吗？</p><p>欢迎你在评论区给我留言分享你的观点，我会在下一篇文章中等待你！感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p><p></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/e7/15/8d699a19.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>只是丶很孤单</span>
+  </div>
+  <div class="_2_QraFYR_0">flutter更新有点快，老师那个方法不行了，最新的在这里: https:&#47;&#47;flutter.dev&#47;docs&#47;development&#47;add-to-app&#47;android&#47;project-setup</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-08 17:44:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_a9f943</span>
+  </div>
+  <div class="_2_QraFYR_0">如果在flutter中添加了第三方依赖，打包时就会报错，所以这种方式本质上还是不适用于混合开发。最理想的状态是将flutter作为一个单独的项目，然后把最终产物提供给android，ios，这样原生的开发人员也不需要安装flutter运行环境。这一节可以当作是混合开发的预习，希望老师后续能把混合开发讲的更彻底一些，毕竟这才是flutter存在的主要目的</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Flutter的插件机制只是一层弱依赖，Flutter module并不会关心这堆代码的运行时来源，所以打包并不会顺藤摸瓜携带Native的依赖库。Native的依赖库是需要原生工程去管理的，所以如果你的Flutter module依赖的原生插件有其他的底层依赖库，请依次找到他们，并在原生Android工程中的build.gradle、iOS工程中的Podfile里把原生插件所依赖的原生库也声明为依赖</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-16 15:23:02</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_Rafe</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，有空更新一下教程吧，变化太多了，对新来的同学很不好</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-09-16 14:40:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/c4/d6/73656a64.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_JOJO</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，按步骤在Android原生项目中集成Flutter的构建产物aar,gradle成功编译，但是MainActivity中测试时，找不到Flutter这个类</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-22 22:23:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/eb/c8/773ff168.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>千の星</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，按照您的混编方法，再 flutter build apk --release，之后生产的aar&#47;assets&#47;flutter_assets&#47;,里面缺少isolate_snapshot_data，isolate_snapshot_instr，vm_snapshot_data，vm_snapshot_instr。aar拷贝到公司nativeapp运行到flutter就会报错：Abort message: &#39;[FATAL:flutter&#47;shell&#47;common&#47;shell.cc(218)] Check failed: vm. Must be able to initialize the VM.。请问是缺少什么环节<br>或者配置吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 参考下这个issue下的解决方案：https:&#47;&#47;github.com&#47;flutter&#47;flutter&#47;issues&#47;25147<br>1.flutter clean<br>2.cd .android<br>3.&#47;gradlew clean<br>4.&#47;gradlew assembleRelease</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-03 11:34:31</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/5a/7f/c50d520e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>颜为晨</span>
+  </div>
+  <div class="_2_QraFYR_0">包体积最少会增加多少呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: iOS 15MB左右，安卓5MB左右</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-10 14:19:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/4d/fd/0aa0e39f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>许童童</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，三端分离的话，是要建三个git仓库吗？还是有什么其它的方式管理？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 三端工程分别管理，一个工程一个仓库</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-31 15:11:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/b3/17/9f6d67dc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>超越杨超越</span>
+  </div>
+  <div class="_2_QraFYR_0">感谢陈老师的课程。如果flutter工程和原生工程的相对路径可以确定的话，比如iOS中就可以直接指定pod path到flutter工程里边，如flutter_demo&#47;ios&#47;Flutter。flutter工程中已经配置好了podspec，以及一些xcconfig文件，所以iOS原生嵌入flutter还是挺方便的。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-30 11:49:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJ7h2t7ZmOZEpzazicoHF0ricTvaObicQCYZpolMz38tnPzcV1KywglcTibf6yPY0JLc4PWA3LtapgJKg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_473879</span>
+  </div>
+  <div class="_2_QraFYR_0">老师用你给的demo，打包aar，还是缺少flutter.jar包，是我这边配置有什么问题吗<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-11 10:42:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTJ7h2t7ZmOZEpzazicoHF0ricTvaObicQCYZpolMz38tnPzcV1KywglcTibf6yPY0JLc4PWA3LtapgJKg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_473879</span>
+  </div>
+  <div class="_2_QraFYR_0">老师我编译出来的arr 是没有flutter.jar包的，为什么</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-10 16:05:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/c4/d6/73656a64.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_JOJO</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，为啥我用命令打出来的产物不对呢，跟您的aar不一样，我的没有jni的资源文件，所以一直找不到Flutter的类库文件，是为啥呀<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-02-23 09:55:06</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/81/45/9aa91b75.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>矮个子先生😝</span>
+  </div>
+  <div class="_2_QraFYR_0">对于flutter module的测试,可以手动添加入口,以IDEA为例,add configurations-&gt; + -&gt;flutter -&gt;<br>name随便取个标识,Dart entrypoint指明入口dart文件,比如main.dart,其他不用管,这样可以边编写flutter时边看效果了</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-04 16:47:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_29f263</span>
+  </div>
+  <div class="_2_QraFYR_0">强烈建议老师更新下教程，Flutter已经更新了太多的内容，语法、库使用和混合编程都有变化。新人照着老师教程的代码写，还是有些不太友好的。需要去改一些代码才能适应新版。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2023-03-14 19:58:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/39/ab/42622d70.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>James Bond</span>
+  </div>
+  <div class="_2_QraFYR_0">[!] No podspec found for `FlutterEngine` in `.&#47;`<br>为什么会提示这个啊，pod install 的时候出现</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2023-01-08 14:43:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/29/b6/83/944b035c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>风吹裤裤的海量</span>
+  </div>
+  <div class="_2_QraFYR_0">原生应用中混编，分离 Android、iOS 和 Flutter 三端，我觉得使用flutter_boost好一点，https:&#47;&#47;github.com&#47;alibaba&#47;flutter_boost</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-08-20 17:21:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/f1/39/768503ad.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>钱洋彪</span>
+  </div>
+  <div class="_2_QraFYR_0">flutter clean 之后，直接 flutter build ios 会报错，原因是因为生成的.ios里工程的证书配置不对，目前我是采用flutter pub get + xcodeproj修改证书 + flutter build ios解决的，请问老师有更好的方式解决吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-05-14 09:53:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83er6ADlY3IFt3Rs1aVDyrTO2BiaV8wiabypPwbXhbPcyqicCvnTV9lUYHULVqUab7ww4taX5QbmFyatLQ/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_cc0a3b</span>
+  </div>
+  <div class="_2_QraFYR_0">三端分离的架构怎么debug呢：比如原生通过MethodChannel调用了Flutter，怎么从原生层debug到Flutter层</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-05-07 11:46:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/58/1d/f2ea994b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>尘凉</span>
+  </div>
+  <div class="_2_QraFYR_0">setting.gradle中配置了evaluate(new File(地址))之后，一直报错：Illegal class name &quot;&quot; in class file ，老师知道怎么回事吗？搜了半天也找不到原因</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-11-01 14:37:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/6f/5d/f0a19f09.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ldd</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，iOS 按照 flutter module 的方式集成的时候，每次 flutter clean 后，执行 flutter build ios --rebug 都会报“签名失败”的错误，需要手动修改下 .ios 目录下的 iOS 项目签名配置，有没有其他什么配置可以设置，每次手动改很麻烦，跪求老师帮忙！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-27 11:38:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/MxIKVrOfvGrWibezibHJ376rHJOAtiaVyKtX9j5hZNdY9z1GH6tPJdgu66oE1fuBvc3Jnz9dhwd046xBXQYjia0H2g/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>。。。。。。</span>
+  </div>
+  <div class="_2_QraFYR_0">看了您上面, 是在mainActivity初始化flutter引擎，创建试图的，但是这里会有个一瞬黑屏的问题，想问一下，能不能在mainActivity之前就将flutter引擎初始化好了，在调用的时候直接基于引擎去渲染试图？ 如果可以的话，具体要怎么去做呢？一直有点闹不太懂它引擎初始化的相关步骤</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-16 09:41:27</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

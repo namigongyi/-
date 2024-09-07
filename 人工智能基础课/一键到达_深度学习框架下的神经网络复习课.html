@@ -1,0 +1,152 @@
+<p>今天我们来复习专栏的第五部分内容，<span class="orange">深度学习框架下的神经网络</span>。在这个模块里，我们一起学习了深度信念网络、卷积神经网络、循环神经网络、长短期记忆网络等内容。</p>
+<p><span class="reference">点击要点卡，直达你最需要复习的那篇。</span></p>
+<p><a href="https://time.geekbang.org/column/article/3431"><img src="https://static001.geekbang.org/resource/image/6e/45/6ee015991274b820f056695c8b5f9e45.jpg?wh=1110*1092" alt=""></a></p>
+<p><a href="https://time.geekbang.org/column/article/3638"><img src="https://static001.geekbang.org/resource/image/4d/e7/4dce2701152a658ff621948a3ed26ce7.jpg?wh=1110*1102" alt=""></a></p>
+<p><a href="https://time.geekbang.org/column/article/3639"><img src="https://static001.geekbang.org/resource/image/3b/05/3b35d656105e4d355b968f7f292d9a05.jpg?wh=1110*1022" alt=""></a></p>
+<p><a href="https://time.geekbang.org/column/article/3643"><img src="https://static001.geekbang.org/resource/image/3f/7f/3f505cb5fd0b5f18eece1522718a707f.jpg?wh=1110*1152" alt=""></a></p>
+<p><a href="https://time.geekbang.org/column/article/3644"><img src="https://static001.geekbang.org/resource/image/2e/14/2e463cd67177ecafb547c36d65524a14.jpg?wh=1110*1002" alt=""></a></p>
+<!-- [[[read_end]]] -->
+<p></p>
+
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/36/88/20b6a6ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Simon</span>
+  </div>
+  <div class="_2_QraFYR_0">LSTM能解决梯度弥散问题，本质原因是出现了加法。类似于Residual net。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-23 10:18:07</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/34/dd/2b301c8b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Sean</span>
+  </div>
+  <div class="_2_QraFYR_0">赞</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-01-29 20:24:41</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

@@ -1,0 +1,320 @@
+<audio title="16｜应用状态管理（上）：应用状态管理框架Redux" src="https://static001.geekbang.org/resource/audio/da/56/daa6695fc072b378e4dc49698b52b356.mp3" controls="controls"></audio> 
+<p>你好，我是宋一玮，欢迎回到React应用开发的学习。</p><p>上节课我们学习了不可变数据，了解了不可变数据对React的重要意义，然后学习了用 <code>React.memo</code> 创建具有更佳性能的纯组件。最后介绍了在JS中实现不可变数据的几种方式，除了我们在<code>oh-my-kanban</code> 中的手工实现，还有Immutable.js和Immer这些开源框架。</p><p>接下来我们会用两节课的时间，学习React的应用状态管理。你也许已经胸有成竹了：“应用状态，不就是 <code>useState</code> 吗？已经很熟悉啦。”</p><p>很高兴你有这份自信，不过我们上面提到的应用状态管理的学习，是一个概念到框架再到具体案例的过程。首先应用状态管理是一个前端领域的概念，这节课我们会先来看看它是解决什么问题的，然后来学习目前仍然最流行的应用状态管理框架Redux，了解它的用法和设计思想。</p><p>这里也提前做个小预告，在下节课我们会进一步讨论什么情况下使用React的state，什么情况下使用Redux，并举一些实际的例子。</p><p>下面开始这节课的内容。</p><h2>什么是应用状态管理？</h2><p>我们先看<strong>应用状态（Application State）</strong>。理论上，一个应用在运行的时候内存里所有跟它有关的数据都可以称作是应用状态，但实际上，这远远超出了应用开发者需要关注的范围。</p><!-- [[[read_end]]] --><p>我们姑且可以类比一下后端服务：<strong>有状态服务（Stateful Service）和无状态服务（Stateless Service）</strong>常被一起提及。</p><p>比如一个购物车HTTP服务，在服务器端临时保存了当前登录用户的session信息，用户先后两次请求都会读写这个session，那这个HTTP服务就是<strong>有状态服务</strong>；另一个商品列表HTTP服务，并不关心用户是否登录，仅凭用户发过来的HTTP请求里包含的参数就可以完成工作，把结果作为HTTP响应返回给用户，那么它就是<strong>无状态服务</strong>。</p><p>这两个服务相减，得出“<em>服务器端临时保存的登录用户的session信息</em>”就是我们需要关注的应用状态（至于session保存在内存里还是数据库里，我们这里暂时不讨论）。</p><p><strong>越是“富JS”的浏览器端应用，越是倾向于把服务器端的应用状态转移到浏览器端</strong>。于是就有了“<em>浏览器端临时保存的登录用户的session信息</em>”，这样提供给前端JS使用的应用状态。</p><p><img src="https://static001.geekbang.org/resource/image/01/6a/01b6a0efdecf1807f165c7a89d6d766a.png?wh=1503x1224" alt="图片"></p><p>如果不这样做呢？这里我们再举个反例。</p><p>比如对一个简单的对话框来说，决定它是否显示的是一个布尔值状态。如果把这个状态保存在服务器端，意味着每次弹出和关闭对话框都要去调用后端服务，这比在浏览器端保存状态要重得多。</p><p>从用户体验看，用户开关对话框都要等服务器响应，体验是比较差的。从前端开发角度看，开关对话框本来可以是一个同步的本地逻辑，却非要实现成异步的服务器请求，增加了复杂性。你可能会有疑惑：“真有框架会这样做吗？”有啊，当年的JSF就是。</p><p>React这样由数据驱动的前端框架，更是依赖浏览器本地的应用状态。</p><p>当开发本地状态越来越复杂，复杂到需要一层专门的抽象时，就出现了<strong>应用状态管理</strong>框架，来管理这些应用状态。</p><h2>应用状态管理框架Redux</h2><p>在React技术社区中，提到应用状态管理框架，一定会先提到Redux。Redux是一个用于JS应用的、可预测的状态容器。它并不是React专用，你也可以在Vue或Svelte应用中使用Redux。</p><p>你可以在任何一个JS项目中安装Redux：</p><pre><code class="language-bash">npm install redux
+</code></pre><p>我们先看一段为 <code>cardList</code> 写的样例代码：</p><pre><code class="language-javascript">import { createStore } from 'redux';
+
+function cardListReducer(state = [], action) {
+&nbsp; switch (action.type) {
+&nbsp; &nbsp; case 'card/add':
+&nbsp; &nbsp; &nbsp; return [action.newCard, ...state];
+&nbsp; &nbsp; case 'card/remove':
+&nbsp; &nbsp; &nbsp; return state.filter(card =&gt; card.title !== action.title);
+&nbsp; &nbsp; default:
+&nbsp; &nbsp; &nbsp; return state;
+&nbsp; }
+}
+
+const store = createStore(cardListReducer);
+store.subscribe(() =&gt; console.log(store.getState()));
+
+store.dispatch({ type: 'card/add', newCard: { title: '开发任务-1' } });
+// [{ title: '开发任务-1' }]
+store.dispatch({ type: 'card/add', newCard: { title: '测试任务-2' } });
+// [{ title: '测试任务-2' }, { title: '开发任务-1' }]
+store.dispatch({ type: 'card/remove', title: '开发任务-1' });
+// [{ title: '测试任务-2' }]
+</code></pre><p>你一下子看到了有点熟悉的名称： <code>reducer</code> 、 <code>action</code> 、 <code>dispatch</code> ，好嘛，这不就是<a href="https://time.geekbang.org/column/article/566338?">第9节课</a>讲到的，状态Hooks之一的 <code>useReducer</code> 吗？是的，你没看错，之所以这么像，原因之一是Redux的两位原作者，都加入了React核心团队。</p><p>上面这段代码的核心概念是 <code>store</code> 即存储。在用Redux的 <code>createStore</code> API 创建 <code>store</code> 时指定 <code>reducer</code> 归约器函数，然后调用 <code>store.subscribe()</code> 方法订阅  <code>store</code> 的变化， <code>store.getState()</code> 可以取得最新的状态数据。然后调用  <code>store.dispatch()</code>  方法派发<code>action</code> 动作， <code>reducer</code> 会根据 <code>action</code> 中的 <code>type</code> 字段决定动作的类型，然后返回新的状态用于更新<code>store</code> 。</p><h3>Redux的核心概念和设计思想</h3><p>刚才已经提到了Redux几个重要概念，这里再稍作介绍：</p><ul>
+<li>动作 <code>action</code> ：一个具有type属性的简单JS对象，用于表达一种意图或是事件；</li>
+<li>归约器 <code>reducer</code> ：一个纯函数，接收当前状态和 <code>action</code> 作为参数，根据 <code>action</code> 不同，返回与不同变更过程相当的新状态；</li>
+<li>存储 <code>store</code> ：应用状态的容器，通过 <code>reducer</code> 返回的初始值创建，可以通过<code>store.getState()</code> 返回最新的状态，也可以通过<code>store.dispatch()</code> 方法派发<code>action</code> ，接受外部使用者订阅状态的变化。</li>
+</ul><p>Redux用上面这些概念，实现了一套<strong>单向数据流（Unidirectional Data Flow）</strong>。</p><p><img src="https://static001.geekbang.org/resource/image/4d/48/4d85838ae4cb4901a26d258c4d74b548.png?wh=1541x1159" alt="图片"></p><p>这里也有必要强调Redux的三个基本原则：</p><ul>
+<li><strong>单一事实来源（Single Source Of Truth）</strong>。Redux全局只有一个store，里面包含了唯一的状态对象树；</li>
+<li><strong>状态只读</strong>。这就是在强调状态的不可变性，只有通过派发action的方式才能触发reducer，返回一个包含变更的新状态；</li>
+<li><strong>状态变更不应有副作用</strong>。在store中使用的reducer，都必须是不会产生副作用的纯函数（Pure Function）。</li>
+</ul><p>这三个基本原则保证了Redux管理的应用状态是可预测的。</p><h3>Redux Toolkit</h3><p>也许你听到过这样的评价：“使用Redux框架会导致代码冗长、啰嗦（verbose）。”我的建议是，不用纠结，只要想清楚你想从Redux中得到什么收益，也许这个收益足以抵消掉啰嗦带来的痛点。</p><p>一个好消息是，Redux官方已经推出了一套更易于使用的<strong>封装库Redux Toolkit，来简化Redux开发</strong>：</p><ul>
+<li>降低了配置Redux store的复杂度；</li>
+<li>减少了Redux所需的样板代码；</li>
+<li>内置了Redux必备的扩展库。</li>
+</ul><p>依旧在任何JS项目中都可以安装Redux Toolkit，Redux Toolkit里已经内置了Redux，不用重复安装：</p><pre><code class="language-bash">npm uninstall redux
+npm install @reduxjs/toolkit
+</code></pre><p>以下是用Redux Toolkit改写的前面Redux的代码：</p><pre><code class="language-javascript">import { createSlice, configureStore } from '@reduxjs/toolkit';
+
+const cardListSlice = createSlice({
+&nbsp; name: 'cardList',
+&nbsp; initialState: [],
+&nbsp; reducers: {
+    addCard(state, action) {
+      state.unshift(action.payload.newCard);
+    },
+    removeCard(state, action) {
+      const index = state.findIndex(card =&gt; card.title === action.payload.title); 
+      if (index !== -1) {
+        state.splice(index, 1);
+      }
+    },
+&nbsp; },
+});
+export const { addCard, removeCard } = cardListSlice.actions;
+
+const store = configureStore({
+&nbsp; reducer: cardListSlice.reducer
+});
+store.subscribe(() =&gt; console.log(store.getState()));
+
+store.dispatch(addCard({ newCard: { title: '开发任务-1' } }));
+// [{ title: '开发任务-1' }]
+store.dispatch(addCard({ newCard: { title: '测试任务-2' } }));
+// [{ title: '测试任务-2' }, { title: '开发任务-1' }]
+store.dispatch(removeCard({ title: '开发任务-1' }));
+// [{ title: '测试任务-2' }]
+</code></pre><p>我猜你会过来吐槽：“前面Redux的样例代码是745B，这个Redux Toolkit的样例代码是953B，代码怎么反而变多了？”</p><p>虽然场面有点尴尬，但请放心，从我实际开发经验来看，<strong>在项目规模增大时，后者比前者减少的代码量非常可观</strong>。顺便提一下，在写Redux代码时，为成堆的action.type起名字很容易导致决策疲劳，而用Redux Toolkit来写会好很多。</p><p>Redux Toolkit新引入了一个概念 <code>slice</code> ，即切片。切片是一组相关的state默认值、 <code>action</code> 、 <code>reducer</code> 的集合。</p><p>首先用Redux Toolkit的 <code>createSlice</code> API创建 <code>slice</code> ，然后从这个 <code>slice</code> 中拿到生成的 <code>actionCreator</code> 和 <code>reducer</code> ，用 <code>configureStore</code>  API消费这个 <code>reducer</code> 创建 <code>store</code> 。接下来的步骤就与前面Redux的例子类似了，有一点区别是这边用于派发的 <code>action</code> 都是调用 <code>actionCreator</code> 创建的。</p><p>如果你的眼睛够尖，也许你已经发现了：“ <code>reducer</code> 函数的写法怎么不一样了？之前是返回新state，现在又退回了最早的 <code>Array.unshift()</code> ？”</p><p>这只是表象，其实Redux Toolkit的 <code>reducer</code> 中默认启用了Immer，也就是上节课刚学习使用的不可变数据框架。</p><blockquote>
+<p>它可以让JS开发者使用原生的JS数据结构，和本来不具有不可变性的JS API，创建和操作不可变数据。</p>
+</blockquote><p>这就是说，我们在Redux Toolkit中创建的 <code>reducer</code> ，可以直接用熟悉的JS API来修改状态，框架会帮我们加入state的不可变性。</p><p>除此之外，Redux Toolkit还有不少重要的功能，尤其是包括获取远程数据相关的状态管理，我们会在下节课和后面的课程中陆续涉及。</p><h2>其他应用状态管理框架</h2><p>当然，Redux也不是应用状态管理领域的唯一玩家，同样被广泛使用的还有MobX、XState等框架，下面我们来简要介绍一下。</p><h3>MobX</h3><p>MobX是以透明的<strong>函数式响应编程（Transparent Functional Reactive Programming，TFRP）</strong>的方式，实现状态管理。以下是来自MobX官方文档的样例代码：</p><pre><code class="language-javascript">import React from "react"
+import ReactDOM from "react-dom"
+import { makeAutoObservable } from "mobx"
+import { observer } from "mobx-react"
+
+// 对应用状态进行建模。
+class Timer {
+&nbsp; &nbsp; secondsPassed = 0
+&nbsp; &nbsp; constructor() {
+&nbsp; &nbsp; &nbsp; &nbsp; makeAutoObservable(this)
+&nbsp; &nbsp; }
+&nbsp; &nbsp; increase() {
+&nbsp; &nbsp; &nbsp; &nbsp; this.secondsPassed += 1
+&nbsp; &nbsp; }
+&nbsp; &nbsp; reset() {
+&nbsp; &nbsp; &nbsp; &nbsp; this.secondsPassed = 0
+&nbsp; &nbsp; }
+}
+
+const myTimer = new Timer()
+// 构建一个使用 observable 状态的“用户界面”。
+const TimerView = observer(({ timer }) =&gt; (
+&nbsp; &nbsp; &lt;button onClick={() =&gt; timer.reset()}&gt;已过秒数：{timer.secondsPassed}&lt;/button&gt;
+))
+ReactDOM.render(&lt;TimerView timer={myTimer} /&gt;, document.body)
+
+// 每秒更新一次‘已过秒数：X’中的文本。
+setInterval(() =&gt; {
+&nbsp; &nbsp; myTimer.increase()
+}, 1000)
+</code></pre><p>如果你是先上手Immer，之后才接触MobX的话，会发现它们的思路很像，都鼓励你用熟悉的JS类型和方法修改数据，由框架来界定前后的变更。这并不意外，因为MobX（<a href="https://zh.mobx.js.org/">官网</a>）跟前面用到的Immer框架是同一个作者，MobX比Immer还早面世3年。</p><h3>XState</h3><p>这个XState框架比起Redux和MobX来说更加硬核一些。它本身就是一个<strong>有限状态机</strong>（<a href="https://zh.wikipedia.org/wiki/%E6%9C%89%E9%99%90%E7%8A%B6%E6%80%81%E6%9C%BA">维基百科</a>）的JS/TS实现，且遵守了<a href="https://www.w3.org/TR/scxml/">W3C的XCXML规范</a>。以下是来自XState官方Github，在React中使用XState的样例代码：</p><pre><code class="language-javascript">import { useMachine } from '@xstate/react';
+import { createMachine } from 'xstate';
+
+const toggleMachine = createMachine({
+&nbsp; id: 'toggle',
+&nbsp; initial: 'inactive',
+&nbsp; states: {
+&nbsp; &nbsp; inactive: {
+&nbsp; &nbsp; &nbsp; on: { TOGGLE: 'active' }
+&nbsp; &nbsp; },
+&nbsp; &nbsp; active: {
+&nbsp; &nbsp; &nbsp; on: { TOGGLE: 'inactive' }
+&nbsp; &nbsp; }
+&nbsp; }
+});
+
+export const Toggler = () =&gt; {
+&nbsp; const [state, send] = useMachine(toggleMachine);
+&nbsp; return (
+&nbsp; &nbsp; &lt;button onClick={() =&gt; send('TOGGLE')}&gt;
+&nbsp; &nbsp; &nbsp; {state.value === 'inactive'
+&nbsp; &nbsp; &nbsp; &nbsp; ? 'Click to activate'
+&nbsp; &nbsp; &nbsp; &nbsp; : 'Active! Click to deactivate'}
+&nbsp; &nbsp; &lt;/button&gt;
+&nbsp; );
+};
+</code></pre><p>XState还有一个强项，就是它可视化的<strong>状态图</strong>：</p><p><img src="https://static001.geekbang.org/resource/image/31/1e/3195f78ef95587edb21f5a500d50081e.png?wh=1920x1030" alt="图片"></p><p>可惜我自己还没有机会在生产项目中使用XState，如果你曾经用过，欢迎你在留言区分享你的经验。</p><h2>小结</h2><p>这节课我们学习了应用状态对于JS前端应用的重要意义，也学习了以Redux为代表的应用状态管理框架，介绍了Redux的核心概念 <code>action</code> 、 <code>reducer</code> 、 <code>store</code> ，以及它单向数据流的本质。</p><p>从使用角度，我们介绍了Redux封装库Redux Toolkit的用法，强调了它对Redux开发中 <code>action</code> 、 <code>reducer</code> 和不可变数据的简化。最后我们也简要介绍了另外两个应用状态管理框架MobX和XState，希望能帮到你拓宽思路。</p><p>下节课，我们会把Redux与React结合起来使用，看看它能为React的状态管理带来什么好处，同时会要探讨什么时候该用Redux，什么时候用React内建的state就好。</p><h2>思考题</h2><ol>
+<li>这节课我们提到过Redux的 <code>action</code> 、 <code>reducer</code> 、 <code>dispatch</code> 概念，与前面第9节课学过的 <code>useReducer</code> 很类似。那么单就这节课学到的内容，可以请你把Redux和 <code>useReducer</code> 做个对比吗？</li>
+<li>Redux一直在强调自己管理的状态是可预测的，那么可预测这件事本身，对我们的应用开发有什么好处吗？</li>
+</ol><p>好的，这节课就到这里，我们下节课再见。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/96/87/bbdeb4ee.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杨永安</span>
+  </div>
+  <div class="_2_QraFYR_0">新手学习，遇到跨组件状态管理问题。context 似乎只能传递一个对象，多个数据，需要在根节点上添加多层 Provider，不太方便。<br><br>看到了 redux，恍然大悟。但是写到后来模板代码太多了，还好有 redux-toolkit。<br><br>另外，Recoil 感觉更加简洁。老师怎么看这个库？<br>https:&#47;&#47;recoiljs.org&#47;zh-hans&#47;docs&#47;introduction&#47;getting-started&#47;</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2023-03-16 10:35:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/13/8b/a161ae71.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Gn</span>
+  </div>
+  <div class="_2_QraFYR_0">1.useReducer+Context可以复制Redux流程，更加轻量；Redux对频繁state更新做了优化；<br>2.redux devTools，state改变很清晰，使用很方便；<br>让望补充<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-10-28 00:07:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/13/8b/a161ae71.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Gn</span>
+  </div>
+  <div class="_2_QraFYR_0">1.useReducer + Context 可以复制Redux状态流程，更轻量；Redux在多次状态更新有优化</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-10-28 00:02:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/09/c2/4e086a4b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>炒鸡辣鸡</span>
+  </div>
+  <div class="_2_QraFYR_0">redux的作用有点像redis ，发布订阅模式，缓存各类状态。难道开发者是后端转的前端吗</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-10-26 09:15:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/4f/39/791d0f5e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>学习前端-react</span>
+  </div>
+  <div class="_2_QraFYR_0">请问：“React.memo 创建具有更佳性能的纯组件”。对于目前创建的组件来说是不是都可以包上memo。收益是大于成本。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你好，学习前端-react，这是个好问题。我的立场与React官方文档相同，即这个API只应该用于性能优化，不应该依赖它来开发业务交互逻辑。专栏的《21｜性能优化：保证优秀的用户体验》也会讨论这个话题。<br><br>React.memo() 是个高阶组件，本身会加深虚拟DOM的层级，它会将props一一做对比，当props的绝对数量足够多时，它的成本也不再可以忽略不计。相应的，被修饰的原组件的渲染成本并不一定就高。当没有具体数据能佐证收益明显大于成本时，不建议加入多余的优化。<br><br>此外，React官方文档虽然提到：<br><br>    “此方法仅作为性能优化的方式而存在。但请不要依赖它来“阻止”渲染，因为这会产生 bug。”（https:&#47;&#47;zh-hans.reactjs.org&#47;docs&#47;react-api.html#reactmemo 截止到2022年11月初这段描述还在）<br><br>但它并没有提到是哪方面的Bug。经过一路考古，找到React官方Github最直接提及的issue在这里： https:&#47;&#47;github.com&#47;facebook&#47;react&#47;issues&#47;14616#issuecomment-455341032 memo vs. useMemo<br><br>    &gt; Can someone please clarify what sort of bugs and how to avoid them? Thanks!<br>    This is about shouldComponentUpdate but the issue is similar: reactjs&#47;reactjs.org#1149. Basically — if your component breaks without memo then you&#39;re not using it correctly. It only serves as perf optimization.<br><br>React团队Dan提到的Bug是这个： https:&#47;&#47;github.com&#47;reactjs&#47;reactjs.org&#47;issues&#47;1149 Save previous view when move data fetch from componentWillUpdate(WillReceiveProps) to ComponentDidUpdate <br><br>如果你感兴趣，还可以看看 https:&#47;&#47;github.com&#47;facebook&#47;react&#47;issues&#47;14463  Q: When should you NOT use React memo?</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-10-25 10:36:29</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

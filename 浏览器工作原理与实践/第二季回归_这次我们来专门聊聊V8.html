@@ -1,0 +1,223 @@
+<p>你好，我是李兵。在这个专栏中，我们对浏览器的工作原理进行了详细的介绍。</p><p>初期的浏览器，展示的只是一些静态页面，随着需要和页面交互的需求越来越多，JavaScript就出现在了浏览器中，它让静态的页面动了起来。目前JavaScript已成为页面中最核心的一部分了，不过，JavaScript作为一门高级语言，它的代码给到浏览器或者Node.js时，是不能直接被底层的CPU所执行的，这就需要通过JavaScript虚拟机来实现代码的编译和执行。</p><p>市面上有很多种JavaScript虚拟机，比如SpiderMonkey、V8、JavaScriptCore等，其中由谷歌开发的开源项目V8使用最为广泛。</p><p>V8主要应用于Google开源浏览器Chrome中，它拥有非常庞大的生态圈，一方面得益于全球25亿台安卓设备上的Chrome浏览器，另一方面，也和它的许多革命性设计分不开。</p><p>比如，V8摒弃了导致JavaScript执行速度过慢的解释执行方式，率先采用了即时编译（JIT）的双轮驱动的设计，混合了编译执行和解释执行两种方式。JIT作为一种权衡策略，大幅优化了JavaScript代码的执行效率，也将JavaScript虚拟机技术推向了一个全新的高度。</p><!-- [[[read_end]]] --><p>作为JavaScript程序员，你可能并不会去实现一个JavaScript虚拟机，不过我们还是有必要理解JavaScript虚拟机工作机制的，你可以从中学习到很多优化性能的方法，帮你写出更高效的JavaScript代码。</p><p>所以，我回到极客时间做了第二季专栏《<a href="https://time.geekbang.org/column/intro/296?utm_term=zeusOVYAE&utm_source=app&utm_medium=geektime&utm_campaign=296-presell&utm_content=liulanqizhuanlan0316">图解Google V8</a>》。在这一季里，我会专门讲讲V8的工作原理，帮你完整梳理V8的核心知识体系。在讲述方式上，我仍然延续这一季的风格，通过大量图片演示，深入浅出地讲解V8执行JavaScript代码的底层机制和原理。</p><p>希望通过这门课程，带你了解完整的V8编译流水线，同时通过对V8工作机制的学习，搞懂JavaScript语言的核心特性，进而从根源解决程序问题，加快JavaScript的执行速度。</p><p>下面是专栏的目录：</p><p><img src="https://static001.geekbang.org/resource/image/2c/a1/2cb0c3abcb6d7683df56353ac33beca1.jpg?wh=1251*3461" alt=""></p><p>为了感谢老同学，我还准备了一个「<span class="orange">专属福利</span>」：</p><p>3 月 16 日，专栏上新时，我会送你一张 <span class="orange">10 元专属优惠券</span>，可与限时优惠同享，<span class="orange">有效期 48 小时</span>，建议尽早使用。</p><p><strong>点击下方图片</strong>，立即免费试读新专栏。</p><p><a href="https://time.geekbang.org/column/intro/296?utm_term=zeusOVYAE&utm_source=app&utm_medium=geektime&utm_campaign=296-presell&utm_content=liulanqizhuanlan0316"><img src="https://static001.geekbang.org/resource/image/c4/c4/c485757bed7d2269fe02048011a5f5c4.jpg?wh=1110*739" alt=""></a></p><p>一段新的征程，期待与你见证成长！我在《<a href="https://time.geekbang.org/column/intro/296?utm_term=zeusOVYAE&utm_source=app&utm_medium=geektime&utm_campaign=296-presell&utm_content=liulanqizhuanlan0316">图解Google V8</a>》等你。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c9/1d/c7586cfc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Zkerhcy</span>
+  </div>
+  <div class="_2_QraFYR_0">🙏🙏迫不及待再来感谢李老师了，最近半年非常认真学习这个专栏，很多关键的知识点也是反复学习实践，刚终于拿到了心仪已久公司的offer了，很多知识点在面试过程中都发挥了作用。新年，在新的公司，跟着李老师拆开V8黑盒！💪</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-19 18:10:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/1e/71/54ff7b4e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>3Spiders</span>
+  </div>
+  <div class="_2_QraFYR_0">支持，第一时间购买！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-16 18:00:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>moss</span>
+  </div>
+  <div class="_2_QraFYR_0">老师的可以课闭着眼睛买！《浏览器工作原理与实践》真的是可以反复听，每次都可以学到新东西！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-22 17:21:08</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/2f/1f/f95bd8c9.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>余文郁</span>
+  </div>
+  <div class="_2_QraFYR_0">看了李兵老师的课之后，怎么有点想开发浏览器去了，毕竟自己开发过才算真正懂了</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-04-13 10:35:08</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/25/3b/a971fc8e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>阿感</span>
+  </div>
+  <div class="_2_QraFYR_0">已买</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 21:29:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/25/4e/3f/3e84f39e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Chin 是我啊</span>
+  </div>
+  <div class="_2_QraFYR_0">JavaScriptCore 是苹果的，才知道</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-10-05 11:50:33</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/fb/25/f6743e97.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>进击的前端er</span>
+  </div>
+  <div class="_2_QraFYR_0">已经购买并学习中的前端er来冒个泡</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-22 11:46:33</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

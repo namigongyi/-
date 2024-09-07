@@ -1,0 +1,497 @@
+<audio title="浏览器：一个浏览器是如何工作的（阶段三）" src="https://static001.geekbang.org/resource/audio/b9/b3/b9ecca12e8fa1bfc3802b31aedc388b3.mp3" controls="controls"></audio> 
+<p>你好，我是winter。</p><p>在上一节课中，我已经讲了浏览器的DOM构建过程，但是这个构建的DOM，实际上信息是不全的，它只有节点和属性，不包含任何的样式信息。</p><p>我们这一节课就来讲讲：浏览器是如何把CSS规则应用到节点上，并给这棵朴素的DOM树添加上CSS属性的。</p><h2>整体过程</h2><p>首先我们还是要感性地理解一下这个过程。</p><p>首先CSS选择器这个名称，可能会给你带来一定的误解，觉得好像CSS规则是DOM树构建好了以后，再进行选择并给它添加样式的。实际上，这个过程并不是这样的。</p><p>我们回忆一下我们在浏览器第一节课讲的内容，浏览器会尽量流式处理整个过程。我们上一节课构建DOM的过程是：从父到子，从先到后，一个一个节点构造，并且挂载到DOM树上的，那么这个过程中，我们是否能同步把CSS属性计算出来呢？</p><p>答案是肯定的。</p><p>在这个过程中，我们依次拿到上一步构造好的元素，去检查它匹配到了哪些规则，再根据规则的优先级，做覆盖和调整。所以，从这个角度看，所谓的选择器，应该被理解成“匹配器”才更合适。</p><p>我在CSS语法部分，已经总结了选择器的各种符号，这里再把它列出来，我们回顾一下。</p><ul>
+<li>空格: 后代，选中它的子节点和所有子节点的后代节点。</li>
+<li>&gt;: 子代，选中它的子节点。</li>
+<li>+：直接后继选择器，选中它的下一个相邻节点。</li>
+<li>~：后继，选中它之后所有的相邻节点。</li>
+<li>||：列，选中表格中的一列。</li>
+</ul><!-- [[[read_end]]] --><p>关于选择器的知识，我会在CSS的部分继续讲解。这里我们主要介绍浏览器是如何实现这些规则的。</p><p>不知道你有没有发现，这里的选择器有个特点，那就是选择器的出现顺序，必定跟构建DOM树的顺序一致。这是一个CSS设计的原则，即保证选择器在DOM树构建到当前节点时，已经可以准确判断是否匹配，不需要后续节点信息。</p><p>也就是说，未来也不可能会出现“父元素选择器”这种东西，因为父元素选择器要求根据当前节点的子节点，来判断当前节点是否被选中，而父节点会先于子节点构建。</p><p>理解了CSS构建的大概过程，我们下面来看看具体的操作。</p><p>首先，我们必须把CSS规则做一下处理。作为一门语言，CSS需要先经过词法分析和语法分析，变成计算机能够理解的结构。</p><p>这部分具体的做法属于编译原理的内容，这里就不做赘述了。我们这里假设CSS已经被解析成了一棵可用的抽象语法树。</p><p>我们在之前的CSS课程中已经介绍过 compound-selector 的概念，一个 compound-selector 是检查一个元素的规则，而一个复合型选择器，则是由数个 compound-selector 通过前面讲的符号连接起来的。</p><h2>后代选择器 “空格”</h2><p>我们先来分析一下后代选择器，我们来一起看一个例子：</p><pre><code>a#b .cls {
+    width: 100px;
+}
+</code></pre><p>可以把一个CSS选择器按照 compound-selector 来拆成数段，每当满足一段条件的时候，就前进一段。</p><p>比如，在上面的例子中，当我们找到了匹配a#b的元素时，我们才会开始检查它所有的子代是否匹配 .cls。</p><p>除了前进一段的情况，我们还需要处理后退的情况，比如，我们这样一段代码：</p><pre><code>&lt;a id=b&gt;
+    &lt;span&gt;1&lt;span&gt;
+    &lt;span class=cls&gt;2&lt;span&gt;
+&lt;/a&gt;
+&lt;span class=cls&gt;3&lt;span&gt;
+</code></pre><p>当遇到 &lt;/a&gt;时，必须使得规则 a#b .cls 回退一步，这样第三个 span 才不会被选中。后代选择器的作用范围是父节点的所有子节点，因此规则是在匹配到本标签的结束标签时回退。</p><h2>后继选择器“ ~ ”</h2><p>接下来我们看下后继选择器，跟后代选择器不同的地方是，后继选择器只作用于一层，我们来看一个例子：</p><pre><code>.cls~* {
+    border:solid 1px green;
+}
+&lt;div&gt;
+&lt;span&gt;1&lt;span&gt;
+&lt;span class=cls&gt;2&lt;span&gt;
+&lt;span&gt;
+    3
+    &lt;span&gt;4&lt;/span&gt;
+&lt;span&gt;
+&lt;span&gt;5&lt;/span&gt;
+&lt;/div&gt;
+</code></pre><p>这里 .cls 选中了 span 2 然后 span 3 是它的后继，但是span 3的子节点 span 4 并不应该被选中，而span 5也是它的后继，因此应该被选中。</p><p>按照DOM树的构造顺序，4在3和5中间，我们就没有办法像前面讲的后代选择器一样通过激活或者关闭规则来实现匹配。</p><p>但是这里有个非常方便的思路，就是给选择器的激活，带上一个条件：父元素。</p><p>注意，这里后继选择器，当前半段的 .cls 匹配成功时，后续 * 所匹配的所有元素的父元素都已经确定了（后继节点和当前节点父元素相同是充分必要条件）。在我们的例子中，那个div就是后继节点的父元素。</p><h2>子代选择器“ &gt;”</h2><p>我们继续看，子代选择器是如何实现的。</p><p>实际上，有了前面讲的父元素这个约束思路，我们很容易实现子代选择器。区别仅仅是拿当前节点作为父元素，还是拿当前节点的父元素作为父元素。</p><pre><code>div&gt;.cls {
+    border:solid 1px green;
+}
+&lt;div&gt;
+&lt;span&gt;1&lt;span&gt;
+&lt;span class=cls&gt;2&lt;span&gt;
+&lt;span&gt;
+    3
+    &lt;span&gt;4&lt;/span&gt;
+&lt;span&gt;
+&lt;span&gt;5&lt;/span&gt;
+&lt;/div&gt;
+</code></pre><p>我们看这段代码，当DOM树构造到div时，匹配了CSS规则的第一段，因为是子代选择器，我们激活后面的 .cls选择条件，并且指定父元素必须是当前div。于是后续的构建DOM树构建过程中，span 2 就被选中了。</p><h2>直接后继选择器“ +”</h2><p>直接后继选择器的实现是上述中最为简单的了，因为它只对唯一一个元素生效，所以不需要像前面几种一样反复激活和关闭规则。</p><p>一个最简单的思路是，我们可以把它当作检查元素自身的选择器来处理。即我们把#id+.cls都当做检查某一个元素的选择器。</p><p>另外的一种思路是：给后继选择器加上一个flag，使它匹配一次后失效。你可以尝试一下，告诉我结果。</p><h2>列选择器“ || ”</h2><p>列选择器比较特别，它是专门针对表格的选择器，跟表格的模型建立相关，我们这里不详细讲了。</p><h2>其它</h2><p>我们不要忘记，CSS选择器还支持逗号分隔，表示“或”的关系。这里最简单的实现是把逗号视为两条规则的一种简易写法。</p><p>比如：</p><pre><code>a#b, .cls {
+
+}
+</code></pre><p>我们当作两条规则来处理：</p><pre><code>a#b {
+
+}
+</code></pre><pre><code>.cls {
+
+}
+</code></pre><p>还有一个情况，就是选择器可能有重合，这样，我们可以使用树形结构来进行一些合并，来提高效率：</p><pre><code>#a .cls {
+
+}
+
+#a span {
+
+}
+#a&gt;span {
+
+}
+</code></pre><p>这里实际上可以把选择器构造成一棵树：</p><ul>
+<li>#a
+<ul>
+<li>&lt;空格&gt;.cls</li>
+<li>&lt;空格&gt;span</li>
+<li>&gt;span</li>
+</ul>
+</li>
+</ul><p>需要注意的是，这里的树，必须要带上连接符。</p><h2>结语</h2><p>这一节我们讲解了CSS计算的过程。CSS计算是把CSS规则应用到DOM树上，为DOM结构添加显示相关属性的过程。在这一节中，我们主要介绍了选择器的几种复合结构应该如何实现。</p><p>在这一步骤之后，我们得到了一棵带有CSS属性的树，为我们后续打下了基础。</p><p>最后留一个问题，你认为CSS语法解析成什么结构，最适合我们进行CSS计算。</p><p><img src="https://static001.geekbang.org/resource/image/a1/9d/a1fa9a462fb96ae3a70ff4751203d79d.jpg?wh=1110*549" alt=""></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/Fcx276V5ZyrYtGuWiaWQugKMX4aicY8cibicQISyiaAEKZKVmdz8apIhKzCfIZolyetSFXbl2gHSK9qZT5moJkk7DYg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>coma</span>
+  </div>
+  <div class="_2_QraFYR_0">之前选择器是从右往左匹配，好像跟这里的说法不一致，是理解错了吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 11:20:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/11/5c/9f6827cc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>以勒</span>
+  </div>
+  <div class="_2_QraFYR_0">css的渲染过程：<br>1. 流式渲染，每生成一个dom节点，便立刻去匹配相应的css规则<br><br>2. dom节点的生成顺序是 从父-&gt; 子。 css的渲染顺序也是   从 父节点-》子节点<br><br>3.混合选择器 在激活的时候父元素已经确定好了 。 后代选择器，所有元素都是父元素，并 选中自己的子元素。  子元素 选择器，只有父元素为当前节点的 dom  元素会被选中。 在父元素 结束标签时，关闭 选择器。<br><br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 08:48:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/0clFBGW3KxGFmV1dNxjoA5nQkdNW6QoiaNMPdrnYB5eNPpMypRy078fZRE8ysXRte27Lt1lkErm0DIqb5xf88ibw/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>啊柴</span>
+  </div>
+  <div class="_2_QraFYR_0">老师好，文中后代选择器是说先检查父级，匹配后再检查子级，以前学习看到比较多的一种说法是从关键选择器开始匹配，然后左移查找选择器的祖先元素，实践中也一直把最后一个选择器权重加高。请问这是从开始就学错了，还是我对两种说法理解有偏差呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 浏览器编写本身有不同的思路，但是按关键选择器这个思路，据我所知还没有实现。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 10:10:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/1c/c8/c3f867c6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>南半边翅膀</span>
+  </div>
+  <div class="_2_QraFYR_0">dom树构建与cssom构建有先后关系吗？css计算与dom树流式构建同步进行是不是意味着dom树流式构建之前cssom已经构建完成呢？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 15:53:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/57/4f/6fb51ff1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>一步</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，对于这个问题，我也有疑问：<br>dom树构建与cssom构建有先后关系吗？css计算与dom树流式构建同步进行是不是意味着dom树流式构建之前cssom已经构建完成呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 我这里说的确实有点歧义，cssom是有rule部分和view部分的，rule部分是在dom开始之前就构件完成的，而view部分是跟着dom同步构建的。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-01 08:17:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/62/1e/ad721e61.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>flow</span>
+  </div>
+  <div class="_2_QraFYR_0">请问DOM去匹配css rule的时候是不是必须先等页面的css都下载完成后才会去匹配的？否则如果DOM匹配的时候对应的css还没下载完，后面怎么得到正确的css？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: head中的css是要下载完的，body中放CSS的话，会重新计算。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-16 11:13:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/1e/69/ddb4f98c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>嗯喊我杰哥</span>
+  </div>
+  <div class="_2_QraFYR_0">&lt;也就是说，未来也不可能会出现“父元素选择器”这种东西，<br>因为父元素选择器要求根据当前节点的子节点，来判断当前节点是否被选中，而父节点会先于子节点构建。&gt;<br><br>这句话后半句好难理解，有大神能通俗地解释一下吗<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 意思是DOM树构造到父节点的时候，还不知道它有没有子节点，所以算不出来CSS。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 10:09:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/41/a5/16c615cc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>乃乎</span>
+  </div>
+  <div class="_2_QraFYR_0">CSS 没有父选择器那里讲得太好了，这个原因不能更合理</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 其实Selector Level 4里面已经打破这个规则了，现在还是draft，也不知道最后能不能过。<br><br>要是真过了 webkit这块差不多得重写……</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-26 16:01:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/94/56/4b8395f6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>CC</span>
+  </div>
+  <div class="_2_QraFYR_0">第一反应猜测 CSS 语法应该解析成对象（Object），然后根据 DOM 的树形结构，CSS 也会生成自己的树形结构。<br><br>查找验证后发现，这被称为 CSSOM（CSS Object Model）。<br><br>举个 CSSOM 的例子：<br><br>body {font-size: 16px;}<br>h1 {font-size: 2rem;}<br>.orange {color: orange;}<br>div {margin: 1rem 0;}<br>div p {padding-bottom: 1rem;}<br><br>从根结点 body 开始，树形结构如下：<br><br>* body {font-size: 16px;}<br>    * h1 {font-size: 2rem;}<br>    * .orange {color: orange;}<br>    * div {margin: 1rem 0;}<br>        * div p {padding-bottom: 1rem;}<br><br>不知道这样理解是否准确？<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 哈哈 CSSOM不是这样子的，CSSOM主要是DOM结构上的盒的描述，它基本上是依附于DOM树的。<br><br>你说的这个东西，比较接近的是CSS的语法树。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-14 02:56:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/62/1e/ad721e61.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>flow</span>
+  </div>
+  <div class="_2_QraFYR_0">看到老师一个分享会的视频，说到DOM匹配css rule的时候是从右往左匹配的，为什么跟文章提到的后代选择器的匹配顺序相反呢？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 哈哈，是这样的没错，但是你看，新加了这么多运算符，所以思路也会有不一样。<br><br>其实浏览器实现是比较懒的，直接每条规则都检查了，没做合并优化。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-16 11:52:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/51/9f/1840385e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>胡永</span>
+  </div>
+  <div class="_2_QraFYR_0">css选择器这里面最重要的一条规则就是没有父选择器，根据流式处理的dom规则，这样就节省了很多的重新计算</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-09-04 08:28:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/f8/d0/ecc68a4f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>🐻🔫🐸</span>
+  </div>
+  <div class="_2_QraFYR_0">我发现关于CSS选择从右到左开始匹配的理论网上还是有很多相关资料的，https:&#47;&#47;www.sitepoint.com&#47;optimizing-css-id-selectors-and-other-myths&#47;<br>看起来应该还是有点道理？不过这个东西浏览器引擎应该也会不断优化，不同版本不同引擎都可能有差异</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-07 14:08:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/a4/c5/a53f8bbc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Young！</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，请问一下您说的「后退，前进」的含义，不太理解<br><br>a#b .cls 这个选择器中，分成 a#b 和 .cls ，当 DOM 树构造到 &lt;a id=b&gt; 这个节点时，css 匹配 a#b，并且「前进」看是否自带是否有 class=&quot;cls&quot; 的元素，这里可能会有指针这个抽象，指向 .cls，当 DOM 树构建到 &lt;&#47;a&gt; 这里时，css 选择器指针「后退」到 a#b 这里，然后继续构造 DOM 树，而且这个选择器已经被构造所谓的 css 树之类的，只是指针会有回退和前进的时候<br><br>可以这样理解吗<br><br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-03-13 11:02:06</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Dylan-Tseng</span>
+  </div>
+  <div class="_2_QraFYR_0">请问老师，有一点不是很明白，如果是在构建dom树的同时，就开始构建css，带空格选择子元素的时候，css怎么知道dom树有没有构建完成，是否有没有子元素，是怎么做匹配的？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 并不管有没有子元素，只是让这条规则前进一格。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-20 10:17:11</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/d2/78/1f1b45f9.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jaykey</span>
+  </div>
+  <div class="_2_QraFYR_0">空格，和后代选择器有什么不一样吗？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-06-19 19:29:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/21/ac/71453cf7.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>KB24_钱昊</span>
+  </div>
+  <div class="_2_QraFYR_0">程老师你好。我在很多地方看到的说法是：CSS会阻塞dom渲染，但不会阻塞dom的解析，且CSS文件的请求是异步请求。<br>那么如果按照上面文章中所说，DOM的构建和CSS属性的计算是同步的话，head中CSS文件的下载以及CSSOM的rule部分的构建应该会阻塞HTML的解析和DOM的构建。<br>好像这两种说法之间就有了冲突。。麻烦程老师有空的时候可以帮忙解释一下，万分感谢～</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-05-07 23:01:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/fd/f9/3662c371.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>超人</span>
+  </div>
+  <div class="_2_QraFYR_0">div&gt;.cls {<br>    border:solid 1px green;<br>}<br>&lt;div&gt;<br>&lt;span&gt;1&lt;&#47;span&gt;<br>&lt;span class=cls&gt;2&lt;&#47;span&gt;<br>&lt;span&gt;<br>    3<br>    &lt;span&gt;4&lt;&#47;span&gt;<br>&lt;&#47;span&gt;<br>&lt;span&gt;5&lt;&#47;span&gt;<br>&lt;&#47;div&gt;<br>Span的闭合是这样的吗？这里我有点不确定</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-05-06 21:37:04</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/01/09/a35710f0.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>啊咩</span>
+  </div>
+  <div class="_2_QraFYR_0">|| 列选择器  是最新的标准出的吗？ 我在w3school和 菜鸟教程 都找不到这个选择器</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Selector Level 3里的，不过不太重要，不用太在意。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-22 23:00:28</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/3a/93/56a99549.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>么么</span>
+  </div>
+  <div class="_2_QraFYR_0">按照文章的描述，css的匹配好像是从左到右匹配的，但是网上有很多文章说的是从右往左进行匹配的，这样的规则可以优化重复选择计算。那这种说法与文章上的是否右冲突？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是没错，浏览器多数实现是从右往左匹配的，这个说法早年我还设计过实验，但是现在我觉得这是比较偷懒的做法，实际上关于”实现“并没有一定的规定，我这里讲的也仅仅是一种思路。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-19 11:36:05</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/1a/5d/3c8004c6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>*</span>
+  </div>
+  <div class="_2_QraFYR_0">因为DOM是树形的，CSS依附于DOM树计算出样式属性，所以CSS语法也要用树的结构表示吧</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-03-25 20:08:37</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

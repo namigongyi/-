@@ -1,0 +1,616 @@
+<audio title="08_理论五：接口vs抽象类的区别？如何用普通的类模拟抽象类和接口？" src="https://static001.geekbang.org/resource/audio/f9/a7/f9e4a9f08f84083c4b03f5420a7a9ba7.mp3" controls="controls"></audio> 
+<p>在面向对象编程中，抽象类和接口是两个经常被用到的语法概念，是面向对象四大特性，以及很多设计模式、设计思想、设计原则编程实现的基础。比如，我们可以使用接口来实现面向对象的抽象特性、多态特性和基于接口而非实现的设计原则，使用抽象类来实现面向对象的继承特性和模板设计模式等等。</p><p>不过，并不是所有的面向对象编程语言都支持这两个语法概念，比如，C++这种编程语言只支持抽象类，不支持接口；而像Python这样的动态编程语言，既不支持抽象类，也不支持接口。尽管有些编程语言没有提供现成的语法来支持接口和抽象类，我们仍然可以通过一些手段来模拟实现这两个语法概念。</p><p>这两个语法概念不仅在工作中经常会被用到，在面试中也经常被提及。比如，“接口和抽象类的区别是什么？什么时候用接口？什么时候用抽象类？抽象类和接口存在的意义是什么？能解决哪些编程问题？”等等。</p><p>你可以先试着回答一下，刚刚我提出的几个问题。如果你对某些问题还有些模糊不清，那也没关系，今天，我会带你把这几个问题彻底搞清楚。下面我们就一起来看！</p><h2>什么是抽象类和接口？区别在哪里？</h2><p>不同的编程语言对接口和抽象类的定义方式可能有些差别，但差别并不会很大。Java这种编程语言，既支持抽象类，也支持接口，所以，为了让你对这两个语法概念有比较直观的认识，我们拿Java这种编程语言来举例讲解。</p><!-- [[[read_end]]] --><p><strong>首先，我们来看一下，在Java这种编程语言中，我们是如何定义抽象类的。</strong></p><p>下面这段代码是一个比较典型的抽象类的使用场景（模板设计模式）。Logger是一个记录日志的抽象类，FileLogger和MessageQueueLogger继承Logger，分别实现两种不同的日志记录方式：记录日志到文件中和记录日志到消息队列中。FileLogger和MessageQueueLogger两个子类复用了父类Logger中的name、enabled、minPermittedLevel属性和log()方法，但因为这两个子类写日志的方式不同，它们又各自重写了父类中的doLog()方法。</p><pre><code>// 抽象类
+public abstract class Logger {
+  private String name;
+  private boolean enabled;
+  private Level minPermittedLevel;
+
+  public Logger(String name, boolean enabled, Level minPermittedLevel) {
+    this.name = name;
+    this.enabled = enabled;
+    this.minPermittedLevel = minPermittedLevel;
+  }
+  
+  public void log(Level level, String message) {
+    boolean loggable = enabled &amp;&amp; (minPermittedLevel.intValue() &lt;= level.intValue());
+    if (!loggable) return;
+    doLog(level, message);
+  }
+  
+  protected abstract void doLog(Level level, String message);
+}
+// 抽象类的子类：输出日志到文件
+public class FileLogger extends Logger {
+  private Writer fileWriter;
+
+  public FileLogger(String name, boolean enabled,
+    Level minPermittedLevel, String filepath) {
+    super(name, enabled, minPermittedLevel);
+    this.fileWriter = new FileWriter(filepath); 
+  }
+  
+  @Override
+  public void doLog(Level level, String mesage) {
+    // 格式化level和message,输出到日志文件
+    fileWriter.write(...);
+  }
+}
+// 抽象类的子类: 输出日志到消息中间件(比如kafka)
+public class MessageQueueLogger extends Logger {
+  private MessageQueueClient msgQueueClient;
+  
+  public MessageQueueLogger(String name, boolean enabled,
+    Level minPermittedLevel, MessageQueueClient msgQueueClient) {
+    super(name, enabled, minPermittedLevel);
+    this.msgQueueClient = msgQueueClient;
+  }
+  
+  @Override
+  protected void doLog(Level level, String mesage) {
+    // 格式化level和message,输出到消息中间件
+    msgQueueClient.send(...);
+  }
+}
+</code></pre><p>通过上面的这个例子，我们来看一下，抽象类具有哪些特性。我总结了下面三点。</p><ul>
+<li>抽象类不允许被实例化，只能被继承。也就是说，你不能new一个抽象类的对象出来（Logger logger = new Logger(...);会报编译错误）。</li>
+<li>抽象类可以包含属性和方法。方法既可以包含代码实现（比如Logger中的log()方法），也可以不包含代码实现（比如Logger中的doLog()方法）。不包含代码实现的方法叫作抽象方法。</li>
+<li>子类继承抽象类，必须实现抽象类中的所有抽象方法。对应到例子代码中就是，所有继承Logger抽象类的子类，都必须重写doLog()方法。</li>
+</ul><p><strong>刚刚我们讲了如何定义抽象类，现在我们再来看一下，在Java这种编程语言中，我们如何定义接口。</strong></p><pre><code>// 接口
+public interface Filter {
+  void doFilter(RpcRequest req) throws RpcException;
+}
+// 接口实现类：鉴权过滤器
+public class AuthencationFilter implements Filter {
+  @Override
+  public void doFilter(RpcRequest req) throws RpcException {
+    //...鉴权逻辑..
+  }
+}
+// 接口实现类：限流过滤器
+public class RateLimitFilter implements Filter {
+  @Override
+  public void doFilter(RpcRequest req) throws RpcException {
+    //...限流逻辑...
+  }
+}
+// 过滤器使用Demo
+public class Application {
+  // filters.add(new AuthencationFilter());
+  // filters.add(new RateLimitFilter());
+  private List&lt;Filter&gt; filters = new ArrayList&lt;&gt;();
+  
+  public void handleRpcRequest(RpcRequest req) {
+    try {
+      for (Filter filter : filters) {
+        filter.doFilter(req);
+      }
+    } catch(RpcException e) {
+      // ...处理过滤结果...
+    }
+    // ...省略其他处理逻辑...
+  }
+}
+</code></pre><p>上面这段代码是一个比较典型的接口的使用场景。我们通过Java中的interface关键字定义了一个Filter接口。AuthencationFilter和RateLimitFilter是接口的两个实现类，分别实现了对RPC请求鉴权和限流的过滤功能。</p><p>代码非常简洁。结合代码，我们再来看一下，接口都有哪些特性。我也总结了三点。</p><ul>
+<li>接口不能包含属性（也就是成员变量）。</li>
+<li>接口只能声明方法，方法不能包含代码实现。</li>
+<li>类实现接口的时候，必须实现接口中声明的所有方法。</li>
+</ul><p>前面我们讲了抽象类和接口的定义，以及各自的语法特性。从语法特性上对比，这两者有比较大的区别，比如抽象类中可以定义属性、方法的实现，而接口中不能定义属性，方法也不能包含代码实现等等。除了语法特性，从设计的角度，两者也有比较大的区别。</p><p>抽象类实际上就是类，只不过是一种特殊的类，这种类不能被实例化为对象，只能被子类继承。我们知道，继承关系是一种is-a的关系，那抽象类既然属于类，也表示一种is-a的关系。相对于抽象类的is-a关系来说，接口表示一种has-a关系，表示具有某些功能。对于接口，有一个更加形象的叫法，那就是协议（contract）。</p><h2>抽象类和接口能解决什么编程问题？</h2><p>刚刚我们学习了抽象类和接口的定义和区别，现在我们再来学习一下，抽象类和接口存在的意义，让你知其然知其所以然。</p><p><strong>首先，我们来看一下，我们为什么需要抽象类？它能够解决什么编程问题？</strong></p><p>刚刚我们讲到，抽象类不能实例化，只能被继承。而前面的章节中，我们还讲到，继承能解决代码复用的问题。所以，抽象类也是为代码复用而生的。多个子类可以继承抽象类中定义的属性和方法，避免在子类中，重复编写相同的代码。</p><p>不过，既然继承本身就能达到代码复用的目的，而继承也并不要求父类一定是抽象类，那我们不使用抽象类，照样也可以实现继承和复用。从这个角度上来讲，我们貌似并不需要抽象类这种语法呀。那抽象类除了解决代码复用的问题，还有什么其他存在的意义吗？</p><p>我们还是拿之前那个打印日志的例子来讲解。我们先对上面的代码做下改造。在改造之后的代码中，Logger不再是抽象类，只是一个普通的父类，删除了Logger中log()、doLog()方法，新增了isLoggable()方法。FileLogger和MessageQueueLogger还是继承Logger父类，以达到代码复用的目的。具体的代码如下：</p><pre><code>// 父类：非抽象类，就是普通的类. 删除了log(),doLog()，新增了isLoggable().
+public class Logger {
+  private String name;
+  private boolean enabled;
+  private Level minPermittedLevel;
+
+  public Logger(String name, boolean enabled, Level minPermittedLevel) {
+    //...构造函数不变，代码省略...
+  }
+
+  protected boolean isLoggable() {
+    boolean loggable = enabled &amp;&amp; (minPermittedLevel.intValue() &lt;= level.intValue());
+    return loggable;
+  }
+}
+// 子类：输出日志到文件
+public class FileLogger extends Logger {
+  private Writer fileWriter;
+
+  public FileLogger(String name, boolean enabled,
+    Level minPermittedLevel, String filepath) {
+    //...构造函数不变，代码省略...
+  }
+  
+  public void log(Level level, String mesage) {
+    if (!isLoggable()) return;
+    // 格式化level和message,输出到日志文件
+    fileWriter.write(...);
+  }
+}
+// 子类: 输出日志到消息中间件(比如kafka)
+public class MessageQueueLogger extends Logger {
+  private MessageQueueClient msgQueueClient;
+  
+  public MessageQueueLogger(String name, boolean enabled,
+    Level minPermittedLevel, MessageQueueClient msgQueueClient) {
+    //...构造函数不变，代码省略...
+  }
+  
+  public void log(Level level, String mesage) {
+    if (!isLoggable()) return;
+    // 格式化level和message,输出到消息中间件
+    msgQueueClient.send(...);
+  }
+}
+</code></pre><p>这个设计思路虽然达到了代码复用的目的，但是无法使用多态特性了。像下面这样编写代码，就会出现编译错误，因为Logger中并没有定义log()方法。</p><pre><code>Logger logger = new FileLogger(&quot;access-log&quot;, true, Level.WARN, &quot;/users/wangzheng/access.log&quot;);
+logger.log(Level.ERROR, &quot;This is a test log message.&quot;);
+</code></pre><p>你可能会说，这个问题解决起来很简单啊。我们在Logger父类中，定义一个空的log()方法，让子类重写父类的log()方法，实现自己的记录日志的逻辑，不就可以了吗？</p><pre><code>public class Logger {
+  // ...省略部分代码...
+  public void log(Level level, String mesage) { // do nothing... }
+}
+public class FileLogger extends Logger {
+  // ...省略部分代码...
+  @Override
+  public void log(Level level, String mesage) {
+    if (!isLoggable()) return;
+    // 格式化level和message,输出到日志文件
+    fileWriter.write(...);
+  }
+}
+public class MessageQueueLogger extends Logger {
+  // ...省略部分代码...
+  @Override
+  public void log(Level level, String mesage) {
+    if (!isLoggable()) return;
+    // 格式化level和message,输出到消息中间件
+    msgQueueClient.send(...);
+  }
+}
+</code></pre><p>这个设计思路能用，但是，它显然没有之前通过抽象类的实现思路优雅。我为什么这么说呢？主要有以下几点原因。</p><ul>
+<li>在Logger中定义一个空的方法，会影响代码的可读性。如果我们不熟悉Logger背后的设计思想，代码注释又不怎么给力，我们在阅读Logger代码的时候，就可能对为什么定义一个空的log()方法而感到疑惑，需要查看Logger、FileLogger、MessageQueueLogger之间的继承关系，才能弄明白其设计意图。</li>
+<li>当创建一个新的子类继承Logger父类的时候，我们有可能会忘记重新实现log()方法。之前基于抽象类的设计思路，编译器会强制要求子类重写log()方法，否则会报编译错误。你可能会说，我既然要定义一个新的Logger子类，怎么会忘记重新实现log()方法呢？我们举的例子比较简单，Logger中的方法不多，代码行数也很少。但是，如果Logger有几百行，有n多方法，除非你对Logger的设计非常熟悉，否则忘记重新实现log()方法，也不是不可能的。</li>
+<li>Logger可以被实例化，换句话说，我们可以new一个Logger出来，并且调用空的log()方法。这也增加了类被误用的风险。当然，这个问题可以通过设置私有的构造函数的方式来解决。不过，显然没有通过抽象类来的优雅。</li>
+</ul><p><strong>其次，我们再来看一下，我们为什么需要接口？它能够解决什么编程问题？</strong></p><p>抽象类更多的是为了代码复用，而接口就更侧重于解耦。接口是对行为的一种抽象，相当于一组协议或者契约，你可以联想类比一下API接口。调用者只需要关注抽象的接口，不需要了解具体的实现，具体的实现代码对调用者透明。接口实现了约定和实现相分离，可以降低代码间的耦合性，提高代码的可扩展性。</p><p>实际上，接口是一个比抽象类应用更加广泛、更加重要的知识点。比如，我们经常提到的“基于接口而非实现编程”，就是一条几乎天天会用到，并且能极大地提高代码的灵活性、扩展性的设计思想。关于接口这个知识点，我会单独再用一节课的时间，更加详细全面的讲解，这里就不展开了。</p><h2>如何模拟抽象类和接口两个语法概念？</h2><p>在前面举的例子中，我们使用Java的接口语法实现了一个Filter过滤器。不过，如果你熟悉的是C++这种编程语言，你可能会说，C++只有抽象类，并没有接口，那从代码实现的角度上来说，是不是就无法实现Filter的设计思路了呢？</p><p>实际上，我们可以通过抽象类来模拟接口。怎么来模拟呢？这是一个不错的面试题，你可以先思考一下，然后再来看我的讲解。</p><p>我们先来回忆一下接口的定义：接口中没有成员变量，只有方法声明，没有方法实现，实现接口的类必须实现接口中的所有方法。只要满足这样几点，从设计的角度上来说，我们就可以把它叫作接口。实际上，要满足接口的这些语法特性并不难。在下面这段C++代码中，我们就用抽象类模拟了一个接口（下面这段代码实际上是策略模式中的一段代码）。</p><pre><code>class Strategy { // 用抽象类模拟接口
+  public:
+    ~Strategy();
+    virtual void algorithm()=0;
+  protected:
+    Strategy();
+};
+</code></pre><p>抽象类Strategy没有定义任何属性，并且所有的方法都声明为virtual类型（等同于Java中的abstract关键字），这样，所有的方法都不能有代码实现，并且所有继承这个抽象类的子类，都要实现这些方法。从语法特性上来看，这个抽象类就相当于一个接口。</p><p>不过，如果你熟悉的既不是Java，也不是C++，而是现在比较流行的动态编程语言，比如Python、Ruby等，你可能还会有疑问：在这些动态语言中，不仅没有接口的概念，也没有类似abstract、virtual这样的关键字来定义抽象类，那该如何实现上面的讲到的Filter、Logger的设计思路呢？实际上，除了用抽象类来模拟接口之外，我们还可以用普通类来模拟接口。具体的Java代码实现如下所示。</p><pre><code>public class MockInteface {
+  protected MockInteface() {}
+  public void funcA() {
+    throw new MethodUnSupportedException();
+  }
+}
+</code></pre><p>我们知道类中的方法必须包含实现，这个不符合接口的定义。但是，我们可以让类中的方法抛出MethodUnSupportedException异常，来模拟不包含实现的接口，并且能强迫子类在继承这个父类的时候，都去主动实现父类的方法，否则就会在运行时抛出异常。我们将构造函数设置成protected属性的，这样就能避免非同包下的类去实例化MockInterface。不过，这样还是无法避免同包中的类去实例化MockInterface。为了解决这个问题，我们可以学习Google Guava中@VisibleForTesting注解的做法，自定义一个注解，人为表明不可实例化。</p><p>刚刚我们讲了如何用抽象类来模拟接口，以及如何用普通类来模拟接口，那如何用普通类来模拟抽象类呢？这个问题留给你自己思考，你可以留言说说你的实现方法。</p><p>实际上，对于动态编程语言来说，还有一种对接口支持的策略，那就是duck-typing。我们在上一节课中讲到多态的时候也有讲过，你可以再回忆一下。</p><h2>如何决定该用抽象类还是接口？</h2><p>刚刚的讲解可能有些偏理论，现在，我们就从真实项目开发的角度来看一下，在代码设计、编程开发的时候，什么时候该用抽象类？什么时候该用接口？</p><p>实际上，判断的标准很简单。如果我们要表示一种is-a的关系，并且是为了解决代码复用的问题，我们就用抽象类；如果我们要表示一种has-a关系，并且是为了解决抽象而非代码复用的问题，那我们就可以使用接口。</p><p>从类的继承层次上来看，抽象类是一种自下而上的设计思路，先有子类的代码重复，然后再抽象成上层的父类（也就是抽象类）。而接口正好相反，它是一种自上而下的设计思路。我们在编程的时候，一般都是先设计接口，再去考虑具体的实现。</p><h2>重点回顾</h2><p>好了，今天内容就讲完了，我们一块来总结回顾一下，你需要掌握的重点内容。</p><p><strong>1.抽象类和接口的语法特性</strong></p><p>抽象类不允许被实例化，只能被继承。它可以包含属性和方法。方法既可以包含代码实现，也可以不包含代码实现。不包含代码实现的方法叫作抽象方法。子类继承抽象类，必须实现抽象类中的所有抽象方法。接口不能包含属性，只能声明方法，方法不能包含代码实现。类实现接口的时候，必须实现接口中声明的所有方法。</p><p><strong>2.抽象类和接口存在的意义</strong></p><p>抽象类是对成员变量和方法的抽象，是一种is-a关系，是为了解决代码复用问题。接口仅仅是对方法的抽象，是一种has-a关系，表示具有某一组行为特性，是为了解决解耦问题，隔离接口和具体的实现，提高代码的扩展性。</p><p><strong>3.抽象类和接口的应用场景区别</strong></p><p>什么时候该用抽象类？什么时候该用接口？实际上，判断的标准很简单。如果要表示一种is-a的关系，并且是为了解决代码复用问题，我们就用抽象类；如果要表示一种has-a关系，并且是为了解决抽象而非代码复用问题，那我们就用接口。</p><h2>课堂讨论</h2><ol>
+<li>你熟悉的编程语言，是否有现成的语法支持接口和抽象类呢？具体是如何定义的呢？</li>
+<li>前面我们提到，接口和抽象类是两个经常在面试中被问到的概念。学习完今天的内容之后，你是否对抽象类和接口有一个新的认识呢？如果面试官再让你聊聊接口和抽象类，你会如何回答呢？</li>
+</ol><p>欢迎在留言区写下你的答案，和同学一起交流和分享。如果有收获，也欢迎你把这篇文章分享给你的朋友。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/50/d7/f82ed283.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>辣么大</span>
+  </div>
+  <div class="_2_QraFYR_0">如果让我聊聊接口和抽象类，我会这么聊：定义、区别（是什么），存在意义（从哪来），应用（到哪去）。<br>1、定义：<br>抽象类：不允许实例化，只能被继承；可包含属性和方法，包含抽象方法；子类继承抽象类必须重写抽象方法。<br>接口：不允许实例化，只能被实现；不包含属性和普通方法，包含抽象方法、静态方法、default 方法；类实现接口时，必须实现抽象方法。<br>2、意义：<br>抽象类：解决复用问题，适用于is-a的关系。<br>接口：解决抽象问题，适用于has-a的关系。<br>3、应用：<br>例如：<br>解决复用问题：java中的子类FileInputStream和PipeInputStream等继承抽象类InputStream。重写了read(source)方法，InputStream 中还包含其他方法，FileInputStream继承抽象类复用了父类的其他方法。<br>解决抽象问题：抽象类InputStream实现了Closeable接口，该接口中包含close()抽象方法。Closeable这个接口还在很多其他类中实现了，例如Channel，Socket中都有close() 关闭这个功能，但具体实现每个类又各有不同的实现，这个就是抽象。<br><br>4、补充知识点（语法）：<br>Java接口中可以定义静态方法、default方法，枚举类型，接口中还可以定义接口（嵌套）。<br>public interface ILog {<br>  enum Type {<br>    LOW,<br>    MEDIUM,<br>    HIGH<br>  }<br>  interface InILog{<br>    void initInLog();<br>  }<br>  default void init() {<br>    Type t = Type.LOW;<br>    System.out.println(t.ordinal());<br>  }<br>  static void OS() {<br>System.out.println(System.getProperty(&quot;os.name&quot;, &quot;linux&quot;));<br>  }<br>  void log(OutputStream out);<br>}<br>class ConsoleLog implements ILog {<br>  @Override<br>  public void log(OutputStream out) {<br>    System.out.println(&quot;ConsoleLog...&quot;);<br>  }<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 06:38:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Maurice</span>
+  </div>
+  <div class="_2_QraFYR_0">嗯，刚刚看了一下评论区，小弟给大家初学设计模式以及刚刚接触项目的同学一些建议，其实在学这一章更以及往后正式的20多种设计模式时候更加锻炼的是一种抽象思维，以我个人的一点经验，就像老师一开始说的，在学习的时候，不要总是类比生活中的一些阿猫啊狗的例子，没错初次是很好理解，而且你会感觉好像懂了，但是实际上你还是不懂（可能是以为我笨），建议大家没学习一种模式的时候，思考一下现在在做的项目中那些业务可以进行优化，如果可以的话，可以进行重构，这样对你的学习才有很大的帮助；举个栗子，例如策略模式，我们在代码是不是经常调用第三方接口，每个接口都有它的规范之类的，如果你按照low 的方式就是按照规范组织一些报文请求，但是这个时候，你可以用的你的抽象思维，比如,在这类业务中，无外乎就是，1、构建报文，2、请求结构，3、解析返回，那么我就可以这样设计：<br>    &#47;**<br>     * 请求统一接口<br>     *&#47;<br>    public interface Fun&lt;T&gt; {<br>        &#47;**<br>         * 发送请求报文<br>         *&#47;<br>        String constructionRequest();<br>        &#47;**<br>         * 请求报文<br>         *&#47;<br>        String doPost(String request);<br>        &#47;**<br>         * 解析回执报文<br>         *&#47;<br>        T resolveResponse(String responseText);<br>    }<br>然后再写一个策略的算法簇（应该是这么叫）<br>&#47;**<br> * 统一实现接口<br> *&#47;<br>public class DealWithHandle {<br>    <br>    &#47;**<br>     * 描述 create.<br>     *<br>     * @param &lt;T&gt; the type parameter<br>     * @param fun the fun<br>     * @return the t<br>     * @author Maurice Mao<br>     * @created 2018 -07-13 10:58:32 Handle t.<br>     *&#47;<br>    public static &lt;T&gt; T handle(Fun&lt;T&gt; fun) {<br>        <br>        String request = fun.constructionRequest();<br>        <br>        String response = fun.doPost(request);<br>        <br>        T t = fun.resolveResponse(response);<br>        <br>        return t;<br><br>    }<br>}<br>这个时候，假设你做支付宝扫码支付的时候（或者微信以及第三方支付），是不是可以这么调用：<br>public class OfficialAliScan {<br><br>    private static Logger logger = LoggerFactory.getLogger(OfficialAliScan.class);<br><br>    public static ApiTradeResultDto operate(final TradeOrderDO orderDO, final SubMerchatAuthDO subMerchatAuthDO, final String authCode) {<br>        return DealwithHandle.handle(new DealwithHandle.Fun&lt;ApiTradeResultDto&gt;() {<br>            @Override<br>            public String constructionRequest() {<br>                  &#47;&#47;&#47;todo<br>            }<br><br>            @Override<br>            public String doPost(String bizContent) {<br>                &#47;&#47;&#47;todo<br>            }<br><br>            @Override<br>            public ApiTradeResultDto resolveResponse(String responseTxt) {<br>                &#47;&#47;&#47;todo<br>            }<br>        });<br>    }<br>这样的话，你的业务代码组织的就很清晰，也便于调试维护<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-21 15:32:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/20/6c/e4966364.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>NoAsk</span>
+  </div>
+  <div class="_2_QraFYR_0">Java使用abstract表示抽象类，interface表示接口。<br>老师讲的很好，我补充一下使用；<br>1.java中抽象类是类，而java不支持多继承，当想要实现多继承的时候只能使用表示has-a的接口来实现。<br>2.在java8之前，定义的接口不能有具体实现，这会导致在后续维护的时候如果想要在接口中新增一个方法，必须在所有实现类中都实现一遍，并且只有几个新的实现类可能要去具体实现，其他的都只是加上默认实现，这样比较麻烦。在java8中接口可以用使用关键字default，来实现一个默认方法，这样就解决了上述的麻烦。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 07:14:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/f9/98/95b13446.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jimbol</span>
+  </div>
+  <div class="_2_QraFYR_0">接口强调具有什么能力(has-a)，<br>抽象类强调是什么(is-a)。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 07:58:09</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/7f/ca/ea85bfdd.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>helloworld</span>
+  </div>
+  <div class="_2_QraFYR_0">『那又如何避免这个类被实例化呢？实际上很简单，我们只需要将这个类的构造函数声明为 protected 访问权限就可以了。』当把一个类的构造方法声明为protected后，在同一个包的其他类中还是可以new这个类的对象的。老师，是我想错了吗？请老师指正</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 好像我写的是有点问题，稍后更正下，多谢指出</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-21 16:15:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/60/4f/db0e62b3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Daiver</span>
+  </div>
+  <div class="_2_QraFYR_0">go和java 都有接口设计，但go的设计是飞入侵入性（duck type），而java必须显式实现该借口，这一点go做的真的好了。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 00:51:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/08/eb/594e9e6c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>五岳寻仙</span>
+  </div>
+  <div class="_2_QraFYR_0"><br>Python中抽象类是通过 abc 模块中的 abstractmethod 和 ABCMeta<br><br>from abc import abstractmethod, ABCMeta<br><br>class BaseClass(metaclass=ABCMeta):<br>    @abstractmethod<br>    def fun(self, x): pass<br><br>因为 Python 需要天然支持多继承，所以可以直接用上述的抽象类实现接口</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-21 20:27:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/0f/70/759b1567.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张飞online</span>
+  </div>
+  <div class="_2_QraFYR_0">谈谈c吧，linux内核的设备驱动总线模型，就但说设备吧，<br><br>抽象类:<br>首先来个通用设备结构体，到了具体设备把通用设备结构体包含了，这是典型的抽象类思想，提炼公共部分做基类，提高复用度。<br>接口，接口实现就是函数指针，不管你的驱动如何实现，接口不变，你就按照函数指针的定义实现函数，任何人都要受控这个函数定义协议。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 23:46:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/a8/e8/bc84c47d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>熊斌</span>
+  </div>
+  <div class="_2_QraFYR_0">举个例子吧，附件上传服务端实现<br><br>需求：支持上传、下载、删除以及文件的存储，存储的话需要支持存本地和云端，涉及附件上传的业务点有十几个。<br><br>设计思路：<br>1、接口设计：上传、下载、删除是公共行为，抽象到接口中<br><br>2、存储方法是一大块公共代码，写到抽象类里面<br><br>3、每个业务的附件上传子类实现接口、继承抽象类</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 07:13:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/71/05/db554eba.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>👽</span>
+  </div>
+  <div class="_2_QraFYR_0">个人认为，jdk8中，接口的默认实现之后。接口和抽象的区别渐渐模糊了。接口，从一定程度上也可以当抽象类使用。而且最主要的是，支持多实现，但不支持多继承。<br>并且，我认为，多实现也是接口和抽象类最主要的区别，没有之一！<br><br>我的理解：<br>抽象类：描述整个类的一个概况。（举例来说，抽象类，爬行动物）<br>接口： 描述的是需要具备的能力。（举例来说，飞行，游泳）<br><br>乌龟，在类上，应该继承爬行动物。因为属于爬行动物（说实话不确定是不是爬行动物），但是乌龟同时也会游泳。会游泳，就只能是乌龟实现的接口。如果，有一天，乌龟长翅膀会飞了（致敬超级马里奥），那这时候，实现会飞行接口就可以了。<br><br>在使用到这个接口的角度，某个游戏，需要十个飞行的小怪。以前是十个各种鸟类。但是现在需要十一个了，于是乎给乌龟安上了翅膀（实现飞行接口），拿来充当飞行小怪使用。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-25 17:05:38</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>InfoQ_6fbe5db36682</span>
+  </div>
+  <div class="_2_QraFYR_0">本文讲述用抽象类模拟接口举的C++例子有个小问题，Strategy接口的析构函数忘记了virtual关键字，没有这个关键字delete一个基类指针将导致部分析构。下面的代码可以用来验证这个问题：<br><br>#include &lt;iostream&gt;<br>#include &lt;vector&gt;<br><br>class Strategy {<br>public:<br>    ~Strategy() = default;<br>    virtual void algorithm() = 0;<br><br>protected:<br>    Strategy() = default;<br>};<br><br>class DestructIndicator {<br>public:<br>    ~DestructIndicator() {<br>        std::cout &lt;&lt; &quot;DestructIndicator destructed.\n&quot;;<br>    }<br>};<br><br>class Abc : public Strategy {<br>private:<br>    DestructIndicator indicator;<br><br>public:<br>    void algorithm() override {}<br>};<br><br>int main() {<br>    Strategy *instance = new Abc;<br>    delete instance;<br>    return 0;<br>}<br><br>在~Strategy前面加上virtual关键字就可以看到DestructIndicator destructed输出了。<br><br>唉，C++这个玩意坑多的很。。。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-08 22:39:24</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/f3/92/96fe653f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Uncle.席</span>
+  </div>
+  <div class="_2_QraFYR_0">接口强调某一方面的统一，抽象强调共性的复用</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 07:05:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/bvj76PmeUvW8kokyu91IZWuRATKmabibDWbzAj2TajeEic7WvKCJOLaOh6jibEmdQ36EO3sBUZ0HibAiapsrZo64U8w/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>梦倚栏杆</span>
+  </div>
+  <div class="_2_QraFYR_0">关于抽象类和接口有一个疑问，也可能是对业务模型不够了解，同一件事其实可以表达成is a也可以表达成has a，这个就看你的语言描述到底是个名词还是行为。<br>举例说明：<br>宠物猫和宠物狗都是宠物。<br>宠物猫和宠物狗都有会被宠。<br>is a基类定义：宠物类<br>has a  接口定义：可被宠的<br>如果取决于需求的语言阐述，感觉就太依赖个人表达习惯了，这不是一个团队持续迭代好项目的方式吧<br>希望老师可以帮忙解惑</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 07:45:08</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>nelson</span>
+  </div>
+  <div class="_2_QraFYR_0">抽象类 Strategy 没有定义任何属性，并且所有的方法都声明为 virtual 类型（等同于 Java 中的 abstract 关键字）<br>这里关于C++的说明有点问题，virtual是虚函数和abstract没有对应关系，换句话说，java中成员函数都是virtual的。Java中的abstract关键字对应“virtual void algorithm()=0”当中的“=0”，也就是所谓的纯虚函数，即在本类中没有实现，派生类必须实现</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 23:30:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/73/a3/2b077607.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Michael</span>
+  </div>
+  <div class="_2_QraFYR_0">1、Java中接口和抽象类的区别是什么？什么时候用接口？什么时候用抽象类？抽象类和接口存在的意义是什么？能解决哪些编程问题？<br>1）类关键字修饰符：<br>抽象类使用abstract修饰，含有抽象方法（使用abstract关键字修饰的方法）的类是抽象类，必须使用abstract关键字修饰；<br>接口使用interface修饰<br><br>2）实例化：<br>抽象类和接口均不能实例化<br>若想实例化，抽象类变量必须指向实现所有抽象方法的子类对象，接口变量必须指向实现所有接口方法的类对象<br><br>3）实现：<br>一个类只能实现一个抽象类；<br>一个类可以实现多个接口，接口自己本身可以通过extends 关键字扩展多个接口，如果一个类实现多个接口，多个接口有相同default方法，则子类必须重写该方法<br><br>4）访问级别关键字修饰符：<br>JDK 1.8以前，接口中的方法必须是public的<br>JDK 1.8时，接口中的方法可以是public的，也可以是default的<br>JDK 1.9时，接口中的方法可以是private的<br>JDK 1.8以前，抽象类的方法默认访问权限为protected<br>JDK 1.8时，抽象类的方法默认访问权限变为default<br><br>5）方法：<br>抽象类可以含有抽象方法，也可以不包含抽象方法，抽象类中可以有具体的方法，抽象类中的抽象方法只有方法体没有具体实现；<br>接口中的方法均为抽象方法，接口中不能包含实例或静态方法<br><br>6）变量<br>接口中除了 static、final 变量，不能有其他变量，而抽象类中则不一定<br>7）设计层面：<br>抽象是对类的抽象，是一种模板设计；接口是对行为的抽象，是一种行为的规范<br>8）继承层次<br>抽象类是一种自下而上的设计思路，先有子类的代码重复，然后再抽象成上层的父类（也就是抽象类）。<br>而接口正好相反，它是一种自上而下的设计思路。我们在编程的时候，一般都是先设计接口，再去考虑具体的实现。<br><br>8）使用场景：<br>使用抽象类是为了代码的复用，<br>接口是对行为的抽象，而使用接口的动机是为了实现多态性,侧重于抽象和解耦；<br>接口实现了约定和实现相分离，可以降低代码间的耦合性，提高代码的可扩展性。<br><br>具体代表：<br>抽象类-模板模式(把不变的流程抽象到父类的模板方法中，将可变的部分留给子类实现）<br>eg.<br>JDK的InputStream、OutputStream、Reader、Writer;<br>AbstractList中的AddAll是模板方法，add、get、set均抛出异常异常没法正常使用需要子类重写<br>HttpServlet中的service方法是模板方法，doGet和doPost可以是子类重写定制的部分。<br><br>接口：<br>eg.<br>Spring的BeanFactory，BeanFactory是IOC容器的核心接口，它的职责包括：实例化、定位、配置应用程序中的对象及建立这些对象间的依赖。BeanFactory只是个接口，并不是IOC容器的具体实现，但是Spring容器给出了很多种实现，如DefaultListableBeanFactory、XmlBeanFactory、ApplicationContext等，其中XmlBeanFactory就是常用的一个，该实现将以XML方式描述组成应用的对象及对象间的依赖关系</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-10-04 18:05:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/32/db/8541b844.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>bigtom</span>
+  </div>
+  <div class="_2_QraFYR_0">is-a 和 has-a 的地方我觉得有点问题。应该说 is-a 是继承（Inheritance），has-a 是组合（Composition）。所以我感觉无论接口还是抽象类都是继承，所以都是 is-a 的关系呀。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-23 00:11:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/4c/6d/c20f2d5a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>LJK</span>
+  </div>
+  <div class="_2_QraFYR_0">Python有抽象类吧？abc不是可以定义抽象类么</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 03:14:23</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/7e/bb/947c329a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>程序员小跃</span>
+  </div>
+  <div class="_2_QraFYR_0">1. 目前学习的就是Java余元，所以有了一套线程的支持接口和抽象类的东西。其实刚入门的时候，确实对这两个不是很理解，而且很多时候都不知道如何运用，那时候是靠《疯狂Java讲义》学会了区别，并且通过一些面试题了解到其中的一些区别和使用方式。<br>2. 通过今天老师的讲解，我又结合了《疯狂Java讲义》、面试题、以及自己项目中的代码实现，来重新梳理这两个的区别。为什么我的业务代码是使用接口而不是抽象类，为什么有些API是用了抽象类而不是接口，是基于某方面的考虑，是处于什么方式的考虑，或是基于哪个设计模式。不过这些都还需要消化，沉淀，会用只是一方面，会思考，会架构才是更好的方式。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 14:44:52</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/78/51/4790e13e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Smallfly</span>
+  </div>
+  <div class="_2_QraFYR_0">抽象类 vs 接口<br><br>			抽象类    接口<br>实例化		    否	      否<br>属性		    是               否<br>方法                    是               是<br>实现                    是               否<br>目的                 复用          扩展<br>意义                  is-a           has-a</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 08:44:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/f5/bc/63be02b6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>水银</span>
+  </div>
+  <div class="_2_QraFYR_0">Java语言接口和抽象的用法老师已经在文中讲了，但在后来的语法规则里，接口也可以由default修饰符来构造默认的接口方法逻辑了，这样在实现接口的时候可以不用必须实现包含被标记为default的方法了，这样的设计是否也是因为接口中如果包含了通用的方法逻辑，可以不用每个接口都实现一遍，避免方法逻辑冗余呢？也是复用的一种思想？</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-11-20 07:40:15</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

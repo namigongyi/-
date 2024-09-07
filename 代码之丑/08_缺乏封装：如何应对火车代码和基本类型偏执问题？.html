@@ -1,0 +1,481 @@
+<audio title="08_缺乏封装：如何应对火车代码和基本类型偏执问题？" src="https://static001.geekbang.org/resource/audio/38/5f/388d02c1d3ab93760b9d38c799a3cf5f.mp3" controls="controls"></audio> 
+<p>你好，我是郑晔。</p><p>上一讲，我们讲的是控制语句体现出的坏味道，它们不是一种坏味道，而是一类坏味道。这一讲，我们再来讲一类代码的坏味道：缺乏封装。</p><p>在程序设计中，一个重要的观念就是封装，将零散的代码封装成一个又一个可复用的模块。任何一个程序员都会认同封装的价值，但是，具体到写代码时，每个人对于封装的理解程度却天差地别，造成的结果就是：写代码的人认为自己提供了封装，但实际上，我们还是看到许多的代码散落在那里。</p><p>这一讲，我们就来看看，那些被封装遗忘的角落。</p><h2>火车残骸</h2><p>我们先从一段你可能很熟悉的代码开始：</p><pre><code>String name = book.getAuthor().getName();
+</code></pre><p>这段代码表达的是“获得一部作品作者的名字”。作品里有作者信息，想要获得作者的名字，通过“作者”找到“作者姓名”，这就是很多人凭借直觉写出的代码，不过它是有问题的。</p><p>如果你没看出这段代码的问题，说明你可能对封装缺乏理解。</p><p>你可以想一想，如果你想写出上面这段代码，是不是必须得先了解Book和Author这两个类的实现细节？也就是说，我们必须得知道，作者的姓名是存储在作品的作者字段里的。这时你就要注意了：当你必须得先了解一个类的细节，才能写出代码时，这只能说明一件事，这个封装是失败的。</p><p>这段代码只是用来说明这种类型坏味道是什么样的，在实际工作中，这种在一行代码中有连续多个函数调用的情况屡见不鲜，数量上总会不断突破你的认知。</p><!-- [[[read_end]]] --><p>Martin Fowler 在《<a href="https://book.douban.com/subject/33400354/">重构</a>》中给这种坏味道起的名字叫<strong>过长的消息链（Message Chains）</strong>，而有人则给它起了一个更为夸张的名字：<a href="https://wiki.c2.com/">火车残骸（Train Wreck）</a>，形容这样的代码像火车残骸一般，断得一节一节的。</p><p>解决这种代码的重构手法叫<strong>隐藏委托关系（Hide Delegate）</strong>，说得更直白一些就是，把这种调用封装起来：</p><pre><code>class Book {
+  ...
+  public String getAuthorName() {
+    return this.author.getName();
+  }
+  ...
+}
+
+
+String name = book.getAuthorName();
+</code></pre><p>前面我说过，火车残骸这种坏味道的产生是缺乏对于封装的理解，因为封装这件事并不是很多程序员编码习惯的一部分，他们对封装的理解停留在数据结构加算法的层面上。</p><p>在学习数据结构时，我们所编写的代码都是拿到各种细节直接操作，但那是在做编程练习，并不是工程上的编码方式。遗憾的是，很多人把这种编码习惯带到了工作中。</p><p>比如说，有人编写一个新的类，第一步是写出这个类要用到的字段，然后，就是给这些字段生成相应的 getter，也就是各种 getXXX。很多语言或框架提供的约定就是基于这种 getter的，就像 Java 里的 JavaBean，所以相应的配套工具也很方便。现在写出一个 getter 往往是 IDE 中一个快捷键的操作，甚至不需要自己手工敲代码。</p><p>诸如此类种种因素叠加，让暴露细节这种事越来越容易，封装反而成了稀缺品。</p><p><strong>要想摆脱初级程序员的水平，就要先从少暴露细节开始。</strong>声明完一个类的字段之后，请停下生成 getter 的手，转而让大脑开始工作，思考这个类应该提供的行为。</p><p>在软件行业中，有一个编程的指导原则几乎就是针对这个坏味道的，叫做<a href="https://en.wikipedia.org/wiki/Law_of_Demeter">迪米特法则（Law of Demeter）</a>，这个原则是这样说的：</p><ul>
+<li>每个单元对其它单元只拥有有限的知识，而且这些单元是与当前单元有紧密联系的；</li>
+<li>每个单元只能与其朋友交谈，不与陌生人交谈；</li>
+<li>只与自己最直接的朋友交谈。</li>
+</ul><p>这个原则需要我们思考，哪些算是直接的朋友，哪些算是陌生人。火车残骸般的代码显然就是没有考虑这些问题而直接写出来的代码。</p><p>或许你会说，按照迪米特法则这样写代码，会不会让代码里有太多简单封装的函数？</p><p>确实有可能，不过，这也是单独解决这一个坏味道可能带来的结果。正如我前面所说，这种代码的出现，根本的问题是缺乏对封装的理解，而一个好的封装是需要基于行为的，所以，如果把视角再提升一个角度，我们应该考虑的问题是类应该提供哪些行为，而非简简单单地把数据换一种形式呈现出来。</p><p>最后，还有一个问题我要提醒你一下。有些内部 DSL 的表现形式也是连续的函数调用，但 DSL 是声明性的，是在说做什么（What），而这里的坏味道是在说怎么做（How），二者的抽象级别是不同的，不要混在一起。</p><h2>基本类型偏执</h2><p>我们再来看一段代码：</p><pre><code>public double getEpubPrice(final boolean highQuality, final int chapterSequence) {
+  ...
+}
+</code></pre><p>这是我们上一讲用过的一个函数声明，根据章节信息获取 EPUB（一种电子书的格式）  的价格。也许你会问，这是一个看上去非常清晰的代码，难道这里也有坏味道吗？</p><p>没错，有。问题就出在返回值的类型上，也就是价格的类型上。</p><p>那么，我们在数据库中存储价格的时候，就是用一个浮点数，这里用 double 可以保证计算的精度，这样的设计有什么问题吗？</p><p>确实，这就是很多人使用基本类型（Primitive）作为变量类型思考的角度。但实际上，<strong>这种采用基本类型的设计缺少了一个模型</strong>。</p><p>虽然价格本身是用浮点数在存储，但价格和浮点数本身并不是同一个概念，有着不同的行为需求。比如，一般情况下，我们要求商品价格是大于 0 的，但 double 类型本身是没有这种限制的。</p><p>就以“价格大于0”这个需求为例，如果使用 double 类型你会怎么限制呢？我们通常会这样写：</p><pre><code>if (price &lt;= 0) {
+  throw new IllegalArgumentException(&quot;Price should be positive&quot;);
+}
+</code></pre><p>问题是，如果使用 double 作为类型，那我们要在使用的地方都保证价格的正确性，像这样的价格校验就应该是使用的地方到处写的。</p><p>如果补齐这里缺失的模型，我们可以引入一个 Price 类型，这样的校验就可以放在初始化时进行：</p><pre><code>class Price {
+  private long price;
+  
+  public Price(final double price) {
+    if (price &lt;= 0) {
+      throw new IllegalArgumentException(&quot;Price should be positive&quot;);
+    }
+    
+    this.price = price;
+  }
+}
+</code></pre><p>这种引入一个模型封装基本类型的重构手法，叫做<strong>以对象取代基本类型（Replace Primitive with Object）</strong>。一旦有了这个模型，我们还可以再进一步，比如，如果我们想要让价格在对外呈现时只有两位，在没有 Price 类的时候，这样的逻辑就会散落代码的各处，事实上，代码里很多重复的逻辑就是这样产生的。而现在我们可以在 Price 类里提供一个函数：</p><pre><code>public double getDisplayPrice() {
+  BigDecimal decimal = new BigDecimal(this.price)；
+  return decimal.setScale(2, BigDecimal.ROUND_HALF_UP).doubleValue();
+}
+</code></pre><p>其实，使用基本类型和使用继承出现的问题是异曲同工的。大部分程序员都学过这样一个设计原则：组合优于继承，也就是说，我们不要写出这样的代码：</p><pre><code>public Books extends List&lt;Book&gt; {
+  ...
+}
+</code></pre><p>而应该写成组合的样子，也就是：</p><pre><code>public Books  {
+  private List&lt;Book&gt; books;
+  ...
+}
+</code></pre><p>之所以有人把Books写成了继承，因为在代码作者眼中，Books 就是一个书的集合；而有人用 double 做价格的类型，因为在他看来，价格就是一个 double。这里的误区就在于，<strong>一些程序员只看到了模型的相同之处，却忽略了差异的地方</strong>。Books 可能不需要提供 List 的所有函数，价格的取值范围与 double 也有所差异。</p><p>但是，Books 的问题相对来说容易规避，因为产生了一个新的模型，有通用的设计原则帮助我们判断这个模型构建得是否恰当，而价格的问题却不容易规避，因为这里没有产生新的模型，也就不容易发现这里潜藏着问题。</p><p>这种以基本类型为模型的坏味道称为<strong>基本类型偏执</strong>（Primitive Obsession）。这里说的基本类型，不限于程序设计语言提供的各种基本类型，像字符串也是一个产生这种坏味道的地方。</p><p>这里我稍微延伸一下，有很多人对于集合类型（比如数组、List、Map 等等）的使用也属于这种坏味道。之前课程里我提到过“对象健身操（出自《<a href="https://www.infoq.cn/minibook/thoughtworks-anthology">ThoughtWorks文集</a>》）”这篇文章，里面有两个与此相关的条款，你可以作为参考：</p><ul>
+<li>封装所有的基本类型和字符串；</li>
+<li>使用一流的集合。</li>
+</ul><p>这一讲我们讲到的坏味道都是关于封装的。不过，正如我在开头所说，封装是一个人人都懂的道理，但具体到代码上，就千差万别了。</p><p><strong>封装之所以有难度，主要在于它是一个构建模型的过程</strong>，而很多程序员写程序，只是用着极其粗粒度的理解写着完成功能的代码，根本没有构建模型的意识；还有一些人以为划分了模块就叫封装，所以，我们才会看到这些坏味道的滋生。</p><p>这里我给出的坏味道，其实也是在挑战一些人对于编程的认知：那些习以为常的代码居然成了坏味道。而这只是一个信号，一个起点，告诉你这段代码存在问题，但真正要写好代码，还是需要你对软件设计有着深入的学习。</p><h2>总结时刻</h2><p>这一讲，我们讨论的是与封装有关的坏味道：</p><ul>
+<li>过长的消息链，或者叫火车残骸；</li>
+<li>基本类型偏执。</li>
+</ul><p>火车残骸的代码就是连续的函数调用，它反映的问题就是把实现细节暴露了出去，缺乏应有的封装。重构的手法是隐藏委托关系，实际就是做封装。软件行业有一个编程指导原则，叫迪米特法则，可以作为日常工作的指导，规避这种坏味道的出现。</p><p>基本类型偏执就是用各种基本类型作为模型到处传递，这种情况下通常是缺少了一个模型。解决它，常用的重构手法是以对象取代基本类型，也就是提供一个模型代替原来的基本类型。基本类型偏执不局限于程序设计语言提供的基本类型，字符串也是这种坏味道产生的重要原因，再延伸一点，集合类型也是。</p><p>这两种与封装有关的坏味道，背后体现的是对构建模型了解不足，其实，也是很多程序员在软件设计上的欠缺。想成为一个更好的程序员，学习软件设计是不可或缺的。</p><p>如果今天的内容你只能记住一件事，那请记住：<strong>构建模型，封装散落的代码</strong>。</p><p><img src="https://static001.geekbang.org/resource/image/f5/9f/f588d43df7d91c63d422a7c522dfe29f.jpg?wh=2284*3156" alt=""></p><h2>思考题</h2><p>这一讲提到的坏味道可以说是在代码里随处可见，也挑战了很多人的编程习惯。我想请你结合实际的工作，谈谈你对这一讲内容的理解，欢迎在留言区分享你的看法。</p><p><span class="reference">参考资料：</span></p><p><a href="https://time.geekbang.org/column/article/252598">面向对象之封装：怎样的封装才算是高内聚？</a></p><p><a href="https://time.geekbang.org/column/article/248638">DSL：你也可以设计一门自己的语言</a></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/19/70/67/0c1359c2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>qinsi</span>
+  </div>
+  <div class="_2_QraFYR_0">个人理解：<br><br>* 链式调用不一定都是火车残骸。比如builder模式，每次调用返回的都是自身，不牵涉到其他对象，不违反迪米特法则。又比如java stream操作，应该就是文中提到的声明性的操作<br><br>* 构建模型还有一个好处是增加了一层抽象，屏蔽了外部的变化，类似防腐层的作用。比如写可移植的c代码用typedef定义内部使用的类型而非直接使用基本类型，或是DDD中领域内只处理本领域的对象，使用其他领域的对象要先经过转换而不会直接使用</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这个理解很到位。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-16 11:32:00</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/73/a0/7dcc9212.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>adang</span>
+  </div>
+  <div class="_2_QraFYR_0">课程里讲的坏味道自己写的代码上都有，虽然知道不好，但是一直不知道应该怎样优化。没有好好系统地学习过软件设计，凭直觉感觉好或者不好，因为软件设计功底薄弱，明知道不好，却不知道怎样改进。几节课里，老师也一直在强调软件设计的重要性。发现自己确实需要系统的学习一下软件设计，好好扎扎马步，打实基本功了。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 欢迎加入《软件设计之美》</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-16 12:04:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/13/e2/21ac191d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>dev.bin</span>
+  </div>
+  <div class="_2_QraFYR_0">今天说的我都干过，一直都没意识到，但总是觉得有许多重复的代码，看着别扭，能早点看到就好了</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 早一天知道，早一天应用。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-16 21:17:32</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/9b/7a/78dde0a2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>克一</span>
+  </div>
+  <div class="_2_QraFYR_0">请教老师个问题：Java 里的 JavaBean，用MyBatis Genarater或者Lombok生成都会有Setter方法，这样数据库查询或者接受参数时，数据自动映射到这个对象。如果不用setter的话，应该怎么赋值？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 其实，现在的数据库映射用的都是反射的方式实现，与setter关系不大。下一讲，我们就来说说setter。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-16 10:38:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/38/c0/04decf07.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>里子的忧伤</span>
+  </div>
+  <div class="_2_QraFYR_0">我设计了一个客hu模型，包含客hu基本信息（证jian类型，证jian号码，名称），个人信息（有些客hu是自然人，客hu不是用户），企业信息，联xi电话List，地址List（注册地址，经营地址，身份证地址），等等；个人信息、企业信息、联xi电话等都是懒加载，需要用到的时候get才执行查询。如果按照本节的说法，可能这种设计就有问题，但是不知道怎么解决</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 先要分析这些模型之间的关系，如果它们是聚合和聚合根之间的关系，那就要一次性的拿出来，没有什么懒加载的问题。如果是组合关系，也许用不同的访问入口更合适。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-20 08:26:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/8d/b4/ff82483d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>邵俊达</span>
+  </div>
+  <div class="_2_QraFYR_0">对这句话不太明白「使用一流的集合」，请问什么是一流的集合？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 简单的理解，就是语言直接提供的数据结构，比如：List、Map、Set 之类的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-08-10 19:35:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/38/c0/04decf07.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>里子的忧伤</span>
+  </div>
+  <div class="_2_QraFYR_0">郑老师，我们实际开发中，每个模型都有对应的ModelService， service里专门负责该模型相关的业务逻辑，譬如某个Model有状态status字段， 如果单考虑模型封装，会在Model里写 激活 active()，取消 cancel（），冻结frozen（），实际状态set成什么service里完全不需要知道。但如果考虑service层就是写业务逻辑的，那Model只需要一个setStatus就行，他们还会觉得封装起来了service层还看不清了。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这就取决于你模型希望暴露的是什么了，我倾向于暴露行为，而直接暴露状态倾向于暴露细节。行为容易保持一致性，状态如果后面扩充了，是不是所有人都要知道呢，这是个值得考虑的问题。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-03-22 17:57:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/aa/24/01162b6c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>UncleNo2</span>
+  </div>
+  <div class="_2_QraFYR_0">解决链式调用的方案，是否与处理大类的方案矛盾呢？<br>(导致大类原因：字段未分组)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-11-28 18:06:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/7b/89/34f2cbcc.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杨宇</span>
+  </div>
+  <div class="_2_QraFYR_0">class Price {<br>  private long price;<br>  public Price(final double price) {<br>    ...<br>  }<br>}<br>——成员变量price的类型，long应为double。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-05-13 08:51:21</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/3a/87/82d25bb3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>AE86</span>
+  </div>
+  <div class="_2_QraFYR_0">“根本的问题是缺乏对封装的理解，而一个好的封装是需要基于行为的，所以，如果把视角再提升一个角度，我们应该考虑的问题是类应该提供哪些行为，而非简简单单地把数据换一种形式呈现出来。”  文中提到的这句话，请问能有个较直观具体的例子么？个人感觉这句话很重要，但是理解稍有问题</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 《软件设计之美》中，专门有一讲是关于封装的，你可以看一下，这里用的是结论。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-20 17:33:23</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/a5/4f/592d00f2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>岁月神偷</span>
+  </div>
+  <div class="_2_QraFYR_0">这一章的讲解令人醍醐灌顶，尤其是利用模型解决基本类型偏执的问题讲解上，那个天天环绕在身边的坏味道竟然拨云见雾，感谢</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 有收获，可转发😄</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-20 17:02:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/c1/57/27de274f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>萧</span>
+  </div>
+  <div class="_2_QraFYR_0">学了就用，美滋滋</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-18 23:26:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_3b1096</span>
+  </div>
+  <div class="_2_QraFYR_0">&quot;根本没有构建模型的意识&quot;...说得就是我啊</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你现在有了。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-18 02:07:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/d8/5d/07dfb3b5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杯莫停</span>
+  </div>
+  <div class="_2_QraFYR_0">迪米特法则说的其实就是解耦，“火车残骸”链式调用String name = book.getAuthor().getName();是间接的Author和当前对象发生了直接关系，产生了耦合，也破坏了封装。所以应该通过直接联系的book对象第三方建立间接联系，所谓“隐藏委托关系”。<br>构建模型封装了数据和处理数据的逻辑，使得外部不需要关心数据的内部逻辑，只关心数据本身。这就是封装性。不知道理解的对不对。<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这个理解很到位</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-07-02 00:32:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/17/27/ec30d30a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jxin</span>
+  </div>
+  <div class="_2_QraFYR_0">1.如果你的编码方式是置顶向下的，且当前层都只面向意图定义空类和空函数。那么写出郑大佬说提倡的这种风格其实很正常。<br>2.结合1描述的编码方式。顶层类中不会有基础类型，每个属性的类型都会是一个面向意图的类来承接。顶层函数的实现部分只会有一个个函数，哪怕函数实现只有一行。<br><br>3.曾经这样试过，写起来其实很舒服，多一点工作量其实也还好。但后面放弃了。主要还是与其他小伙伴合作的话会很难让人接受。毕竟认知是有差异的(非高低),达成共识并不容易。而如果达成共识的成本高过这种编码方式带来的收益，那么去坚持就没有太大必要了。（如果我的沉默成本足以说法其他人无条件信任，或者有借用大佬沉默成本的方式，或许可以拿个项目试试）</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 其实，你讨论的问题是《10x 程序员工作法》中讨论的问题。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-24 18:04:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/bb/11/7069b8eb.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>炫炫</span>
+  </div>
+  <div class="_2_QraFYR_0">真的棒棒哒，给力</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-23 20:17:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/cb/49/0b9ffc8e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>刘大明</span>
+  </div>
+  <div class="_2_QraFYR_0"><br>String name = book.getAuthor().getName();<br>最开始没有往下看的时候，根本就没有意识到这个代码有什么坏味道。<br>这是最可怕的，你不知道你不知道的事情。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 恭喜你有收获。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-18 16:33:13</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://thirdwx.qlogo.cn/mmopen/vi_32/AgxRed0BUUY840uyqd88OCoIdfFLCMb6sib0PibOgj0Zxp3FceiaPNskwm1XAtxlQZqGGYicnUWnall9UG0rI6WMow/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_611de6</span>
+  </div>
+  <div class="_2_QraFYR_0">这里深有感触，而且我目前还没有做好：“一旦有了这个模型，我们还可以再进一步，比如，如果我们想要让价格在对外呈现时只有两位，在没有 Price 类的时候，这样的逻辑就会散落代码的各处，事实上，代码里很多重复的逻辑就是这样产生的。”</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-11-04 09:34:15</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/26/eb/d7/90391376.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ifelse</span>
+  </div>
+  <div class="_2_QraFYR_0">构建模型，封装散落的代码--记下来</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-05-29 19:13:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1f/4c/dd/c6035349.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Bumblebee</span>
+  </div>
+  <div class="_2_QraFYR_0">今日收获<br><br>① 链式调用容易暴露实现细节（如果每次调用都是返回对象自身，这种也是符合迪米特法则的）；<br><br>② 基本类型也是一种坏味道，构建模型封装散落的代码；</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-05-25 23:45:58</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

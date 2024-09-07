@@ -1,0 +1,518 @@
+<audio title="03_新特性：初探Vue3新特性" src="https://static001.geekbang.org/resource/audio/b4/34/b43a2d702a83e0b1cd4eb80f083f9e34.mp3" controls="controls"></audio> 
+<p>你好，我是大圣。</p><p>在上一讲我们跟着小圣，通过实现一个清单应用，扭转了思路，认识到jQuery的开发思路和 Vue开发思路的区别。想要用好 Vue，首先就是专注数据本身的操作。</p><p>而我们的主人公小圣并没有满足这些内容，他跑到社区逛了一圈，想知道自己从哪个版本开始学习Vue更合适。这就引出了今天的话题：相比 Vue 2，Vue 3 的优势是什么，以及 Vue 3 到底有哪些新特性值得我们学习。</p><h2>Vue 2 的核心模块和历史遗留问题</h2><p>先看一看Vue 2。从下图你能看到，Vue 2 是一个响应式驱动的、内置虚拟DOM、组件化、用在浏览器开发，并且有一个运行时把这些模块很好地管理起来的框架。</p><p><img src="https://static001.geekbang.org/resource/image/df/a2/df099da509445a941d129eb9696935a2.jpg?wh=1661x957" alt="图片"></p><p>Vue 2 能把上面所说的这些模块很好地管理起来，看起来已经足够好了。不过事实真的如此么？聪明的你估计已经猜到了，Vue 2 还是有缺陷的，所以后面才会升级迭代。</p><p>我在下面列举了一些Vue 2 常见的缺陷，你可以对照你的实际开发经验，看看是否也遇到过这些问题：</p><p>首先从开发维护的角度看，Vue 2 是使用Flow.js来做类型校验。但现在Flow.js已经停止维护了，整个社区都在全面使用TypeScript来构建基础库，Vue团队也不例外。</p><p>然后从社区的二次开发难度来说，Vue 2 内部运行时，是直接执行浏览器API的。但这样就会在Vue 2的跨端方案中带来问题，要么直接进入 Vue 源码中，和 Vue 一起维护，比如Vue 2 中你就能见到Weex的文件夹。</p><!-- [[[read_end]]] --><p>要么是要直接改为复制一份全部Vue的代码，把浏览器API换成客户端或者小程序的。比如mpvue就是这么做的，但是Vue后续的更新就很难享受到。</p><p>最后从我们普通开发者的角度来说，<strong>Vue 2响应式并不是真正意义上的代理，而是基于Object.defineProperty() 实现的</strong>。对于Object.defineProperty() 这个API的细节，我们在后面讲源码时会讲到，现在你只需要知道这个API并不是代理，而是对某个属性进行拦截，所以有很多缺陷，比如：删除数据就无法监听，需要 $delete 等 API 辅助才能监听到。</p><p><strong>并且，Option API在组织代码较多组件的时候不易维护。</strong>对于Option API 来说，所有的methods、computed都在一个对象里配置，这对小应用来说还好。但代码超过300行的时候，新增或者修改一个功能，就需要不停地在data，methods里跳转写代码，我称之为上下反复横跳。</p><h2>从七个方面了解Vue 3新特性</h2><p>前面这些问题并不是Vue 2 有意为之，大部分是发展的过程中碰见的。Vue 3 就是继承了 Vue 2 具有的响应式、虚拟DOM，组件化等所有优秀的特点，并且全部重新设计，解决了这些历史包袱的新框架，是一个拥抱未来的前端框架。</p><p>接下来我们就来具体看看 Vue 3 新特性，我将分成7个具体方面向你展开介绍。其中，响应式系统、Composition API组合语法、新的组件和Vite是你需要重视的；自定义渲染器这方面的知识，你想用Vue开发跨端应用时会用到；如果你想对Vue源码作出贡献，RFC机制你也需要好好研究，并且得对TypeScript重构有很好的经验。</p><h3>RFC机制</h3><p>Vue 3的第一个新特性和代码无关，而是Vue团队开发的工作方式。</p><p>关于 Vue 的新语法或者新功能的讨论，都会先在GitHub上公开征求意见，邀请社区所有的人一起讨论， 你随时可以打开这个项目，我把链接放在<a href="https://github.com/vuejs/rfcs">这里</a>。Vue 3 正在讨论中的新需求，任何人都可以围观、参与讨论和尝试实现。</p><p>这个改变让Vue社区更加有活力，不管是课程后面会提到的&lt;script setup&gt;，还是 Vue 3 引入的ref API，你都可以在这个项目中看到每个需求从诞生到最终被Vue采纳的来龙去脉，这能帮助我们更好地了解Vue的发展。</p><p>Vue很长一段时间都是尤雨溪一个人维护，感慨尤雨溪战斗力的同时，社区也有很多人对Vue的稳定性提出质疑。后来尤雨溪吸纳了社区的人，并成立了Core Team。Vue 3 在此基础之上更进一步，全面拥抱社区，任何对Vue感兴趣的人都可以参与新特性的讨论。</p><p><img src="https://static001.geekbang.org/resource/image/61/68/61bb976a8165ef2e2f177d9e51c8bd68.png?wh=1534x1094" alt="图片"></p><p>RFC的引入，让Vue生态更加开放，在开发方式的新特性之外，我们搞技术的还是要回归代码，下面我来说说Vue 3 在代码层面所做的具体优化。</p><h3>响应式系统</h3><p>Vue 2 的响应式机制是基于Object.defineProperty()这个API实现的，此外，Vue还使用了Proxy，这两者看起来都像是对数据的读写进行拦截，但是defineProperty是拦截具体某个属性，Proxy才是真正的“代理”。</p><p>怎么理解这两者的区别呢？我们首先看defineProperty这个API，defineProperty的使用，要明确地写在代码里，下面是示例代码：</p><pre><code class="language-xml">Object.defineProperty(obj, 'title', {
+&nbsp; get() {},
+&nbsp; set() {},
+})
+</code></pre><p>当项目里“读取obj.title”和“修改obj.title”的时候被defineProperty拦截，但defineProperty对不存在的属性无法拦截，所以 Vue 2 中所有数据必须要在data里声明。</p><p>而且，如果title是一个数组的时候，对数组的操作，并不会改变obj.title的指向，虽然我们可以通过拦截.push等操作实现部分功能，但是对数组的长度的修改等操作还是无法实现拦截，所以还需要额外的$set等API。</p><p>而Proxy这个API就是真正的代理了，我们先看它的用法：</p><pre><code class="language-xml">new Proxy(obj, {
+  get() { },
+  set() { },
+})
+</code></pre><p>需要注意的是，虽然 Proxy 拦截obj这个数据，但obj具体是什么属性，Proxy则不关心，统一都拦截了。而且Proxy还可以监听更多的数据格式，比如Set、Map，这是 Vue 2 做不到的。</p><p>当然，Proxy存在一些兼容性问题，这也是为什么Vue 3 不兼容IE11以下的浏览器的原因，还好现在IE用的人不多了。</p><p><strong>更重要的是，我觉得Proxy代表一种方向，就是框架会越来越多的拥抱浏览器的新特性。</strong>在Proxy普及之前，我们是没有办法完整的监听一个JavaScript对象的变化，只能使用Object.defineProperty()去实现一部分功能。</p><p>前端框架利用浏览器的新特性来完善自己，才会让前端这个生态更繁荣，抛弃旧的浏览器是早晚的事。</p><p>这里你掌握Proxy的优势就可以了，具体的使用我们后面会自己手写一个，帮助你深入理解。</p><h3>自定义渲染器</h3><p>Vue 2 内部所有的模块都是揉在一起的，这样做会导致不好扩展的问题，刚才我也提到了这一点。Vue 3 是怎么解决这个问题的呢？那就是拆包，使用最近流行的monorepo管理方式，响应式、编译和运行时全部独立了，变成下图所示的模样：</p><p><img src="https://static001.geekbang.org/resource/image/95/0c/9573fb8b18cb694fe9959b82742ecb0c.jpg?wh=1444x824" alt="图片"></p><p><strong>我们能看到，在Vue 3 的组织架构中，响应式独立了出来。</strong>而Vue 2 的响应式只服务于Vue，Vue 3 的响应式就和Vue解耦了，你甚至可以在Node.js和React中使用响应式。</p><p>渲染的逻辑也拆成了<strong>平台无关渲染逻辑</strong>和<strong>浏览器渲染API</strong>两部分 。</p><p>在这个架构下，Node的一些库，甚至React都可以依赖响应式。在任何时候，如果你希望数据被修改了之后能通知你，你都可以单独依赖Vue 3 的响应式。</p><p>那么，在你想使用Vue 3 开发小程序、开发canvas小游戏以及开发客户端的时候，就不用全部fork Vue的代码，只需要实现平台的渲染逻辑就可以。</p><p><img src="https://static001.geekbang.org/resource/image/27/f6/2742614d6d43134084835a44079313f6.jpg?wh=1920x939" alt="图片"></p><p>就像动画片《战神金刚》，五个机器人可以独立执行任务，但关键时刻，高呼一声“我来组成头部”，就可以合体，从而发挥整体的作用。Vue 3 也是一样，响应式、编译和运行时几部分组合在一起就是运行在浏览器端的Vue 3，每个模块又都可以独立扩展出新的功能。</p><h3>全部模块使用TypeScript重构</h3><p>由于小圣之前只是用JavaScript来构建他的前端项目，而JavaScript是弱类型的语言。类型系统带来的好处以后我再跟他细说，现在只是笼统地告诉他，<strong>类型系统带来了更方便的提示，并且让我们的代码能够更健壮</strong>。</p><p>我们还是结合例子来看看，在下面这段代码中，我们首先定义了name这个变量，在定义的时候标记的是一个字符串，因而后面给它赋值时，赋值为数字就会报错。</p><p>之后，我们定义一个类型 Person，里面的变量name是字符串类型，变量age是数字类型。违反这个设置的数据就报错，这在多人协同和长期维护的项目里带来的收益是巨大的，因为这样可以使错误的代码在编译阶段就被发现，从而避免程序上线运行后，可能会发生的更大的异常错误。</p><pre><code class="language-xml">let name:string = '我是个靓仔'
+name = 1 // 报错
+interface Person {
+    name: string;
+    age: number;
+}
+let me:Person = {
+  name:'靓仔圣',
+  age:18
+}
+
+me.age = '整条街' // 报错
+</code></pre><p>所以大部分开源的框架都会引入类型系统，来对JavaScript进行限制。这样做的原因，就是我们前面提到的两点：<strong>第一点是，类型系统带来了更方便的提示；第二点是，类型系统让代码更健壮</strong>。</p><p>Vue 2 那个时代基本只有两个技术选型，Facebook家的Flow.js和微软家的TypeScript。Vue 2选Flow.js没问题，但是现在Flow.js被抛弃了。Vue 3 选择了TypeScript，TypeScript官方也对使用TypeScript开发Vue 3 项目的团队也更加友好。</p><h3>Composition API 组合语法</h3><p>Composition API 是Vue 3 中我最喜欢的一个特性，我们也叫它组合API。</p><p>先举个Vue 2 中的简单例子，一个累加器，并且还有一个计算属性显示累加器乘以2的结果。</p><pre><code class="language-xml">&lt;div id="app"&gt;
+
+  &lt;h1 @click="add"&gt;{{count}} * 2 = {{double}}&lt;/h1&gt;
+&lt;/div&gt;
+&lt;script src="https://unpkg.com/vue@next"&gt;&lt;/script&gt;
+&lt;script&gt;
+let App = {
+  data(){
+    return {
+      count:1
+    }
+  },
+  methods:{
+    add(){
+      this.count++
+    }
+  },
+  computed:{
+    double(){
+      return this.count*2
+    }
+  }
+}
+Vue.createApp(App).mount('#app')
+&lt;/script&gt;
+</code></pre><p>在Vue 3 中，除了上面这种这个写法，我们还可以采用下方的写法，新增一个setup配置：</p><pre><code class="language-xml">&lt;div id="app"&gt;
+  &lt;h1 @click="add"&gt;{{state.count}} * 2 = {{double}}&lt;/h1&gt;
+&lt;/div&gt;
+&lt;script src="https://unpkg.com/vue@next"&gt;&lt;/script&gt;
+&lt;script&gt;
+const {reactive,computed} = Vue
+let App = {
+  setup(){
+    const state = reactive({
+      count:1
+    })
+    function add(){
+      state.count++
+    }
+    const double = computed(()=&gt;state.count*2)
+    return {state,add,double}
+  }
+}
+Vue.createApp(App).mount('#app')
+&lt;/script&gt;
+</code></pre><p>使用Composition API后，代码看起来很烦琐，没有Vue 2 中 Options API 的写法简单好懂，但Options API的写法也有几个很严重的问题：</p><ul>
+<li>由于所有数据都挂载在this之上，因而Options API 的写法对TypeScript的类型推导很不友好，并且这样也不好做Tree-shaking清理代码。</li>
+<li>新增功能基本都得修改data、method等配置，并且代码上300行之后，会经常上下反复横跳，开发很痛苦。</li>
+<li>代码不好复用，Vue 2 的组件很难抽离通用逻辑，只能使用mixin，还会带来命名冲突的问题。</li>
+</ul><p>我们使用Composition API 后，虽然看起来烦琐了一些，但是带来了诸多好处：</p><ul>
+<li>所有API都是import 引入的（现在我们的例子还没有工程化，后续会加入）。用到的功能都import进来，对Tree-shaking很友好，我的例子里没用到功能，打包的时候会被清理掉 ，减小包的大小。</li>
+<li>不再上下反复横跳，我们可以把一个功能模块的methods、data都放在一起书写，维护更轻松。</li>
+<li>代码方便复用，可以把一个功能所有的methods、data封装在一个独立的函数里，复用代码非常容易。</li>
+<li>Composotion API 新增的return等语句，在实际项目中使用&lt;script setup&gt;特性可以清除， 我们后续项目中都会用到这样的操作。</li>
+</ul><p><strong>Composition API对我们开发Vue项目起到了巨大的帮助。</strong>下面这个示例图很好地说明了问题：每一个功能模块的代码颜色一样，左边是Options API，一个功能的代码零散的分布在data，methods等配置内，维护起来很麻烦，而右边的Compositon API就不一样了，每个功能模块都在一起维护。</p><p><img src="https://static001.geekbang.org/resource/image/a0/5f/a0010538b40e48fc5fc68b0eed2b025f.jpg?wh=3220x2046" alt=""></p><p>其实还可以更进一步，如果每个颜色块代码，我们都拆分出去一个函数，我们就会写出类似上面右侧风格的代码，每个数据来源都清晰可见，而且每个功能函数都可以在各个地方复用。对于Vue 3 采用的这种代码风格，小圣同学直呼清爽。</p><h3>新的组件</h3><p>Vue 3 还内置了Fragment、Teleport 和 Suspense三个新组件。这个倒不难，项目中用到的时候会详细剖析，现在你只需要这仨是啥就行，以及它们的用途即可：</p><ul>
+<li>Fragment: Vue 3 组件不再要求有一个唯一的根节点，清除了很多无用的占位div。</li>
+<li>Teleport: 允许组件渲染在别的元素内，主要开发弹窗组件的时候特别有用。</li>
+<li>Suspense: 异步组件，更方便开发有异步请求的组件。</li>
+</ul><h3>新一代工程化工具Vite</h3><p>Vite不在Vue 3 的代码包内，和Vue也不是强绑定，Vite的竞品是Webpack，而且按照现在的趋势看，使用率超过Webpack也是早晚的事。</p><p>Vite主要提升的是开发的体验，Webpack等工程化工具的原理，就是根据你的import依赖逻辑，形成一个依赖图，然后调用对应的处理工具，把整个项目打包后，放在内存里再启动调试。</p><p>由于要预打包，所以复杂项目的开发，启动调试环境需要3分钟都很常见，Vite就是为了解决这个时间资源的消耗问题出现的。</p><p>你可能不知道，现代浏览器已经默认支持了ES6的import语法，Vite就是基于这个原理来实现的。具体来说，在调试环境下，我们不需要全部预打包，只是把你首页依赖的文件，依次通过网络请求去获取，整个开发体验得到巨大提升，做到了复杂项目的秒级调试和热更新。</p><p>下图展示了Webpack的工作原理，Webpack要把所有路由的依赖打包后，才能开始调试。</p><p><img src="https://static001.geekbang.org/resource/image/d4/ba/d471d1f14abeaf4b091ddf5fb83e3eba.jpg?wh=1920x913" alt="图片"></p><p>而下图所示的是Vite的工作原理，一开始就可以准备联调，然后根据首页的依赖模块，再去按需加载，这样启动调试所需要的资源会大大减少。</p><p><img src="https://static001.geekbang.org/resource/image/8b/4c/8b726d2b8a09b045874340504a04414c.jpg?wh=1920x960" alt="图片"></p><p>后面我交给小圣的项目也主要用Vite作为工程化工具，你之后会详细地在实战中了解，第四部分我还会带着小圣手写一个mini版Vite，让我们拭目以待吧！</p><h2>总结</h2><p>今天学习的重点是Vue 3 主要的新特性，我们再来对这些特征做一个回顾：</p><ul>
+<li>新的RFC机制也让我们所有人都可以参与Vue新语法的讨论。</li>
+<li>工程化工具Vite带来了更丝滑的调试体验。</li>
+<li>对于产品的最终效果来看，Vue 3 性能更高，体积更小。</li>
+<li>对于普通开发者来说，Composition API 组合语法带来了更好的组织代码的形式。全新的响应式系统基于Proxy，也可以独立使用。</li>
+<li>Vue 3 内置了新的Fragment、Teleport和Suspense等组件。</li>
+<li>对于Vue的二次开发来说，自定义渲染器让我们开发跨端应用时更加得心应手。</li>
+<li>对于Vue的源码维护者，全部的模块使用TypeScript重构，能够带来更好的可维护性。</li>
+</ul><p>简而言之，Vue 3 带给我们的就是更快、更强且更易于扩展的开发体验，我们也可以用下面这个图来做个总结：</p><p><img src="https://static001.geekbang.org/resource/image/cc/d0/cc47460b1f9441d843bff6d37777a8d0.jpg?wh=3059x1664" alt=""></p><h2>思考题</h2><p>你喜欢 Vue 3 的哪一个新特性呢？你可以谈谈你的看法。</p><p>欢迎你在留言区跟我互动讨论，也推荐你把这一讲分享给你自己的朋友、同事。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/5b/9e/a8dec12d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>cwang</span>
+  </div>
+  <div class="_2_QraFYR_0">非常感谢大圣老师的讲解，让我对Vue3有了一些深刻理解。说起Vue2开发，我遇到最头疼的问题便是Option API，如文章所言，一个1000行的代码单页面，维护起来太困难了，经常是反复横跳。这导致的问题是，换一个人过来维护，所花费时间成本迅速增高，因此，我也非常期待Composition API的使用。<br><br>其次，项目大了以后，引用的模块也越来越多，导致编译调试需要等待很长的时间。如果再加上代码校验Eslint等，那运行前的编译就更长时间了。所以，我们一般都把Eslint给去掉了。那么此次的Vite，也是我非常期待的一个新工具。不过要真正使用起来，也要等vue3项目做起来以后了。<br><br>还有类型检查TS，以前我学习的是C#、网页知识也讲一些，C#本来就是强类型语言。当时老师还给我们说JS，说弱类型有多好，多方便。但显然项目大了以后，特别是生命周期长的项目，就变得特别不好维护。不禁感叹，用了这么多年弱类型语言，现在又回到强类型那边去了。<br><br>说完我的感受，我想制定一个Vue3源码阅读计划，就以老师的课程为起始点，把我带进门。但是前途的路不知道怎么样，为了阅读源码计划顺利，想请教下大圣老师，想要完成Vue3源码阅读，需要至少哪些底子呢？谢谢！</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 你好，非常棒的分享， 像阅读完vue3源码的话，先把ts和es6学好，跟着专栏里的节奏先手写一个mini版，再去看实际的代码，会效率很高</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 10:44:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/27/0e/0e/0478a178.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Banbri</span>
+  </div>
+  <div class="_2_QraFYR_0">使用 VS Code 开发的时候可以用 Todo Tree 插件在 data 返回的对象末尾和 methods 对象的末尾添加一个 TODO ，这样就可以迅速定位到 data 或者 methods 的末尾来添加变量 &#47; 方法，解决了上下反复横跳的痛苦。<br><br>另：也可以使用 Bookmarks 插件在相应的位置添加书签，之后使用快捷键来实现迅速定位到 data &#47; methods 的最下方。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 给你这个操作点赞，我确实没想过还可以这么玩，不过Composition还是有很多有点的，比如替代mixin</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 16:48:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/2b/06/97/fe937d40.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>人生如戏</span>
+  </div>
+  <div class="_2_QraFYR_0">看了大圣老师的课程，感觉讲课思路挺好的，让人了解的很全面并且通俗易懂。nice～ <br>使用vue3开发项目简直不要太爽。项目更好维护，也提高了代码复用。唯一的就是公司不让用🙈</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 公司不让用问题不大，学好了有的是好工作</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-24 22:12:57</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/c8/4a/3a322856.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ll</span>
+  </div>
+  <div class="_2_QraFYR_0">为大圣点个赞， 内容对我都很有启发，之前学过许多的前端和vue的知识，通过文章“闪回”，怎么说呢，就是“哦吼”的感觉，想通了。<br>这节题为新特性初探，实际也是对旧的回顾，因为不知旧何来新，这么一对比，收获很大。<br>另外composition API 和 react hooks 很相似，感觉现在框架发展的趋势是“解耦”，都在面向组合而非继承的方向走。<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 很高兴对你有帮助，这个“哦吼”感觉你发了个语音<br>组合优于继承，是设计模式书里写好的最佳实践，现在框架在实践</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 10:13:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1f/3f/11/517f379b.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Mingy</span>
+  </div>
+  <div class="_2_QraFYR_0">突然发现很多特性 react 早已实现，比如 custom render 对标 reconciler ，hostConfig， composition 对标 hooks，只是 mutable 和 inmutable 的区别</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是这样的，在整体的设计和工程体系来说，React一直都是领先的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-24 11:56:45</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/52/0e/c5ff46d2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>CondorHero</span>
+  </div>
+  <div class="_2_QraFYR_0">Vue 2 的核心模块和历史遗留问题，我能想到还有一个：<br><br>根据 [Vue2 的生命周期图示](https:&#47;&#47;cn.vuejs.org&#47;v2&#47;guide&#47;instance.html#%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E5%9B%BE%E7%A4%BA) 当我 `new Vue` 的时候，同时不给 el 或 $mount 让组件挂载，这时，beforeCreate 和 Create 依然会被执行，不合理。<br><br>但在 Vue3 中，只有 CreateApp 然后立刻调用 mount API，才会进入生命周期执行流程，更加合理。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞 善于发现问题是进步的一个方式</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 10:46:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/2a/f5/7a/7351b235.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>ch3cknull</span>
+  </div>
+  <div class="_2_QraFYR_0">组合式API 配合 VueUse 太香了</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: VueUse用户+1</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 10:07:49</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/23/9a/17/1695d3a2.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>我爱我家</span>
+  </div>
+  <div class="_2_QraFYR_0">之前只是看了文档，感觉用起来不如VUE2习惯。。。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Vue2的option确实更符合直觉， composition api带来了更适合复杂组件组织代码的方式，可以多尝试尝试</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 09:40:17</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/23/1a/18/89088ef8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>铁脑壳壳</span>
+  </div>
+  <div class="_2_QraFYR_0">学习vue3书籍和GitHub项目有没有好的推荐？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 现在还没有书籍，github的话我推荐naive-ui，element3，antd-vue等组件库学习</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 07:44:53</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/83/52/d67f276d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>轩爷</span>
+  </div>
+  <div class="_2_QraFYR_0">喜欢proxy，好处不言而喻。<br>实际开发中调试非常方便，ctrl+s，就可以瞬间看到效果，但是首次启动connect的时候也会慢一点。<br>这里有几个小问题：<br>1、我的首页有个setInterval用以显示时间，每次ctrl+s的时候都会重复new一个计时器<br>2、调试时间久一点，笔记本很烫，能明显听见风扇转，mac pro<br>3、生产打包vite依然用的rollup，分块、压缩后50s不到1分钟，期待esbuild，每次打包实在是不能忍。<br>另外，问问大圣，您更倾向于使用es6装饰器的开发方式，还是setup语法糖？😝</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 总结的非常棒，  我更倾向于setup，官方推荐比较稳，而且装饰器的话需要配合class， 这个提案在rfc里面是被Vue团队废弃了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 10:44:44</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_a84b8d</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题 <br>  最喜欢 &lt;script setup&gt; 因为不用return</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞，看来你也是代码简洁党</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 07:54:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/be/e2/57d62270.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>奇奇</span>
+  </div>
+  <div class="_2_QraFYR_0">Vite 新一代打包工具，快，缺点和 element plus ui 框架 build 后兼容性不好</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 快去给plus团队提bug</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-25 11:42:39</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/2a/fc/7b/791d0f5e.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>徐三宝</span>
+  </div>
+  <div class="_2_QraFYR_0">写Vue2的时候会在main.js里定义一些Vue.$xxx的全局属性，然后在普通JS里使用，Vue3取消了这种写法。</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 赞  全局变量在任何系统里，都是尽可能不用的</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 14:23:34</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/2b/04/b9/946db0b8.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Coding...</span>
+  </div>
+  <div class="_2_QraFYR_0">我知道的一些公司为了兼容IE还是用Vue2.6多一点</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Vue2.6是没问题的，属于稳定版本，但是2.7会带上官方的Composition实现 ，所以想用Composition推荐2.7</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 10:07:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1e/c1/a5/661c5443.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>复活</span>
+  </div>
+  <div class="_2_QraFYR_0">用vue3的公司多吗</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: Vue3还在普及中，现在用Vue的团队开新项目会用Vue3</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 00:21:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/03/1e/8bff5370.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>杨子皓</span>
+  </div>
+  <div class="_2_QraFYR_0">vite3 年初 我尝试用了下 确实不错 但是vite生态问题怎么看待呢，一些vue2项目的依赖要平迁到vue3项目，带来的巨大问题就是一些三方库的配置目前只支持webpack的配置</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 所以现在的主要场景就是新的项目使用vue3，老的项目依旧使用vue2，等vue2.7上线后，就可以直接在vue2.7中使用vue3的写法，渐进式升级</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-12-30 16:09:19</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/4c/3c/028dc8b1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Shane灬7</span>
+  </div>
+  <div class="_2_QraFYR_0">大圣，文章中响应式系统那边，Proxy 的用法示例是不是写错啦？get 和 set 函数的第一个参数应该是 target 目标对象呀</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 感谢指出，算是我示例代码没清理到位，我想表达的是这个内容， Proxy是针对对象的，参数其实是想忽略的<br>new Proxy(obj, {<br>      get() { },<br>      set() { },<br>    }</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-26 19:31:41</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jujuul</span>
+  </div>
+  <div class="_2_QraFYR_0">最近在学习 React，Vue3 新增的 Fragment 和 Teleport 与 React 的 Fragment 和 Portals 是不是差不多？另外想问一下大圣，自定义渲染器那部分提到的可以在 React 中使用响应式是什么意思啊？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 是差不多，自定义渲染器其实React天生就是这个架构，非为React和ReactDom，React里使用响应式回头我演示个代码</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-25 14:30:20</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/2a/fc/bd/12f5fe89.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>The Word</span>
+  </div>
+  <div class="_2_QraFYR_0">必须是组合式api和setup语法糖！！！！！</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 和我一样！</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-23 09:43:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1c/01/2b/69bb5d5f.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>派大星</span>
+  </div>
+  <div class="_2_QraFYR_0">很好奇 响应式剥离出来后，怎么在小程序或者 react 中使用，小程序使用的是setData 更新数据，无法感知数据的变化</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 就是因为很多框架和系统没有响应式，才可以引入响应式，React通过setState修改数据，也无法直接感知，但是也有数据管理框架Mobx提供了响应式的数据管理解决方案<br>小程序现在还没有成型的响应式解决方案可以参考，我就是举个例子</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-10-22 16:51:30</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

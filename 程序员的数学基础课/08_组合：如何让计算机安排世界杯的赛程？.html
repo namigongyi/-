@@ -1,0 +1,491 @@
+<audio title="08_组合：如何让计算机安排世界杯的赛程？" src="https://static001.geekbang.org/resource/audio/c6/f0/c6246cebe1d9040824beef742ba806f0.mp3" controls="controls"></audio> 
+<p>你好，我是黄申。</p><p>2018年足球世界杯结束有半年了，当时激烈的赛况你现在还记忆犹新吧？你知道这场足球盛宴的比赛日程是怎么安排的吗？如果现在你是组委会，你会怎么安排比赛日程呢？我们可以用上一节的排列思想，让全部的32支入围球队都和其他球队进行一次主客场的比赛。</p><p>自己不可能和自己比赛，因此在这种不可重复的排列中，主场球队有32种选择，而客场球队有31种选择。那么一共要进行多少场比赛呢？很简单，就是32x31=992场！这也太夸张了吧？一天看2场，也要1年多才能看完！即使球迷开心了，可是每队球员要踢主客场共62场，早已累趴下了。</p><p>好吧，既然这样，我们是否可以取消主客场制，让任意两个球队之间只要踢1场就好啦？取消主客场，这就意味着原来两队之间的比赛由2场降为1场，那么所有比赛场次就是992/2=496场。还是很多，对吧？</p><p>是的，这就是为什么要将所有32支队伍分成8个小组先进行小组赛的原因。一旦分成小组，每个小组的赛事就是(4x3)/2=6场。所有小组赛就是6x8=48场。</p><p>再加上在16强阶段开始采取淘汰制，两两淘汰，所以需要8+4+2+2=16场淘汰赛（最后一次加2是因为还有3、4名的决赛），那么整个世界杯决赛阶段就是48+16=64场比赛。</p><!-- [[[read_end]]] --><p>当然，说了这么多，你可能会好奇，这两两配对比赛的场次，我是如何计算出来的？让我引出今天的概念，<strong>组合</strong>（Combination）。</p><p>组合可以说是排列的兄弟，两者类似但又有所不同，这两者的区别，不知道你还记得不，上学的时候，老师肯定说过不止一次，那就是，组合是不考虑每个元素出现的顺序的。</p><p>从定义上来说，组合是指，从n个不同元素中取出m（1≤m≤n）个不同的元素。例如，我们前面说到的世界杯足球赛的例子，从32支球队里找出任意2支球队进行比赛，就是从32个元素中取出2个元素的组合。如果上一讲中，田忌赛马的规则改一下，改为从10匹马里挑出3匹比赛，但是并不关心这3匹马的出战顺序，那么也是一个组合的问题。</p><p>对于所有m取值的组合之全集合，我们可以叫作<strong>全组合</strong>（All Combination）。例如对于集合{1, 2, 3}而言，全组合就是{空集, {1}, {2}, {3}, {1, 2}, {1,3} {2, 3}, {1, 2, 3}}。</p><p>如果我们安排足球比赛时，不考虑主客场，也就是不考虑这两支球队的顺序，两队只要踢一次就行了。那么从n个元素取出m个的组合，有多少种可能呢？</p><p>我们假设某种运动需要3支球队一起比赛，那么32支球队就有32x31x30种排列，如果三支球队在一起只要比一场，那么我们要抹除多余的比赛。三支球队按照任意顺序的比赛有3x2x1=6场，所以从32支队伍里取出3支队伍的组合是(32x31x30)/(3x2x1)。基于此，我们可以扩展成以下两种情况。</p><ul>
+<li>
+<p>n个元素里取出m个的组合，可能性数量就是n个里取m个的排列数量，除以m个全排列的数量，也就是(n! / (n-m)!) / m!。</p>
+</li>
+<li>
+<p>对于全组合而言，可能性为2^n种。例如，当n=3的时候，全组合包括了8种情况。</p>
+</li>
+</ul><p>这两点都可以用数学归纳法证明，有兴趣的话你可以自己尝试一下。</p><h2>如何让计算机来组合队伍？</h2><p>上一节，我用递归实现了全排列。全组合就是将所有元素列出来，没有太大意义，所以我这里就带你看下，如何使用递归从3个元素中选取2个元素的组合。</p><p>我们假设有3个队伍，t1，t2和t3。我还是把递归的选择画成图，这样比较直观，你也好理解。从图中我们可以看出，对于组合而言，由于{t1, t2}已经出现了，因此就无需{t2, t1}。同理，出现{t1, t3}，就无需{t3, t1}等等。对于重复的，我用叉划掉了。这样，最终只有3种组合了。</p><p><img src="https://static001.geekbang.org/resource/image/82/4b/827020c47c2c4b825dc5d51697f5cd4b.jpg?wh=1142*650" alt=""></p><p>那么，如何使用代码来实现呢？一种最简单粗暴的做法是：</p><ol>
+<li>
+<p>先实现排列的代码，输出所有的排列。例如{t1, t2}, {t2, t1}；</p>
+</li>
+<li>
+<p>针对每种排列，对其中的元素按照一定的规则排序。那么上述两种排列经过排序后，就是{t1, t2}, {t1, t2}；</p>
+</li>
+<li>
+<p>对排序后的排列，去掉重复的那些。上述两种排列最终只保留一个{t1, t2}。</p>
+</li>
+</ol><p>这样做效率就会比较低，很多排列生成之后，最终还是要被当做重复的结果去掉。</p><p>显然，还有更好的做法。从图中我们可以看出被划掉的那些，都是那些出现顺序和原有顺序颠倒的元素。</p><p>例如，在原有集合中，t1在t2的前面，所以我们划掉了{t2, t1}的组合。这是因为，我们知道t1出现在t2之前，t1的组合中一定已经包含了t2，所以t2的组合就无需再考虑t1了。因此，我只需要在原有的排列代码中，稍作修改，每次传入嵌套函数的剩余元素，不再是所有的未选择元素，而是出现在当前被选元素之后的那些。具体代码是这样的：</p><pre><code>import java.util.ArrayList;
+import java.util.Arrays; 
+
+public class Lesson8_1 {
+	
+	/**
+    * @Description:	使用函数的递归（嵌套）调用，找出所有可能的队伍组合
+    * @param teams-目前还剩多少队伍没有参与组合，result-保存当前已经组合的队伍
+    * @return void
+    */
+	
+    public static void combine(ArrayList&lt;String&gt; teams, ArrayList&lt;String&gt; result, int m) {
+    	
+    	// 挑选完了m个元素，输出结果
+    	if (result.size() == m) {
+    		System.out.println(result);
+    		return;
+    	}
+    	
+    	for (int i = 0; i &lt; teams.size(); i++) {
+    		// 从剩下的队伍中，选择一队，加入结果
+    		ArrayList&lt;String&gt; newResult = (ArrayList&lt;String&gt;)(result.clone());
+    		newResult.add(teams.get(i));
+    		
+    		// 只考虑当前选择之后的所有队伍
+    		ArrayList&lt;String&gt; rest_teams = new ArrayList&lt;String&gt;(teams.subList(i + 1, teams.size()));
+    		
+    		// 递归调用，对于剩余的队伍继续生成组合
+    		combine(rest_teams, newResult, m);
+    	}
+    	
+    }
+    
+}
+
+</code></pre><p>这是一段测试代码，可以帮助我们找到从3个元素中选择2个元素的所有组合。</p><pre><code>public static void main(String[] args) {
+  
+  ArrayList&lt;String&gt; teams = new ArrayList&lt;String&gt;(Arrays.asList(&quot;t1&quot;, &quot;t2&quot;, &quot;t3&quot;));
+  Lesson8_1.combine(teams, new ArrayList&lt;String&gt;(), 2);
+  
+ }
+
+</code></pre><h2>组合的应用：如何高效地处理词组？</h2><p>组合在计算机领域中也有很多的应用场景。比如大型比赛中赛程的自动安排、多维度的数据分析以及自然语言处理的优化等等。</p><p>在我之前的研究工作中，经常要处理一些自然语言，用组合的思想提升系统性能。今天我结合自己亲身的经历，先来说说组合在自然语言处理中的应用。</p><p>当时，我们需要将每篇很长的文章，分隔成一个个的单词，然后对每个单词进行索引，便于日后的查询。但是很多时候，光有单个的单词是不够的，还要考虑多个单词所组成的词组。例如，“red bluetooth mouse”这样的词组。</p><p>处理词组最常见的一种方式是<strong>多元文法</strong>。什么是多元文法呢？这词看起来很复杂，其实就是把邻近的几个单词合并起来，组合一个新的词组。比如我可以把“red”和“bluetooth”合并为“red bluetooth”，还可以把“bluetooth”和“mouse”合并为“bluetooth mouse”。</p><p>设计多元文法只是为了方便计算机的处理，而不考虑组合后的词组是不是有正确的语法和语义。例如“red bluetooth”，从人类的角度来看，这个词就很奇怪。但是毕竟它还会生成很多合理的词组，例如“bluetooth mouse”。所以，如果不进行任何深入的语法分析，我们其实没办法区分哪些多元词组是有意义的，哪些是没有意义的，因此最简单的做法就是保留所有词组。</p><p>普通的多元文法本身存在一个问题，那就是定死了每个元组内单词出现的顺序。例如，原文中可能出现的是“red bluetooth mouse”，可是用户在查询的时候可能输入的是“bluetooth mouse red”。这么输入肯定不符合语法，但实际上互联网上的用户经常会这么干。</p><p>那么，在这种情况下，如果我们只保留原文的“red bluetooth mouse”，就无法将其和用户输入的“bluetooth red mouse”匹配了。所以，如果我们并不要求查询词组中单词所出现的顺序和原文一致，那该怎么办呢？</p><p>我当时就在想，可以把每个二元或三元组进行全排列，得到所有的可能。但是这样的话，二元组的数量就会增加1倍，三元组的数量就会增加5倍，一篇文章的数据保存量就会增加3倍左右。我也试过对用户查询做全排列，把原有的二元组查询变为2个不同的二元组查询，把原有的三元组查询变为6个不同的三元组查询，但是事实是，这样会增加实时查询的耗时。</p><p>于是，我就想到了组合。多个单词出现时，我并不关心它们的顺序（也就是不关心排列），而只关心它们的组合。因为无需关心顺序，就意味着我可以对多元组内的单词进行某种形式的标准化。即使原来的单词出现顺序有所不同，经过这个标准化过程之后，都会变成唯一的顺序。</p><p>例如，“red bluetooth mouse”，这三个词排序后就是“bluetooth,mouse,red”，而“bluetooth red mouse”排序后也是“bluetooth,mouse,red”，自然两者就能匹配上了。我需要做的事情就是在保存文章多元组和处理用户查询这两个阶段分别进行这种排序。这样既可以减少保存的数据量，同时可以减少查询的耗时。这个问题很容易就解决了。怎么样，组合是不是非常神奇？</p><p>此外，组合思想还广泛应用在多维度的数据分析中。比如，我们要设计一个连锁店的销售业绩报表。这张报表有若干个属性，包括分店名称、所在城市、销售品类等等。那么最基本的总结数据包括每个分店的销售额、每个城市的销售额、每个品类的销售额。除了这些最基本的数据，我们还可以利用组合的思想，生成更多的筛选条件。</p><h2>小结</h2><p>组合和排列有相似之处，都是从n个元素中取出若干个元素。不过，排列考虑了取出的元素它们之间的顺序，而组合无需考虑这种顺序。这是排列和组合最大的区别。因此，组合适合找到多个元素之间的联系而并不在意它们之间的先后顺序，例如多元文法中的多元组，这有利于避免不必要的数据保存或操作。</p><p>具体到编程，组合和排列两者的实现非常类似。区别在于，组合并不考虑挑选出来的元素之间，是如何排序的。所以，在递归的时候，传入下一个嵌套调用函数的剩余元素，只需要包含当前被选元素之后的那些，以避免重复的组合。</p><p><img src="https://static001.geekbang.org/resource/image/b2/ee/b2cbd776947f32b6a3e5e30f388e0eee.jpg?wh=1242*1397" alt=""></p><h2>思考题</h2><p>假设现在需要设计一个抽奖系统。需要依次从100个人中，抽取三等奖10名，二等奖3名和一等奖1名。请列出所有可能的组合，需要注意的每人最多只能被抽中1次。</p><p><span class="orange">欢迎在留言区交作业，并写下你今天的学习笔记。你可以点击“请朋友读”，把今天的内容分享给你的好友，和他一起精进。</span></p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1d/42/df/a034455d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>罗耀龙@坐忘</span>
+  </div>
+  <div class="_2_QraFYR_0">茶艺师学编程<br><br>可以这么记：<br>排列—大家走到一块，还要比个高低<br>组合—大家聚到一起，就是有缘<br><br>生活中的一个例子，比如婚姻，就应该是组合，“我和你一起，怎么都好”，而不是“排列”，“你，都得听我的！”<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 关于婚姻的点，要点赞👍</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-03-31 12:27:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/18/34/c082419c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>风轨</span>
+  </div>
+  <div class="_2_QraFYR_0">从100人中选10人得3等奖，C(100, 10) = 17310309456440<br>再从剩下90人中选3人的3等奖，C(90, 3) = 117480<br>再从剩下87人中选1人得1等奖， C(87, 1) = 87<br>总共有大约有1.8×10^20种可能性，<br>假设我们的计算机每1ns就能输出1个结果，全部输出来大约要5610年！<br>假设每个结果占13个字节，把结果保存下来大约要占1995EB，远远大于世界上存储总容量！<br><br>当数据量比较小时，还是可以算的：<br>public class Combination {<br><br>    &#47;**<br>     * 求组合数<br>     * <br>     * @param n<br>     * @param r<br>     * @return<br>     *&#47;<br>    static int c(int n, int r) {<br>        if (r &gt; n) {<br>            return 0;<br>        }<br>        int R =  n - r;<br>        int ret = 1;<br>        while (n &gt; R) {<br>            ret *= n--;<br>        }<br>        while (r &gt; 1) {<br>            ret &#47;= r--;<br>        }<br>        return ret;<br>    }<br><br>    &#47;**<br>     * 求组合情况<br>     * @param es<br>     * @param r<br>     * @param I 数组es开始取数位置<br>     * @return<br>     *&#47;<br>    static int[][] C(int[] es, int r, int I) {<br>        int[][] rst = new int[c(es.length - I, r)][];<br>        if (r == 1) {<br>            for (int rsti = 0; rsti &lt; rst.length; rsti++, I++) {<br>                rst[rsti] = new int[] { es[I] };<br>            }<br>        } else {<br>            for (int rsti = 0; I &lt; es.length; I++) {<br>                int[][] srst = C(es, r - 1, I + 1);<br>                for (int[] sc : srst) {<br>                    int[] t = rst[rsti] = new int[sc.length + 1];<br>                    t[0] = es[I];<br>                    System.arraycopy(sc, 0, t, 1, sc.length);<br>                    rsti++;<br>                }<br>            }<br>        }<br>        return rst;<br>    }<br><br>    public static void main(String[] args) {<br>        int[][] c = C(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 3, 0);<br>        for (int[] cc : c) {<br>            System.out.println(Arrays.toString(cc));<br>        }<br>        &#47;**<br>         * 输出结果<br>         * [1, 2, 3]<br>         * [1, 2, 4]<br>         * [1, 2, 5]<br>         * [1, 2, 6]<br>         * ··· 省略111行 ···<br>         * [6, 9, 10]<br>         * [7, 8, 9]<br>         * [7, 8, 10]<br>         * [7, 9, 10]<br>         * [8, 9, 10]<br>         * <br>         *&#47;<br>    }<br>}<br></div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 确实数字取得太大了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-31 16:12:42</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/77/da/54c663f3.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Wing·三金</span>
+  </div>
+  <div class="_2_QraFYR_0">思路一：<br>先运行combine(100, 1)，将所有结果保存。然后用一层迭代对每个结果运行combine(99, 3)，将所有结果append进去。<br>然后再来一层迭代对上一结果运行combine(96, 10)，同样依次append进去。<br>此处的关键点在于每个迭代下得将上一结果中的数拿掉，以及得保存临时结果。<br><br>此思路也等价于直接上三个嵌套循环+运行递归程序。<br><br>思路二：<br>先运行combine(100, 14)，对每个结果运行combine(14, 10)，再对每个更新的结果运行combine(4, 3)。其实就是思路一逆过来。<br><br>理论上二者的复杂度是一样的，用scipy验证了下确实如此。<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2018-12-31 17:32:46</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/BAuQlia9Dc07m3icOkibIqu2lhbnLD6cjgCNE8FSzG5Aj4cd26eRgspicTsWvA7WK1ftlQBD34PYRucZRXML5FA27A/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>cwtxz</span>
+  </div>
+  <div class="_2_QraFYR_0">老师的这节课更让我加深了编程思维本质是数学思维的观点。各种各样的if和else语句，实质是从所有可能的集合之中选择符合条件的小集合。各种各样的循环语句实质是从集合里面筛选符合某种条件的集合。这些例子不胜枚举。所以说，数学思维的灵活程度决定了你代码的优雅程度与质量高低，进而影响你的职业极限。数学思维越好，代码的生命才会更健壮，你的职业瓶颈才能越容易被打破，你的生涯才能走得越高远，所以，学数学，会让你的代码功底更强。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-26 22:47:02</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/d2/df/48378afe.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>行者</span>
+  </div>
+  <div class="_2_QraFYR_0">案例python实现：<br><br>comb = [&#39;t1&#39;, &#39;t2&#39;, &#39;t3&#39;, &#39;t4&#39;, &#39;t5&#39;]<br>import copy<br><br>def combination(n, comb, result):<br><br>    if n == 0:<br>        print(result)<br>        return<br>    for i in comb:<br>        newResult = copy.copy(result)<br>        newComb = copy.copy(comb)<br>        newResult.append(i)<br>        newComb = list(set(newComb).difference(set(comb[:comb.index(i) + 1])))<br>        combination(n - 1, newComb, newResult)<br><br>combination(4, comb, [])</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-02 09:07:51</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/14/69/66/e8c207e6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>夏微凉</span>
+  </div>
+  <div class="_2_QraFYR_0">黄老师，我这几天一直在纠结思考题，总共10人，一等名1名，二等奖2名，三等3名，还是没有完全理解思路，希望老师方便的时候解答下</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 这道题是用到了组合及排列，先看100个人里取1人的数量是C100,1 (格式问题，C100,1表示从100人里取1人的组合数量)，剩下99人里取2人为C99,2，再剩下97人里取3人为C97,3，然后再利用排列，总共可能为C100,1 x C99,2 x C97,3</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-14 22:45:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Paul Shan</span>
+  </div>
+  <div class="_2_QraFYR_0">总结<br>排列的递归公式是P(n,m) = nP(n-1,m-1)<br>可以按照这条公式组织递归，也就是一次n的循环（放入第i号元素）调用P(n-1,m-1)<br><br>组合的递归公式是C(n,m) =  C(n-1,m-1) +C(n-1,m)<br>可以按照这条公式（放入或者不放入第0号元素）递归调用</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-21 06:12:37</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/18/d0/49b06424.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>qinggeouye</span>
+  </div>
+  <div class="_2_QraFYR_0">python (比较粗暴的解法...)<br>import copy<br><br>def lucky_draw_combination(n, m, result=None, all_results=None):<br>    &quot;&quot;&quot;<br>    使用函数的递归（嵌套）调用，找出所有可能的中奖者的组合<br>    :param all_results: 中奖者的所有组合<br>    :param n: 参与抽奖的人<br>    :param result: 抽奖结果<br>    :param m: 中奖的人数<br>    :return: None<br>    &quot;&quot;&quot;<br>    if result is None:<br>        result = []<br>    if all_results is None:<br>        all_results = []<br>    if len(result) == m:<br>        # print(result)<br>        return all_results.append(result)<br>    for i in range(len(n)):<br>        # 从剩下的人中，抽出一个人加入结果<br>        new_result = copy.copy(result)<br>        new_result.append(n[i])<br>        # 每人最多只能被抽中一次，当前被抽中的人之后的人，进入下一次抽奖<br>        rest_n = n[i + 1: len(n)]<br>        # 递归调用 在剩下的人中继续抽奖<br>        lucky_draw_combination(rest_n, m, new_result, all_results)<br>    return all_results<br><br><br>if __name__ == &quot;__main__&quot;:<br>    total = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # 被抽奖人列表<br>    m_ = [3, 2, 1]  # 三等奖、二等奖、一等奖的个数<br>    lucky1 = lucky_draw_combination(total, m_[0])<br>    for k1 in lucky1:<br>        total2 = copy.copy(total)<br>        for j1 in k1:<br>            total2.remove(j1)<br>        lucky2 = lucky_draw_combination(total2, m_[1])<br>        for k2 in lucky2:<br>            total3 = copy.copy(total2)<br>            for j2 in k2:<br>                total3.remove(j2)<br>            lucky3 = lucky_draw_combination(total3, m_[2])<br>            for k3 in lucky3:<br>                print(k1, k2, k3)<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-02-10 03:47:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/e4/f0/82281239.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Ricky</span>
+  </div>
+  <div class="_2_QraFYR_0">#include &lt;iostream&gt;<br>#include &lt;vector&gt;<br><br>using namespace std;<br>void winPrize(int f, int s, int t,<br>        vector&lt;int&gt; &amp;first, vector&lt;int&gt; &amp;second, vector&lt;int&gt; &amp;third, vector&lt;int&gt; &amp;base) {<br><br>    if (first.size() == f &amp;&amp; second.size() == s &amp;&amp; third.size() == t) {<br>        cout &lt;&lt; &quot;\nAwards Notification&quot; &lt;&lt; endl;<br>        cout &lt;&lt; &quot;Prize 1: &quot; &lt;&lt; first.back() &lt;&lt; endl;<br>        cout &lt;&lt; &quot;Prize 2: &quot;;<br>        for (int x: second) {<br>            cout &lt;&lt; x &lt;&lt; &quot; &quot;;<br>        }<br>        cout &lt;&lt; endl;<br>        cout &lt;&lt; &quot;Prize 3: &quot;;<br>        for (int y: third) {<br>            cout &lt;&lt; y &lt;&lt; &quot; &quot;;<br>        }<br>        cout &lt;&lt; endl;<br>        return;<br>    }<br>    for (int x: base) {<br>        &#47;&#47; 每次仅添加一个成员进奖项圈, 优先级按照一等奖 &gt; 二等奖 &gt; 三等奖<br>        auto f1 = first, s1 = second, t1 = third, left = base;<br>        if (first.size() &lt; f) {<br>            f1.push_back(x);<br>        } else if (second.size() &lt; s) {<br>            s1.push_back(x);<br>        } else if (third.size() &lt; t) {<br>            t1.push_back(x);<br>        }<br>        &#47;&#47; 删除成员<br>        auto iter = left.begin();<br>        while (iter != left.end()) {<br>            if (*iter == x) {<br>                iter = left.erase(iter);<br>            } else iter++;<br>        }<br>        winPrize(f, s, t, f1, s1, t1, left);<br>    }<br>}<br><br>void winPrize(int tl, int f, int s, int t) {<br>    vector&lt;int&gt; first, second, third, base;<br>    for (int i = 0; i &lt; tl; ++i) {<br>        base.push_back(i);<br>    }<br><br>    winPrize(f, s, t, first, second, third, base);<br>}<br>int main() {<br>    cout &lt;&lt; &quot;Prize Result&quot; &lt;&lt; endl;<br>    winPrize(10, 1, 2, 3);<br>    return 0;<br>}<br>******************结果********************<br>Awards Notification<br>Prize 1: 2<br>Prize 2: 0 6<br>Prize 3: 8 3 1<br><br>Awards Notification<br>Prize 1: 2<br>Prize 2: 0 6<br>Prize 3: 8 3 4<br><br>Awards Notification<br>Prize 1: 2<br>Prize 2: 0 6<br>Prize 3: 8 3 5<br><br>Awards Notification<br>Prize 1: 2<br>Prize 2: 0 6<br>Prize 3: 8 3 7</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-10 13:24:48</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/4a/55/41c73dbe.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>天涯不是咫尺</span>
+  </div>
+  <div class="_2_QraFYR_0">老师，为什么主场球队有32种选择，客场球队只有31种选择？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 因为自己不会和自己踢，所以选定主场球队之后，客场就只有31种选择。同样，如果先选择客场，那么也有32种选择，但是主场就只有31种了</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 14:49:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Mr.L</span>
+  </div>
+  <div class="_2_QraFYR_0">class lucky:<br>    def get_lucky_num(self, rest, result):<br>        if len(result) == 14:<br>            print(result)<br>            return<br>        for i,k in enumerate(rest):<br>            result2 = result.copy()<br>            result2.append(k)<br>            rest2 = rest[i+1:]<br>            self.get_lucky_num(rest2, result2)<br>#test:<br>rest = range(1,101)<br>result = list()<br>lucky().get_lucky_num(rest,result)</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-07 18:19:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/20/86/38/379a9da5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Duke</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;&#47; 课后作业 .Net 实现<br>void Main()<br>{<br>	prize.Sum(i =&gt; total += i);<br>	Combine(Enumerable.Range(1, 8).ToList&lt;int&gt;(), null);<br>	Console.WriteLine($&quot;\n total:{count}&quot;);<br>}<br><br>static int count = 0;  <br>static List&lt;int&gt; prize = <br>	new List&lt;int&gt; { 1, 2, 1 };  &#47;&#47; （8）*（7）*(6*5&#47;2) = 8 * 7 * 15 = 840 <br>	&#47;&#47;new List&lt;int&gt; { 3, 1 };  &#47;&#47; 8*7*6&#47;3*2）* (5) = 280<br><br>static int total = 0; &#47;&#47; 总奖项数<br><br>&#47;&#47; 组合取出所有获奖人数<br>static void Combine(List&lt;int&gt; sourceList, List&lt;int&gt; destList)<br>{<br>	if (destList == null) destList = new List&lt;int&gt;();<br>	&#47;&#47; 获取一个完整的获奖组合后，将他们排序<br>	if (destList.Count == total)<br>	{<br>		Permutation(destList, null);<br><br>		return;<br>	}<br><br>	sourceList.ForEach(<br>	item =&gt;<br>	{<br>		var newDestList = destList.Take(destList.Count).ToList();<br>		newDestList.Add(item);<br>		var newSourceList = sourceList.Skip(sourceList.FindIndex(s =&gt; s.Equals(item)) + 1).ToList();<br><br>		Combine(newSourceList, newDestList);<br>	});<br>}<br><br>&#47;&#47; 将获取人数按照奖项排序<br>static void Permutation(List&lt;int&gt; sourceList, List&lt;int&gt; destList)<br>{<br>	if (destList == null) destList = new List&lt;int&gt;();<br><br>	&#47;&#47; 获取一个完整按照奖项排序后的组合，将结果打印<br>	if (destList.Count == total)<br>	{<br>		count++;<br>		var str = &quot;&quot;;<br>		destList.ForEach(l =&gt; str += l + &quot;,&quot;);<br>		str = str.TrimEnd(&#39;,&#39;);<br>		Console.WriteLine(str);<br><br>		return;<br>	}<br><br>	if (destList == null) destList = new List&lt;int&gt;();<br><br>	sourceList.ForEach(item =&gt;<br>	{<br>		var newDestList = destList.Take(destList.Count).ToList();<br>		newDestList.Add(item);<br><br>		var newSourceList = new List&lt;int&gt;();<br>		&#47;&#47; 同一奖项多人不区分顺序：如果当前和前一位都处于同一奖项的位置（通过奖项集合下标判断），忽略该记录<br>		var currentIndex = newDestList.Count - 1;<br>		if (newDestList.Count &gt; 1<br>			&amp;&amp; prize[GetPrizeIndex(newDestList.Count - 1)] &gt; 1<br>			&amp;&amp; prize[GetPrizeIndex(newDestList.Count)] &gt; 1<br>			&amp;&amp; newDestList[currentIndex] &lt; newDestList[currentIndex - 1])<br>			return;<br><br>		newSourceList = sourceList.Where(s =&gt; !s.Equals(item)).ToList();<br><br>		Permutation(newSourceList, newDestList);<br>	});<br>}<br><br>static int GetPrizeIndex(int num)<br>{<br>	var index = 0;<br>	for (int i = 0; i &lt; prize.Count; i++)<br>	{<br>		num -= prize[i];<br>		if (num &lt;= 0)<br>		{<br>			index = i;<br>			break;<br>		}<br>	}<br>	return index;<br>}</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-09-09 18:04:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_c23a4c</span>
+  </div>
+  <div class="_2_QraFYR_0">连锁店的销售业绩报表的例子不是太理解。意思是分店名称、所在城市、销售品类三个维度做组合来对不同的维度的组合进行统计吗？这个和上面多元文法的应用比起来没啥意思，感觉脱节了</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 对，这里举出组合可能的不同应用场景，多元文法和销售维度没有联系</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-01-02 22:44:26</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/17/37/2b/b32f1d66.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Ball</span>
+  </div>
+  <div class="_2_QraFYR_0">用组合思想来处理多元词组的问题确实妙</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 数学思维很重要，多多学习和运用，你会发现更多妙用</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-05 21:05:58</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/5c/02/e7af1750.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>teddytyy</span>
+  </div>
+  <div class="_2_QraFYR_0">100！&#47;（90！*10！） *  90！&#47;（87！*3！） * 87</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-12-05 12:17:54</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Paul Shan</span>
+  </div>
+  <div class="_2_QraFYR_0">思考题<br>C(100,14) C(14,10)C(4,3)种可能性</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-08-20 15:42:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/62/1e/ad721e61.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>flow</span>
+  </div>
+  <div class="_2_QraFYR_0">&#47;&#47; JavaScript实现<br>var arr = [1, 2, 3, 4, 5, 6];<br><br>function genGroup(arr, result, count) {<br>  if (result.length === count) {<br>    console.log(result);<br>    return;<br>  }<br><br>  for (let i = 0; i &lt; arr.length; i++) {<br>    let new_arr = [...arr];<br>    let new_result = [...result];<br>    new_result.push(arr[i]);<br>    new_arr.splice(0, i + 1);<br>    genGroup(new_arr, new_result, count);<br>  }<br>}<br><br>genGroup(arr, [], 3);<br>&#47;&#47; 思考题也是同理, 100人取14个, 第1个为一等奖, 2-4为二等奖, 5-14为三等奖</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-04-16 17:28:56</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/92/fd/6b0e58fe.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>文刂 氵共 超</span>
+  </div>
+  <div class="_2_QraFYR_0">使用C++实现组合问题-从n个数中取出m个不同的元素，不考虑顺序<br><br>#include &lt;iostream&gt;<br>#include &lt;vector&gt;<br><br>using namespace std;<br><br>template &lt;class T&gt;<br>void PrintVector(vector&lt;T&gt; &amp; DataVec)<br>{<br>	for (size_t i = 0; i &lt; DataVec.size(); ++i)<br>	{<br>		cout &lt;&lt; DataVec[i] &lt;&lt; &quot;  &quot;;<br>	}<br>	cout &lt;&lt; endl;<br>}<br><br>template &lt;class T&gt;<br>void Combination(vector&lt;T&gt; &amp;DataVec, int m, vector&lt;T&gt; &amp;resultVec)<br>{<br>	if (m &lt;= 0 &amp;&amp; m &gt; DataVec.size())<br>	{<br>		return;<br>	}<br><br>	if (resultVec.size() == m)<br>	{<br>		PrintVector(resultVec);<br>		return;<br>	}<br><br>	for (size_t i = 0; i &lt; DataVec.size(); ++i)<br>	{<br>		vector&lt;T&gt; tempResultVec = resultVec;<br>		tempResultVec.push_back(DataVec[i]);<br><br>		vector&lt;T&gt; tempDataVec(DataVec.begin()+i+1, DataVec.end());<br><br>		Combination(tempDataVec, m, tempResultVec);<br>	}<br>}<br><br>int _tmain(int argc, _TCHAR* argv[])<br>{<br>	vector&lt;int&gt; resultV;<br>	int dataList[] = {2,6,8,23,78,45,32,64};<br>	vector&lt;int&gt; dataV(dataList, dataList+8);<br><br>	Combination(dataV, 5, resultV);<br><br>	PrintVector(resultV);<br><br>	return 0;<br>}</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 使用栈来实现递归过程的想法很棒</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-04 15:57:16</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/5c/b2/dca010e5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Youngggg</span>
+  </div>
+  <div class="_2_QraFYR_0">由于数量过大 设置10个人中 1等奖1名 2等奖2名 3等奖3名<br>import copy<br>word = []<br>for i in range(1,11):<br>    word.append(i)<br>def sort(one_num, two_num, three_num, one_result=[], two_result=[], three_result=[]):<br>    if len(one_result) == one_num and len(two_result) == two_num and len(three_result) == three_num:<br>        print(&quot;一等奖&quot;, one_result)<br>        print(&quot;二等奖&quot;, two_result)<br>        print(&quot;三等奖&quot;, three_result)<br>        return<br>    else:<br>        i = 0<br>        while i &lt; len(word):<br>            if word[i] not in one_result and len(one_result) &lt; one_num:<br>                if len(one_result)&gt;0:<br>                    if one_result[-1] &gt; word[i]:<br>                        i = i+1<br>                        continue<br>                new_one_result = copy.copy(one_result)<br>                new_one_result.append(word[i])<br>                i = i+1<br>                sort(one_num, two_num, three_num, new_one_result, [], [])<br>            elif word[i] not in one_result and word[i] not in two_result and len(two_result) &lt; two_num:<br>                if len(two_result)&gt;0:<br>                    if two_result[-1] &gt; word[i]:<br>                        i = i + 1<br>                        continue<br>                new_two_result = copy.copy(two_result)<br>                new_two_result.append(word[i])<br>                i = i+1<br>                sort(one_num, two_num, three_num, one_result, new_two_result, [])<br>            elif word[i] not in one_result and word[i] not in two_result and word[i] not in three_result and len(three_result) &lt; three_num:<br>                if len(three_result)&gt;0:<br>                    if three_result[-1] &gt; word[i]:<br>                        i = i+1<br>                        continue<br>                new_three_result = copy.copy(three_result)<br>                new_three_result.append(word[i])<br>                i = i+1<br>                sort(one_num, two_num, three_num, one_result, two_result, new_three_result)<br>            else:<br>                i = i+1<br>                continue<br>sort(1, 2, 3, [], [], [])<br>运行结果：<br>一等奖 [1]<br>二等奖 [2, 3]<br>三等奖 [4, 5, 6]<br>.....<br></div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2019-01-02 17:34:40</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src=""
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>013923</span>
+  </div>
+  <div class="_2_QraFYR_0">学习了！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2022-07-28 14:39:55</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>

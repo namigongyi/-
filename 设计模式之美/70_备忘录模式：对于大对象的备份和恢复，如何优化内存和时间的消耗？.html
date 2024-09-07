@@ -1,0 +1,561 @@
+<audio title="70_备忘录模式：对于大对象的备份和恢复，如何优化内存和时间的消耗？" src="https://static001.geekbang.org/resource/audio/c5/11/c516c58085171935bcf176471c63b711.mp3" controls="controls"></audio> 
+<p>上两节课，我们学习了访问者模式。在23种设计模式中，访问者模式的原理和实现可以说是最难理解的了，特别是它的代码实现。其中，用Single Dispatch来模拟Double Dispatch的实现思路尤其不好理解。不知道你有没有将它拿下呢？如果还没有弄得很清楚，那就要多看几遍、多自己动脑经琢磨一下。</p><p>今天，我们学习另外一种行为型模式，备忘录模式。这个模式理解、掌握起来不难，代码实现比较灵活，应用场景也比较明确和有限，主要是用来防丢失、撤销、恢复等。所以，相对于上两节课，今天的内容学起来相对会比较轻松些。</p><p>话不多说，让我们正式开始今天的学习吧！</p><h2>备忘录模式的原理与实现</h2><p>备忘录模式，也叫快照（Snapshot）模式，英文翻译是Memento Design Pattern。在GoF的《设计模式》一书中，备忘录模式是这么定义的：</p><blockquote>
+<p>Captures and externalizes an object’s internal state so that it can be restored later, all without violating encapsulation.</p>
+</blockquote><p>翻译成中文就是：在不违背封装原则的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态，以便之后恢复对象为先前的状态。</p><!-- [[[read_end]]] --><p>在我看来，这个模式的定义主要表达了两部分内容。一部分是，存储副本以便后期恢复。这一部分很好理解。另一部分是，要在不违背封装原则的前提下，进行对象的备份和恢复。这部分不太好理解。接下来，我就结合一个例子来解释一下，特别带你搞清楚这两个问题：</p><ul>
+<li>为什么存储和恢复副本会违背封装原则？</li>
+<li>备忘录模式是如何做到不违背封装原则的？</li>
+</ul><p>假设有这样一道面试题，希望你编写一个小程序，可以接收命令行的输入。用户输入文本时，程序将其追加存储在内存文本中；用户输入“:list”，程序在命令行中输出内存文本的内容；用户输入“:undo”，程序会撤销上一次输入的文本，也就是从内存文本中将上次输入的文本删除掉。</p><p>我举了个小例子来解释一下这个需求，如下所示：</p><pre><code>&gt;hello
+&gt;:list
+hello
+&gt;world
+&gt;:list
+helloworld
+&gt;:undo
+&gt;:list
+hello
+</code></pre><p>怎么来编程实现呢？你可以打开IDE自己先试着编写一下，然后再看我下面的讲解。整体上来讲，这个小程序实现起来并不复杂。我写了一种实现思路，如下所示：</p><pre><code>public class InputText {
+  private StringBuilder text = new StringBuilder();
+
+  public String getText() {
+    return text.toString();
+  }
+
+  public void append(String input) {
+    text.append(input);
+  }
+
+  public void setText(String text) {
+    this.text.replace(0, this.text.length(), text);
+  }
+}
+
+public class SnapshotHolder {
+  private Stack&lt;InputText&gt; snapshots = new Stack&lt;&gt;();
+
+  public InputText popSnapshot() {
+    return snapshots.pop();
+  }
+
+  public void pushSnapshot(InputText inputText) {
+    InputText deepClonedInputText = new InputText();
+    deepClonedInputText.setText(inputText.getText());
+    snapshots.push(deepClonedInputText);
+  }
+}
+
+public class ApplicationMain {
+  public static void main(String[] args) {
+    InputText inputText = new InputText();
+    SnapshotHolder snapshotsHolder = new SnapshotHolder();
+    Scanner scanner = new Scanner(System.in);
+    while (scanner.hasNext()) {
+      String input = scanner.next();
+      if (input.equals(&quot;:list&quot;)) {
+        System.out.println(inputText.getText());
+      } else if (input.equals(&quot;:undo&quot;)) {
+        InputText snapshot = snapshotsHolder.popSnapshot();
+        inputText.setText(snapshot.getText());
+      } else {
+        snapshotsHolder.pushSnapshot(inputText);
+        inputText.append(input);
+      }
+    }
+  }
+}
+</code></pre><p>实际上，备忘录模式的实现很灵活，也没有很固定的实现方式，在不同的业务需求、不同编程语言下，代码实现可能都不大一样。上面的代码基本上已经实现了最基本的备忘录的功能。但是，如果我们深究一下的话，还有一些问题要解决，那就是前面定义中提到的第二点：要在不违背封装原则的前提下，进行对象的备份和恢复。而上面的代码并不满足这一点，主要体现在下面两方面：</p><ul>
+<li>第一，为了能用快照恢复InputText对象，我们在InputText类中定义了setText()函数，但这个函数有可能会被其他业务使用，所以，暴露不应该暴露的函数违背了封装原则；</li>
+<li>第二，快照本身是不可变的，理论上讲，不应该包含任何set()等修改内部状态的函数，但在上面的代码实现中，“快照“这个业务模型复用了InputText类的定义，而InputText类本身有一系列修改内部状态的函数，所以，用InputText类来表示快照违背了封装原则。</li>
+</ul><p>针对以上问题，我们对代码做两点修改。其一，定义一个独立的类（Snapshot类）来表示快照，而不是复用InputText类。这个类只暴露get()方法，没有set()等任何修改内部状态的方法。其二，在InputText类中，我们把setText()方法重命名为restoreSnapshot()方法，用意更加明确，只用来恢复对象。</p><p>按照这个思路，我们对代码进行重构。重构之后的代码如下所示：</p><pre><code>public class InputText {
+  private StringBuilder text = new StringBuilder();
+
+  public String getText() {
+    return text.toString();
+  }
+
+  public void append(String input) {
+    text.append(input);
+  }
+
+  public Snapshot createSnapshot() {
+    return new Snapshot(text.toString());
+  }
+
+  public void restoreSnapshot(Snapshot snapshot) {
+    this.text.replace(0, this.text.length(), snapshot.getText());
+  }
+}
+
+public class Snapshot {
+  private String text;
+
+  public Snapshot(String text) {
+    this.text = text;
+  }
+
+  public String getText() {
+    return this.text;
+  }
+}
+
+public class SnapshotHolder {
+  private Stack&lt;Snapshot&gt; snapshots = new Stack&lt;&gt;();
+
+  public Snapshot popSnapshot() {
+    return snapshots.pop();
+  }
+
+  public void pushSnapshot(Snapshot snapshot) {
+    snapshots.push(snapshot);
+  }
+}
+
+public class ApplicationMain {
+  public static void main(String[] args) {
+    InputText inputText = new InputText();
+    SnapshotHolder snapshotsHolder = new SnapshotHolder();
+    Scanner scanner = new Scanner(System.in);
+    while (scanner.hasNext()) {
+      String input = scanner.next();
+      if (input.equals(&quot;:list&quot;)) {
+        System.out.println(inputText.toString());
+      } else if (input.equals(&quot;:undo&quot;)) {
+        Snapshot snapshot = snapshotsHolder.popSnapshot();
+        inputText.restoreSnapshot(snapshot);
+      } else {
+        snapshotsHolder.pushSnapshot(inputText.createSnapshot());
+        inputText.append(input);
+      }
+    }
+  }
+}
+</code></pre><p>实际上，上面的代码实现就是典型的备忘录模式的代码实现，也是很多书籍（包括GoF的《设计模式》）中给出的实现方法。</p><p>除了备忘录模式，还有一个跟它很类似的概念，“备份”，它在我们平时的开发中更常听到。那备忘录模式跟“备份”有什么区别和联系呢？实际上，这两者的应用场景很类似，都应用在防丢失、恢复、撤销等场景中。它们的区别在于，备忘录模式更侧重于代码的设计和实现，备份更侧重架构设计或产品设计。这个不难理解，这里我就不多说了。</p><h2>如何优化内存和时间消耗？</h2><p>前面我们只是简单介绍了备忘录模式的原理和经典实现，现在我们再继续深挖一下。如果要备份的对象数据比较大，备份频率又比较高，那快照占用的内存会比较大，备份和恢复的耗时会比较长。这个问题该如何解决呢？</p><p>不同的应用场景下有不同的解决方法。比如，我们前面举的那个例子，应用场景是利用备忘录来实现撤销操作，而且仅仅支持顺序撤销，也就是说，每次操作只能撤销上一次的输入，不能跳过上次输入撤销之前的输入。在具有这样特点的应用场景下，为了节省内存，我们不需要在快照中存储完整的文本，只需要记录少许信息，比如在获取快照当下的文本长度，用这个值结合InputText类对象存储的文本来做撤销操作。</p><p>我们再举一个例子。假设每当有数据改动，我们都需要生成一个备份，以备之后恢复。如果需要备份的数据很大，这样高频率的备份，不管是对存储（内存或者硬盘）的消耗，还是对时间的消耗，都可能是无法接受的。想要解决这个问题，我们一般会采用“低频率全量备份”和“高频率增量备份”相结合的方法。</p><p>全量备份就不用讲了，它跟我们上面的例子类似，就是把所有的数据“拍个快照”保存下来。所谓“增量备份”，指的是记录每次操作或数据变动。</p><p>当我们需要恢复到某一时间点的备份的时候，如果这一时间点有做全量备份，我们直接拿来恢复就可以了。如果这一时间点没有对应的全量备份，我们就先找到最近的一次全量备份，然后用它来恢复，之后执行此次全量备份跟这一时间点之间的所有增量备份，也就是对应的操作或者数据变动。这样就能减少全量备份的数量和频率，减少对时间、内存的消耗。</p><h2>重点回顾</h2><p>好了，今天的内容到此就讲完了。我们一块来总结回顾一下，你需要重点掌握的内容。</p><p>备忘录模式也叫快照模式，具体来说，就是在不违背封装原则的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态，以便之后恢复对象为先前的状态。这个模式的定义表达了两部分内容：一部分是，存储副本以便后期恢复；另一部分是，要在不违背封装原则的前提下，进行对象的备份和恢复。</p><p>备忘录模式的应用场景也比较明确和有限，主要是用来防丢失、撤销、恢复等。它跟平时我们常说的“备份”很相似。两者的主要区别在于，备忘录模式更侧重于代码的设计和实现，备份更侧重架构设计或产品设计。</p><p>对于大对象的备份来说，备份占用的存储空间会比较大，备份和恢复的耗时会比较长。针对这个问题，不同的业务场景有不同的处理方式。比如，只备份必要的恢复信息，结合最新的数据来恢复；再比如，全量备份和增量备份相结合，低频全量备份，高频增量备份，两者结合来做恢复。</p><h2>课堂讨论</h2><p>今天我们讲到，备份在架构或产品设计中比较常见，比如，重启Chrome可以选择恢复之前打开的页面，你还能想到其他类似的应用场景吗？</p><p>欢迎留言和我分享你的想法。如果有收获，也欢迎你把这篇文章分享给你的朋友。</p>
+<style>
+    ul {
+      list-style: none;
+      display: block;
+      list-style-type: disc;
+      margin-block-start: 1em;
+      margin-block-end: 1em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      padding-inline-start: 40px;
+    }
+    li {
+      display: list-item;
+      text-align: -webkit-match-parent;
+    }
+    ._2sjJGcOH_0 {
+      list-style-position: inside;
+      width: 100%;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      margin-top: 26px;
+      border-bottom: 1px solid rgba(233,233,233,0.6);
+    }
+    ._2sjJGcOH_0 ._3FLYR4bF_0 {
+      width: 34px;
+      height: 34px;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 {
+      margin-left: 0.5rem;
+      -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+      flex-grow: 1;
+      padding-bottom: 20px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2zFoi7sd_0 {
+      font-size: 16px;
+      color: #3d464d;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      line-height: 34px;
+    }
+    ._2sjJGcOH_0 ._36ChpWj4_0 ._2_QraFYR_0 {
+      margin-top: 12px;
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-all;
+      line-height: 24px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 {
+      margin-top: 18px;
+      border-radius: 4px;
+      background-color: #f6f7fb;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._10o3OAxT_0 ._3KxQPN3V_0 {
+      color: #505050;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      font-weight: 400;
+      white-space: normal;
+      word-break: break-word;
+      padding: 20px 20px 20px 24px;
+    }
+    ._2sjJGcOH_0 ._3klNVc4Z_0 {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      margin-top: 15px;
+    }
+    ._2sjJGcOH_0 ._3Hkula0k_0 {
+      color: #b2b2b2;
+      font-size: 14px;
+    }
+</style><ul><li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/9b/b1/61dd29ad.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>DexterPoker</span>
+  </div>
+  <div class="_2_QraFYR_0">MySQL数据库低频全量备份，结合binlog增量备份，来恢复数据。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 08:21:01</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1e/8d/5c/a3e67232.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>张晋 🇨🇳</span>
+  </div>
+  <div class="_2_QraFYR_0">看了王争老师很多课了，觉得都很好，但是不知道是疲惫了还是这个模式不是很重要，感觉没讲好，后面查看了网上资料才知道<br>Originator：发起者，负责创建一个备忘录，并且可以记录、恢复自身的内部状态。可以根据需要决定Memento保存自身的那些内部状态<br>Memento：备忘录，用于存储Originator的状态，防止Originator以外的的对象访问Memento<br>Caretaker：备忘录管理者，负责存储备忘录，不能对备忘录的内容进行操作和访问，只能够将备忘录传递给其他对象。<br><br>作者：MrTrying<br>链接：https:&#47;&#47;www.jianshu.com&#47;p&#47;78b519d39fe5<br>来源：简书<br>著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。<br><br>可能老师觉得比较基础所以没讲吧，感觉听的云里雾里的。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-03 15:39:25</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/70/9e/5095f881.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>jaryoung</span>
+  </div>
+  <div class="_2_QraFYR_0">游戏存档是不是很典型的例子？想当年，玩《勇者斗恶龙》的时候，打不过boss不断回到存档的地方，不断尝试。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 18:21:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/3b/47/f6c772a1.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Jackey</span>
+  </div>
+  <div class="_2_QraFYR_0">想起了Redis主从同步的增量和全量模式</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 09:41:12</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/04/71/0b949a4c.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>何用</span>
+  </div>
+  <div class="_2_QraFYR_0">老师用词太过主观了，灌输访问者模式难理解的潜意识。我倒觉得 Single Dispatch 和 Double Dispatch 容易理解，反倒是今天的备忘模式难理解了。。。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 08:02:02</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/be/53/eda4b622.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Smile @ Life</span>
+  </div>
+  <div class="_2_QraFYR_0">redis通过备份的形式进行持久化，分为两种模式<br>1、RDS：低频率全量备份<br>2、AOF: 高频率增量备份<br>而在AOF模式下通过配置auto-aof-rewrite来达到全量备份和增量备份相结合以减小AOF的备份大小<br>https:&#47;&#47;redis.io&#47;topics&#47;persistence</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-07-31 16:42:43</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/82/3d/356fc3d6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>忆水寒</span>
+  </div>
+  <div class="_2_QraFYR_0">还有比如word写文章的时候，选择撤销。这也是一种备忘录模式的实现。可以参考这个文章https:&#47;&#47;mp.weixin.qq.com&#47;s&#47;J5a5ZcNCBBExpyCpU2o3wg</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-22 18:11:35</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/DYAIOgq83epcs6PibsP9vEXv4EibUw3bhQPUK04zRTOvfrvF08TwM67xPb1LBh2uRENHQwo2VqYfC5GhJmM7icxHA/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>蹦哒</span>
+  </div>
+  <div class="_2_QraFYR_0">理一下备忘录模式诞生的过程：<br>1.对于备份这个需求，一开始自然的想法是一个备份类（snapshot）里面保存一份数据（inputText）来做备份。inputText原来是用来表示数据的，没有提供setText这样的方法的必要，但是由于需要备份，使得inputText需要提供setText方法以便实现备份需求<br>2.为了实现备份需求，提供了setText方法，破坏了inputText原来的封装特性，即：类只需暴露有限的必要访问接口。这本不应该是inputText所应该提供的接口<br>3.为了解决破坏封装性问题，备忘录模式里面单独定义了用来备份的数据类（String）。从而备份的需求就不影响原来的inputText的设计了<br>4.除了备份还需要恢复，这个需求就不得不改动原来inputText的设计了，因为恢复的目标就是inputText，所以inputText需要提供相关恢复的restore方法<br>以上便诞生了备忘录模式：单独用一个新的类保存原来的数据（备份），原来对象提供新接口接收数据恢复（恢复）</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-06-27 18:53:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/15/50/d7/f82ed283.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>辣么大</span>
+  </div>
+  <div class="_2_QraFYR_0">我的电脑重不关机！</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-25 23:16:36</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/10/10/bb/f1061601.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Demon.Lee</span>
+  </div>
+  <div class="_2_QraFYR_0">System.out.println(inputText.toString());  ---&gt;    System.out.println(inputText.getText());</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 嗯嗯，多谢！<br></p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 23:37:30</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="http://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTKiay65IMyD82E59Xnbp370ChMG3N9XQuXoKwfhZJ19zotzKMlJhwzBDxE61bp26jdkf54NY9L41yg/132"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Geek_5227ac</span>
+  </div>
+  <div class="_2_QraFYR_0">感觉很像prototype原型模式啊，比如考虑到内存，时间的消耗采用增量备份这里，老师能说下具体有什么区别吗？</div>
+  <div class="_10o3OAxT_0">
+    <p class="_3KxQPN3V_0">作者回复: 优化内存和时间这一部分的方法确实有点类似prototype的设计思路。不过，备忘录本身并不是为了优化内存和时间，你可以看看文章的前半段解释。</p>
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-06-18 19:59:27</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/1a/86/56/509535da.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>守拙</span>
+  </div>
+  <div class="_2_QraFYR_0">备份的应用场景:<br>1. 游戏有自动备份功能, 掉线&#47;下线再次上线时, 可以继续之前的游戏;<br>2. Android提供了Activity状态的备份&#47;恢复, 当App处于后台, Activity被系统回收前会调用onSavedInstanceState()备份, App切回前台Activity会重建, 可以通过onRestoreInstanceState()恢复之前的状态.</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 10:10:10</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/0f/8a/02/828938c9.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Frank</span>
+  </div>
+  <div class="_2_QraFYR_0">打卡：今日学习备忘录模式，收获如下：<br>备忘录模式是在不违背封装原则的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态，以便之后恢复对象为先前的状态。个人觉得理解起来就是解决对象状态一致性问题，主要是在代码设计上不要违背封装原则，如果能打破封装原则，那么就有可能对象的状态不一致了，后面恢复后对象状态就不一致了。备忘录模式与备份相似，前者注重代码设计，后者注重架构和产品设计。在大对象备份过程中，需要考虑存储以及恢复的时间，可以使用一定的策略，如只备份恢复必要的信息，如全量备份和增量备份相结合。<br>对于课堂讨论还有其他场景：数据库备份与恢复，Git版本管理，虚拟机生成快照与恢复等。</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 07:54:03</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/18/43/16/d18be4c5.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>...？</span>
+  </div>
+  <div class="_2_QraFYR_0">以前做过白板软件，手写字的笔画支持撤销，重做功能，每写一笔就把前一步的画面存到撤销栈里，每次撤销一笔把当前画面存到重做栈，并从撤销栈pop一个画面，重做就从重做栈恢复一个画面，限定栈的大小，就可以支持撤销几次和重做几次，但是当时还没学过设计模式，傻乎乎的做全量保存，根本不考虑性能</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2021-03-06 16:25:18</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/be/e6/7808520d.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Edward Lee</span>
+  </div>
+  <div class="_2_QraFYR_0">备忘录模式实现关键是利用栈的数据结构<br><br>课后思考<br>JDBC rollback 和 save point rollback</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-19 08:50:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/13/ed/88/0d608525.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>微光倾城</span>
+  </div>
+  <div class="_2_QraFYR_0">看到标题就想到了git...</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-18 16:30:47</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/16/a5/98/a65ff31a.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>djfhchdh</span>
+  </div>
+  <div class="_2_QraFYR_0">浏览器的后退、前进功能，也可以看作是一种“备份”</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 17:43:29</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/19/d9/ff/b23018a6.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>Heaven</span>
+  </div>
+  <div class="_2_QraFYR_0">1.从开发上将,在使用定时任务Quartz的时候,会进行对应的备份,方便我们在项目重启后从数据库中反序列化回来,利用了一个外部工具来进行了备份<br>2.在整体架构中,MySQL就是使用全量备份和增量备份相结合的方式进行了备份,我们自己的项目也是一星期一次全量,配合binlog回滚<br>3.在生活中,我记得XBox上的极限竞速游戏提供了回滚功能,就是使用的备份来方便撞车后直接回溯操作</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-04-13 12:20:22</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/12/f8/c3/1d557354.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>o my love</span>
+  </div>
+  <div class="_2_QraFYR_0">redis rdb aof</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-08-09 23:41:33</div>
+  </div>
+</div>
+</div>
+</li>
+<li>
+<div class="_2sjJGcOH_0"><img src="https://static001.geekbang.org/account/avatar/00/11/47/10/2d673601.jpg"
+  class="_3FLYR4bF_0">
+<div class="_36ChpWj4_0">
+  <div class="_2zFoi7sd_0"><span>好饿早知道送外卖了</span>
+  </div>
+  <div class="_2_QraFYR_0">最常见的就是编译器啊，哈哈</div>
+  <div class="_10o3OAxT_0">
+    
+  </div>
+  <div class="_3klNVc4Z_0">
+    <div class="_3Hkula0k_0">2020-05-07 15:54:56</div>
+  </div>
+</div>
+</div>
+</li>
+</ul>
